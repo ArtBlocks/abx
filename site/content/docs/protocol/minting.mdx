@@ -1,0 +1,88 @@
+---
+title: "Minting"
+description: "Token mint authority and the shared fixed-price minters."
+---
+
+Minting is split between the token and a minter contract. The token decides who may mint. The minter
+holds sale terms, takes payment, calls the token, and forwards proceeds to the project's primary payee.
+
+## ERC-721 projects
+
+A Series exposes a sequential mint call:
+
+```solidity
+function mint(address to) external returns (uint256 tokenId);
+```
+
+The buyer receives the next token ID. A buyer cannot select an ID on this lane. A plain 1/1 does not
+expose this interface and cannot use the shared minter.
+
+The fixed-price sale is keyed by token contract. Its terms are:
+
+- payment token, with the zero address meaning ETH
+- unit price
+- allocation available through this minter
+- number sold
+
+The owner must authorize the minter on the token and configure the sale on the minter.
+
+## Editions
+
+An edition exposes:
+
+```solidity
+function mint(address to, uint256 id, uint256 amount) external;
+```
+
+A sale is keyed by contract and token ID. The buyer selects the work and quantity. Every copy of one ID
+shares its metadata, seed, and parameters.
+
+On an `EditionCode` project, the seed is assigned when an ID is minted for the first time. A buyer can
+inspect settled IDs and choose among them. For an unminted ID, the selected ID is part of the seed input.
+If that selection should not be available, mint the IDs before sale or provide a different seed source.
+
+## Buyer protections
+
+Purchase calls include the terms the buyer accepts:
+
+```solidity
+purchase(token, expectedPaymentToken, maxPrice)
+purchaseTo(token, to, expectedPaymentToken, maxPrice)
+
+purchase(token, id, quantity, expectedPaymentToken, maxTotalPrice)
+purchaseTo(token, id, quantity, to, expectedPaymentToken, maxTotalPrice)
+```
+
+A changed payment token or price outside the bound reverts with `SaleTermsChanged`.
+
+ETH purchases require exact payment. ERC-20 purchases draw the live price up to the buyer's maximum.
+Edition limits apply to the total price for the requested quantity.
+
+The minter records the sale before external calls, uses a reentrancy guard, mints, and sends proceeds
+straight to the current primary payee. Funds do not remain in the shared minter.
+
+## Supply and pause
+
+The token contract enforces its own supply cap on every mint path. The minter's allocation is a separate
+limit on what that sale may issue.
+
+Pausing blocks minter and delegate mints. The project owner may still mint while paused.
+
+For an edition, the project has both an ID-space cap and a per-ID copy cap. Neither can increase after it
+is set.
+
+## Events and trust
+
+The minters emit `SaleConfigured` and `Purchase`. The token also emits its ERC-721 or ERC-1155 transfer
+event.
+
+A minter event is not proof that the target token is canonical. The shared minters are public utilities.
+Verify the token through its factory and reconcile the purchase with the token's transfer event.
+
+## Other sale mechanics
+
+ABX ships fixed-price minters. Auctions, allowlists, free mints, and other mechanics can use separate
+contracts that call the same token interfaces. A router can sit in the token's single `minter()` slot
+when a project needs several mechanics at once.
+
+See [Sales](/docs/using-abx/guides/sales) for the CLI flow.

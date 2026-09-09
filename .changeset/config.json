@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [],
+
+  "//": [
+    "Why the experimental option below: @artblocks/abx-storage declares @artblocks/abx-storage-arweave",
+    "as an OPTIONAL PEER dependency, and Changesets majors any package that declares a peer dependency",
+    "on something being bumped. That rule turned a minor release of the new adapter into",
+    "@artblocks/abx-storage@1.0.0-alpha.31 -- a jump to a 1.0 line that does not exist, while every",
+    "sibling stayed 0.1.0-alpha.x, and it would have recurred on EVERY future adapter bump. Verified by",
+    "running `pnpm ci:version` with and without the peer block (1.0.0-alpha.31 vs 0.1.0-alpha.31).",
+    "The peer range is deliberately a permissive `>=0.1.0-alpha.0` rather than `workspace:*`, because",
+    "pnpm rewrites the workspace protocol to an EXACT version at publish time -- which would force a",
+    "consumer to match the adapter version exactly, and break on every storage patch release. A",
+    "permissive range stays satisfied, which is what makes the opt-out below apply.",
+    "The key is namespaced ___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH by Changesets: if a future",
+    "Changesets upgrade renames it, `pnpm ci:version` will start producing a major for abx-storage",
+    "again. Dry-run `pnpm ci:version` and check the versions before any release that bumps the adapter."
+  ],
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true
+  }
+}

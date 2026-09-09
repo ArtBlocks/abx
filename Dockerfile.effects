@@ -1,0 +1,37 @@
+# ABX Self-Host Toolkit — the effects runner image.
+#
+# The heavy sibling of the resolver image, and the ONLY image that carries a browser:
+# Playwright + Chromium live here so the resolver stays small. Run it beside the
+# resolver with the same custody env (it writes render artifacts into the same
+# backend the resolver serves from):
+#
+#   docker build -f Dockerfile.effects -t abx-effects .
+#   docker run --env-file .env -e ABX_RESOLVER_URL=http://resolver:8787 -p 8788:8788 abx-effects
+#
+# An artist rendering their own tokens during a drop is exactly this container on a
+# laptop. One-shot repair: append `--once <address> [tokenId…]`.
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
+
+# Node ships in the Playwright image; pnpm via corepack, pinned to the workspace's version.
+RUN corepack enable && corepack prepare pnpm@10.28.0 --activate
+
+WORKDIR /app
+
+# Deps first for layer caching — every workspace package.json must be listed (see the
+# resolver Dockerfile's trap note: a missing one fails at runtime, not install time).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/sdk/package.json packages/sdk/package.json
+COPY packages/indexer/package.json packages/indexer/package.json
+COPY packages/storage/package.json packages/storage/package.json
+COPY packages/token-api/package.json packages/token-api/package.json
+COPY packages/cli/package.json packages/cli/package.json
+COPY packages/effects/package.json packages/effects/package.json
+# The lockfile pins playwright to the exact version whose browsers this base image
+# ships (the FROM tag above) — bump both together, never one.
+RUN pnpm install --frozen-lockfile
+
+COPY packages packages
+
+ENV ABX_EFFECTS_PORT=8788
+EXPOSE 8788
+ENTRYPOINT ["pnpm", "abx-effects"]

@@ -1,0 +1,96 @@
+---
+title: "Custom mechanics"
+description: "Add mint and parameter rules without forking the token contract."
+---
+
+Most custom mechanics do not need a custom token. Keep the canonical ABX clone and put the new rule in
+a separate controller contract.
+
+## Extension points
+
+| Point | Set with | Job |
+| --- | --- | --- |
+| Minter | `abx set-minter` | Takes payment or checks eligibility before minting. |
+| Configure hook | `abx set-param-hooks --configure` | Accepts or rejects a parameter write. |
+| Transfer hook | `abx set-param-hooks --transfer` | Accepts or rejects a mint, transfer, or burn. |
+| Augment hook | `abx set-param-hooks --augment` | Adds values when `tokenData` is read. |
+
+One controller may be both the minter and a hook.
+
+Parameter hooks exist only on `SeriesCode` and `EditionCode`, the contracts created by
+`abx deploy-code`. An image series cannot gain hooks later. `--burnable` and `--copies` are also fixed
+at deployment.
+
+## Transfer lock
+
+A transfer hook may allow the mint and reject later moves:
+
+```solidity
+function onTokenTransfer(uint256, address from, address, address, uint256) external view {
+    require(msg.sender == address(token), "only token");
+    require(from == address(0), "transfers disabled");
+}
+```
+
+Mints, transfers, and burns all pass through this hook. A mistake can block issuance or redemption.
+Test every path. Lock the hook address with `abx lock-param-hooks` only after deployment is proven.
+
+## Values that only increase
+
+A configure hook reads the current value before the new one is stored:
+
+```solidity
+function onParamConfigured(uint256 id, bytes32 key, bytes32 value, address, uint256, address)
+    external view
+{
+    require(msg.sender == address(token), "only token");
+    if (key != "size") return;
+    (bytes32 current,, bool isSet) = IAbxParams(token).tokenParam(id, key);
+    require(!isSet || uint256(value) >= uint256(current), "size may only grow");
+}
+```
+
+For `String` and `Bytes`, the hook receives a pointer to the incoming blob. The blob already exists
+when the hook runs, even if the hook rejects the write. Simulate the call before asking for a signature.
+
+ABX refuses zero-length `String` and `Bytes` values. Use a sentinel byte or a second scalar key for an
+empty state.
+
+## Predict the token address
+
+The controller may need the token address while the token schema needs the controller address. Break
+that cycle by predicting the clone address first.
+
+```bash
+abx predict --script art.js --for 0xYourDeployer --salt 0xYourSalt
+
+forge script script/DeployController.s.sol \
+  --sig 'run(address)' 0xPredictedToken \
+  --broadcast
+
+abx deploy-code \
+  --script art.js \
+  --salt 0xYourSalt \
+  --schema 'level:Uint256Range[0..99]:Address(0xController)' \
+  --name "Title" --symbol ART \
+  --sign
+
+abx set-minter 0xPredictedToken --minter 0xController --sign
+```
+
+Use a salt whose leading 20 bytes equal the deploying wallet. A zero prefix is permissionless, so
+someone else could deploy to the published address first. `abx predict` reports the guard.
+
+## Interfaces for controllers
+
+| Need | Interface | Call |
+| --- | --- | --- |
+| Mint a unique token | `IAbxSequentialMint` | `mint(address)` |
+| Mint edition copies | `IAbxEditionMint` | `mint(address, id, amount)` |
+| Read a scalar parameter | `IAbxParams` | `tokenParam(id, key)` |
+| Read a blob parameter | `IAbxParams` | `tokenParamData(id, key)` |
+| Read a select label | `IAbxConfigurableParams` | `selectOption(key, index)` |
+| Inspect hooks | `IAbxConfigurableParams` | `paramHooks()` and `paramHooksLocked()` |
+
+Start from `abx scaffold solidity`, which writes a Foundry project with the small ABX interfaces and
+tests. Then test against a deployed clone or a chain fork, not a hand-written token mock.

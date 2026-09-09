@@ -1,0 +1,12 @@
+{
+  "title": "Guides",
+  "icon": "Rocket",
+  "pages": [
+    "deploy-a-digital-asset",
+    "storage",
+    "sales",
+    "custom-mechanics",
+    "royalty-enforcement",
+    "operate"
+  ]
+}

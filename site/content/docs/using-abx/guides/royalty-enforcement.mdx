@@ -1,0 +1,54 @@
+---
+title: "Royalty enforcement"
+description: "Understand the optional ERC-721C and ERC-1155C transfer validator."
+---
+
+ERC-2981 publishes a royalty rate and receiver. Marketplaces may ignore it. ERC-721C and ERC-1155C
+add a transfer validator that can reject sales through unauthorized operators.
+
+## Plain tokens are the default
+
+Without `--721c`, ABX deploys plain ERC-721 or ERC-1155. Transfer restrictions cannot be added later.
+This is the best fit when broad wallet and marketplace compatibility matters most.
+
+Use 721C or 1155C only when enforced venue policy is worth the narrower transfer path. Marketplace
+support changes. Check the venues you intend to use before deployment.
+
+## Enrollment is permanent
+
+Pass `--721c` during any deploy. On an ERC-1155 edition, the same flag enrolls 1155C.
+
+```bash
+abx deploy --image art.png --721c recommended <other-options>
+abx deploy-series --dir ./art --721c recommended <other-options>
+abx deploy-code --script art.js --721c 0xValidator <other-options>
+```
+
+`recommended` selects the validator configured for the current chain. You may pass another deployed
+validator address. The CLI probes it before the transaction.
+
+Enrollment changes transfers only. It does not validate mints or burns.
+
+An enrolled project may replace or suspend its validator:
+
+```bash
+abx set-transfer-validator <collection> 0xNewValidator
+abx set-transfer-validator <collection> none
+abx set-transfer-validator <collection> recommended
+```
+
+Suspension does not remove enrollment. A future owner can restore a validator.
+
+If ownership is renounced, anyone may set the validator to `none`; nobody can arm one again. This
+prevents an ownerless project from remaining stuck behind a broken validator forever.
+
+## Before choosing enforcement
+
+Confirm all of these:
+
+- the intended marketplace recognizes the validator
+- direct wallet transfers still work under its policy
+- the project should remain enrolled for its lifetime
+- collectors can see the validator and the tradeoff before minting
+
+Read the live state with `abx state <collection>`.

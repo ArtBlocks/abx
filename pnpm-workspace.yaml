@@ -1,0 +1,5 @@
+# ABX TypeScript workspace. The Solidity Foundry project lives in contracts/.
+# Each package keeps its scoped @artblocks/abx-* name and publishes independently to npm.
+packages:
+  - 'packages/*'
+  - 'site' # abx-docs — the Next.js + Fumadocs docs site (private, deployed to Vercel)

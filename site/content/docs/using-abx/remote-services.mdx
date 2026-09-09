@@ -1,0 +1,84 @@
+---
+title: "Hosted services"
+description: "Connect ABX to a compatible hosted resolver."
+---
+
+A resolver indexes ABX events and serves metadata. You can run one yourself or use a compatible
+provider. The same CLI commands work with either.
+
+## First-party service
+
+```bash
+abx auth login
+abx remote abx
+abx add 0xYourContract --remote abx
+```
+
+`abx auth login` opens a verified browser flow. The CLI saves the resulting key as
+`ABX_SERVICES_API_KEY` in ignored `.env`. It does not print the key.
+
+The built-in `abx` remote points to `https://services.abx.io`. It is a convenience, not a protocol
+requirement. Check the current service terms before depending on it.
+
+## Another provider
+
+Add a named remote to `.env`:
+
+```bash
+ABX_REMOTE_MYPROVIDER_URL=https://meta.provider.example
+ABX_REMOTE_MYPROVIDER_TOKEN=YOUR_API_KEY
+```
+
+Then pass the name to any remote command:
+
+```bash
+abx remote myprovider
+abx add 0xYourContract --remote myprovider
+abx status 0xYourContract --remote myprovider --watch
+```
+
+A named remote reads only its matching token. It never falls back to your self-hosted admin token.
+
+## What a compatible service exposes
+
+`GET /.well-known/abx-service` returns the supported chains, interface versions, authentication
+method, and rendering support. Inspect it with `abx remote <name-or-url>` before registration.
+
+The version 1 control plane uses bearer authentication:
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /v1/projects` | Register a project. |
+| `GET /v1/projects` | List visible projects and status. |
+| `DELETE /v1/projects/{chainId}/{address}` | Remove a registration. |
+| `POST /v1/projects/{chainId}/{address}/reindex` | Request a fresh index. |
+| `GET /v1/projects/{chainId}/{address}/status` | Read progress and freshness. |
+
+Registration may return `202` while a cold replay continues. `abx add` waits by default. Pass
+`--no-wait` if another process will watch the status.
+
+The status words are `queued`, `backfilling`, `live`, `stale`, and `failed`. A stale service keeps
+serving its last indexed state.
+
+## Public reads
+
+Do not guess metadata routes. Read the URI stored by the contract:
+
+```bash
+abx tokenuri 0xYourContract --token 0
+abx contracturi 0xYourContract
+```
+
+The public API distinguishes a bad route, an unsupported chain, an unregistered project, and a burned
+ERC-721. Those cases return different HTTP status and machine-readable error codes.
+
+## Leave cleanly
+
+The chain remains the source of truth. Move to another provider or your own resolver with:
+
+```bash
+abx migrate 0xYourContract --from <source> --to <destination>
+```
+
+The command copies offchain values, checks content hashes, and compares both resolvers. You choose
+when to update DNS or the onchain base URI.

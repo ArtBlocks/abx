@@ -1,0 +1,13 @@
+{
+  "title": "Start",
+  "icon": "Terminal",
+  "pages": [
+    "quickstart",
+    "installation",
+    "agent-and-skill",
+    "guides",
+    "remote-services",
+    "self-hosting",
+    "upgrading"
+  ]
+}

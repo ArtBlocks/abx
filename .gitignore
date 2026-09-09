@@ -1,0 +1,34 @@
+.env
+.claude/settings.local.json
+.claude/worktrees/
+.agents/skills/abx/
+
+# dependencies
+node_modules/
+
+# self-host runtime data (the disposable, replay-rebuildable projection)
+.abx-self-host/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# skill bundled into the CLI package at prepack time (canonical copy lives in .claude/skills/)
+packages/cli/skill/
+
+# version marker `abx skill install` stamps into an installed skill copy (never the canonical one)
+.abx-skill-version
+
+# distribution-simulation: the throwaway clean-room (pnpm sandbox) + pack tarballs (Tier 2).
+# See contributor/distribution-testing.md. `.sandbox-*` = namespaced parallel agent sandboxes.
+.sandbox/
+.sandbox-*/
+*.tgz
+
+**/*.DS_Store
+
+# local mock remote-service fixture (scripts/mock-remote-fixture.sh) — throwaway chain + store,
+# plus any scratch address files an older/interrupted run may drop anywhere in the tree.
+.mock-remote-fixture-store/
+.mock-remote-fixture.json
+**/.mock-fixture-*

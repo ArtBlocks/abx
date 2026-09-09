@@ -1,0 +1,133 @@
+---
+title: "Choose a project"
+description: "Deploy a 1/1, series, code project, or edition."
+---
+
+ABX has three project shapes. Add `--copies` to any shape when each work should have more than one
+copy.
+
+| Work | Command | Token standard |
+| --- | --- | --- |
+| One piece | `abx deploy` | ERC-721 |
+| A folder of distinct pieces | `abx deploy-series` | ERC-721 |
+| A program or onchain renderer | `abx deploy-code` | ERC-721 |
+| Copies of any shape | Add `--copies <n\|open>` | ERC-1155 |
+
+Run a dry run first. Use `--sign` so the browser wallet handles the real transaction.
+
+## One piece
+
+```bash
+abx deploy \
+  --image ./art.png \
+  --name "Title" \
+  --symbol ART \
+  --onchain-uri --backend arweave \
+  --dry-run --for 0xYourAddress
+```
+
+Repeat with `--sign --for 0xYourAddress` when the plan is right.
+
+Useful choices:
+
+- `--onchain-uri` makes the contract assemble its metadata JSON.
+- `--onchain-image` also writes the media bytes to the chunk store. It implies `--onchain-uri`.
+- `--backend arweave|ipfs|cloud` keeps media offchain. `arweave` needs one extra package — see
+  [Storage](/docs/using-abx/guides/storage#arweave-identity).
+- `--public-base-url <url>` points metadata at a resolver.
+- `--no-mint` deploys without minting token 0.
+- `--royalty-bps` defaults to 500, or 5%. `--royalty-cap` defaults to 1000, or 10%, and can only fall.
+- `--burnable` lets holders burn. This choice is fixed at deployment.
+
+A plain 1/1 has no primary-sale minter. Use a one-token series for a unique work sold through the
+shared minter, or an edition when buyers receive copies.
+
+## Series
+
+```bash
+abx deploy-series \
+  --dir ./art \
+  --name "Series title" \
+  --symbol ART \
+  --onchain-uri --backend arweave \
+  --mint-all --sign
+```
+
+Files sort into token IDs `0, 1, 2, ...`. Use `--count`, `--mint-count`, or `--no-mint` when only part
+of the folder should be active.
+
+Series deploy paused by default. The owner can mint while paused. Run `abx unpause` only after the
+minter, payee, price, and allocation are set.
+
+## Code project
+
+Inspect the program before choosing custody:
+
+```bash
+abx inspect ./sketch.js
+```
+
+Then deploy an onchain script with a hosted resolver:
+
+```bash
+abx deploy-code \
+  --script ./sketch.js \
+  --public-base-url https://metadata.example.com \
+  --name "Code title" \
+  --symbol CODE \
+  --sign
+```
+
+Use `--onchain-uri` instead of `--public-base-url` when the contract should assemble metadata. Other
+inputs include:
+
+- `--script <file>` for an onchain program.
+- `--chunk-size <bytes>` to override the default on-chain split size (~22 KB per chunk) for
+  `--script`; smaller values force a multi-chunk program, useful for testing.
+- `--code-dir <dir>` for an offchain build containing `index.html` and `abx.js`.
+- `--image-renderer <address>` for an SVG computed by Solidity.
+- `--attributes-renderer <address>` for traits computed by Solidity.
+- `--dep <name@version|address>` for ordered code dependencies.
+- `--schema key:Type:Auth` for collector or creator parameters.
+- `--seed-source <address>` for a custom seed source.
+
+The canonical seed is deterministic and pseudorandom. A contract in the mint transaction can predict
+it. Do not use it for raffles, prizes, or other outcomes where rarity changes the economic value.
+
+A JavaScript project still needs a public home for rendered thumbnails. An onchain Solidity image
+renderer does not. Passing both `--script` and `--image-renderer` gives the token a live program and an
+onchain still.
+
+## Editions
+
+Add `--copies <n|open>` to make ERC-1155 copies instead of unique ERC-721 tokens.
+
+```bash
+abx deploy --image ./art.png --copies open \
+  --onchain-uri --backend arweave \
+  --name "Open edition" --symbol OE --sign
+
+abx deploy-series --dir ./art --copies 50 \
+  --onchain-uri --backend arweave \
+  --name "Edition set" --symbol ES --sign
+
+abx deploy-code --script ./sketch.js --copies 25 --onchain-uri --sign
+```
+
+`open` means uncapped. A number sets the default cap for each token ID. `--mint-amount` controls how
+many copies of each selected ID mint during deployment.
+
+Edition sales are priced per token ID. See [Sales](/docs/using-abx/guides/sales#edition-sales).
+
+## Before the real transaction
+
+Read the dry-run summary and confirm:
+
+- Base Sepolia or Sepolia
+- project shape and token standard
+- owner, royalties, burnability, and transfer restrictions
+- media custody and metadata route
+- supply, premint, pause state, and sale plan
+- every expected wallet approval
+
+After deployment, run `abx verify <address>`.

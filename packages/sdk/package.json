@@ -1,0 +1,70 @@
+{
+  "name": "@artblocks/abx-sdk",
+  "version": "0.1.0-alpha.33",
+  "license": "MIT",
+  "description": "Typed SDK for ABX protocol reads, deployments, operations, reconstruction, and verification.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abi": "./src/abi/index.ts",
+    "./node": "./src/node.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtBlocks/abx.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://docs.abx.io",
+  "bugs": "https://github.com/ArtBlocks/abx/issues",
+  "keywords": [
+    "abx",
+    "nft",
+    "erc721",
+    "ethereum",
+    "viem",
+    "art-blocks",
+    "sdk"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./abi": {
+        "types": "./dist/abi/index.d.ts",
+        "import": "./dist/abi/index.js"
+      },
+      "./node": {
+        "types": "./dist/node.d.ts",
+        "import": "./dist/node.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "prepack": "tsc -b tsconfig.build.json",
+    "sync-abis": "tsx scripts/sync-abis.ts"
+  },
+  "dependencies": {
+    "viem": "^2.56.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

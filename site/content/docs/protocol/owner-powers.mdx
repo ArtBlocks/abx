@@ -1,0 +1,98 @@
+---
+title: "Owner powers"
+description: "What a project owner can change, and what the contracts forbid."
+---
+
+ABX has no protocol administrator. Each project owner controls that project's settings until they lock
+them, transfer ownership, or renounce ownership.
+
+## What an owner can change
+
+Depending on the project type, the owner may:
+
+- mint within the supply cap
+- pause public or delegated minting
+- choose a minter and primary-sale payee
+- lower supply caps
+- set royalties within the project's ceiling
+- set, replace, and lock metadata fields
+- change the metadata base URL or onchain renderer
+- set parameter schemas, values, and hooks
+- replace code and dependencies until their locks are set
+- choose the seed source for future mints
+- suspend or replace an enrolled transfer validator
+- transfer or renounce ownership
+
+Run `abx state <address>` to inspect the live settings. Run `abx verify <address>` to check canonical
+deployment and code-project locks.
+
+## Permanent choices
+
+These actions cannot be undone:
+
+| Choice | Result |
+| --- | --- |
+| Lower a supply cap | It can never increase |
+| Lock a field | Its stored representation and value are fixed |
+| Lock URI config | The base URL and metadata renderer are fixed |
+| Lock code | Script chunks are fixed |
+| Lock dependencies | Dependency references and registry address are fixed |
+| Lock parameter hooks | All three hook addresses are fixed |
+| Expire a parameter schema | Its schema and governed values are fixed |
+| Renounce ownership | No owner-only action can run again |
+
+A locked address may still point to upgradeable code. A locked registry reference may still resolve to
+bytes controlled by the registry owner. Read [Metadata](/docs/protocol/metadata#locks) before making an
+immutability claim.
+
+## What an owner cannot do
+
+The contracts do not let an owner:
+
+- raise a supply cap
+- mint past a cap
+- rewrite a settled seed unless a seed schema was declared before minting began
+- take more than the sale terms a buyer signed
+- move or burn a collector's token without normal holder approval
+- add a transfer validator after deployment
+- change a setting after its one-way lock
+- use a shared ABX singleton to administer another project
+
+The fixed-price minter checks the buyer's expected payment token and maximum price. A terms change makes
+the pending purchase revert.
+
+## Transfer controls
+
+Two features can block a transfer:
+
+- An enrolled transfer validator may enforce a royalty policy. If the project becomes ownerless, anyone
+  may suspend that validator.
+- A parameter transfer hook belongs to the project itself. Its revert blocks transfers and mints. Only
+  the owner may change it, and there is no public release valve after ownership is renounced.
+
+Use these reads before buying or integrating:
+
+```solidity
+owner()
+transferValidator()
+paramHooks()
+paramHooksLocked()
+```
+
+An empty, locked hook set proves that a transfer hook cannot be added later.
+
+## Renouncing ownership
+
+Renouncing freezes the project in its current owner-controlled state. Check every URI, renderer,
+dependency, hook, seed source, minter, payee, and policy first.
+
+A live transfer hook can leave an ownerless project unable to mint or transfer. There is no recovery
+path. Prefer explicit locks and a deliberate handoff over using renunciation as a shortcut.
+
+## Related
+
+- [Operate a project](/docs/using-abx/guides/operate)
+- [Minting](/docs/protocol/minting)
+- [Metadata](/docs/protocol/metadata)
+- [Parameters](/docs/protocol/params)
+- [Royalty enforcement](/docs/using-abx/guides/royalty-enforcement)

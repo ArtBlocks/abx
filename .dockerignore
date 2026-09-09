@@ -1,0 +1,19 @@
+# deps + build artifacts (reinstalled in-image)
+node_modules
+**/node_modules
+dist
+**/dist
+*.tsbuildinfo
+
+# local runtime projection + secrets
+.abx-self-host
+.env
+
+# not needed in the self-host runtime image
+.git
+.github
+contracts
+site
+docs
+specs
+.claude

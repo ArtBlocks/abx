@@ -1,0 +1,25 @@
+---
+title: "Quickstart"
+description: "Launch an ABX project on Base Sepolia with one agent prompt."
+---
+
+import {PromptCard} from '@/components/prompt-card';
+import {QUICKSTART_PROMPT} from '@/lib/quickstart';
+
+## Before you start
+
+- Node.js 22.13 or newer
+- A coding agent with shell access
+- A browser wallet with Base Sepolia test ETH
+
+ABX is testnet-only. Base Sepolia is the default; Sepolia also works. There is no mainnet deployment.
+You do not need a private key. The agent opens your browser wallet for each approval.
+
+## Quickstart
+
+Paste this into your coding agent, replacing the bracketed part with your idea.
+
+<PromptCard prompt={QUICKSTART_PROMPT} />
+
+Reinstall the skill after every ABX upgrade (`abx skill install`), or just ask your agent to check in
+periodically with `abx doctor` — it flags an outdated install and offers to fix it.

@@ -1,0 +1,8 @@
+/.env
+/broadcast/
+/cache/
+/dependencies/
+/out/
+/lib/
+/artifacts/
+*.zip

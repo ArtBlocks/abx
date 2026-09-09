@@ -1,0 +1,12 @@
+/* Mermaid renders its SVG at a small native size (sized to its own diagram's natural
+   dimensions), which leaves it tiny and hard to read inside a much wider container. Scale it
+   up to fill the available width, preserving aspect ratio. Scoped to descendants of .wrap
+   (not a bare `svg` rule) so this never touches unrelated inline SVGs elsewhere (e.g. icons). */
+.wrap {
+  width: 100%;
+}
+.wrap :global(svg) {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}

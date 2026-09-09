@@ -1,0 +1,65 @@
+---
+title: "Sales"
+description: "Configure a fixed-price primary sale."
+---
+
+ABX ships one shared fixed-price minter per chain. It is ownerless and serves many collections.
+
+It's a convenience reference contract, not a requirement. Any contract that implements the
+[mint interfaces](/docs/protocol/interfaces#minting) can sit in a token's `minter()` slot; see
+[other sale mechanics](/docs/protocol/minting#other-sale-mechanics) for auctions, allowlists, and
+free mints. The ABX skill knows those interfaces if you want your agent to build a custom minter.
+
+A plain 1/1 has no sale minter. Deploy a one-token series for a unique work, or use `--copies` for an
+edition.
+
+## Open a sale
+
+Run these as the project owner:
+
+```bash
+abx minter configure <token> --price 0.01 --allocation 100
+abx set-minter <token> --minter <minter-address>
+abx set-primary-payee <token> --payee 0xYourPayee
+abx minter show <token>
+abx unpause <token>
+```
+
+Order matters. Configure the sale, authorize the minter, set the payee, inspect the result, then
+unpause.
+
+`allocation` limits how many tokens this minter may sell. The collection supply cap remains the hard
+limit. The owner can still mint reserves.
+
+Repricing takes effect at once. Each purchase includes the terms the buyer accepted and reverts if
+they changed. Pause before a planned price change to avoid failed transactions in flight.
+
+Buy one token:
+
+```bash
+abx minter buy <token> --sign
+```
+
+Use `--erc20 <address>` and `--price-raw <units>` for ERC-20 pricing. Buyers must approve the minter
+before purchase.
+
+## Edition sales
+
+ERC-1155 editions price each token ID separately:
+
+```bash
+abx minter configure <token> --token-id 0 --price 0.01 --allocation 100
+abx minter show <token> --token-id 0
+abx minter buy <token> --token-id 0 --quantity 2 --sign
+```
+
+Minter assignment, payee, and pause state still apply to the whole contract.
+
+## Mint page
+
+```bash
+abx mint-page <token>
+```
+
+This writes a static mint site for the shared minter. A series gets a gallery. An edition gets a token
+ID and quantity form. The generated page currently supports ETH sales.

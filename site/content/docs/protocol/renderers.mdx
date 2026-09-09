@@ -1,0 +1,119 @@
+---
+title: "Field renderers"
+description: "Compute metadata fields from onchain state."
+---
+
+A field renderer is a view contract that computes one metadata field. It can produce an SVG, an
+`attributes` array, or another value without a browser or hosted renderer.
+
+Set a field's representation to `renderer` and store the renderer address as its value.
+
+## Interface
+
+```solidity
+interface IAbxFieldRenderer {
+    function render(
+        address token,
+        uint256 tokenId,
+        bytes32 field
+    ) external view returns (string memory contentType, bytes memory data);
+}
+```
+
+The metadata renderer embeds content bytes in the JSON document. If the content type is
+`text/uri-list`, it uses the returned bytes as a locator.
+
+## Rules
+
+A field renderer should:
+
+1. Return a stable result for the same chain state.
+2. Handle missing state with a sensible fallback.
+3. Return the right content type.
+4. Keep output small enough for a normal `eth_call`.
+5. Avoid upgradeable dependencies when the project claims permanence.
+
+A revert or malformed return can break the full `tokenURI` call. Test unminted IDs, unset parameters,
+the collection surface at `type(uint256).max`, and ordinary token IDs.
+
+## Reading parameters
+
+Scalar parameters use:
+
+```solidity
+tokenParam(tokenId, key)
+contractParam(key)
+```
+
+Read token scope first, then fall back to contract scope. `String` and `Bytes` use
+`tokenParamData` and `contractParamData`; the scalar read contains only their hash.
+
+A `Select` stores an index. Read its label from `selectOption(key, index)` rather than copying the
+option table into the renderer.
+
+An augment hook does not reach a custom field renderer automatically. The renderer must call the hook or
+read the same underlying state itself.
+
+## Example shape
+
+A small SVG renderer can derive color from a token parameter:
+
+```solidity
+function render(address token, uint256 tokenId, bytes32 field)
+    external
+    view
+    returns (string memory contentType, bytes memory data)
+{
+    if (field != bytes32("image")) {
+        return ("text/plain", "");
+    }
+
+    string memory color = _palette(token, tokenId);
+    return (
+        "image/svg+xml",
+        abi.encodePacked(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">',
+            '<rect width="400" height="400" fill="', color, '"/>',
+            '</svg>'
+        )
+    );
+}
+```
+
+Use the scaffold and test against a local ABX deployment before wiring the address:
+
+```bash
+abx scaffold renderer --out ./my-renderer
+```
+
+## Local preview
+
+`forge test` proves the renderer behaves — it never lets you look at what it actually drew. The
+scaffold's `script/Preview.s.sol` runs the same `IAbxFieldRenderer.render` call the deployed contract
+serves, against a mock params contract, and writes the raw output to `preview-out/` so you can open
+it:
+
+```bash
+cd my-renderer
+forge script script/Preview.s.sol
+open preview-out/image.svg
+```
+
+Every input — token id, seed, and any PostParam you set — has a representative default and is
+overridable through env vars, so you can preview a specific token without editing the script:
+
+```bash
+PREVIEW_TOKEN_ID=42 PREVIEW_SEED=0x00...abc PREVIEW_PALETTE=0x00...ff3366 forge script script/Preview.s.sol
+```
+
+The script surfaces reverts instead of swallowing them, and its gas output is a local-EVM sanity
+check, not a production gas measurement — deploy and read `tokenURI` on your target chain for real
+numbers.
+
+## Wiring and locks
+
+Set a renderer during deployment or later with `set-field`. The field lock freezes the renderer
+address, not code behind it.
+
+For a fully onchain metadata path, also set the contract's metadata renderer and lock URI configuration
+when ready. Check [Metadata](/docs/protocol/metadata#locks) before making a permanence claim.

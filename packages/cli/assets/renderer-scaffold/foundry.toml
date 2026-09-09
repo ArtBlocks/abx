@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+script = "script"
+libs = ["dependencies"]
+solc = "0.8.28"
+evm_version = "paris"        # broad multi-chain compatibility (no PUSH0/cancun assumptions)
+optimizer = true
+optimizer_runs = 1_000_000   # a renderer is deployed once and called forever → optimize runtime
+
+# script/Preview.s.sol writes rendered output here for human inspection (vm.writeFileBinary).
+# Foundry denies filesystem writes by default; this is the narrowest grant that lets it work.
+fs_permissions = [{ access = "read-write", path = "./preview-out" }]
+
+# Dependencies are fetched with soldeer (`forge soldeer install`), pinned here.
+[dependencies]
+abx-contracts = "2.0.0"
+solady = "0.1.26"
+forge-std = "1.16.1"

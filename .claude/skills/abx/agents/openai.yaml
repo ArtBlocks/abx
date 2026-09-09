@@ -1,0 +1,4 @@
+interface:
+  display_name: "ABX"
+  short_description: "Launch, host, and operate ABX NFT projects"
+  default_prompt: "Use $abx to plan and safely execute this ABX project workflow."

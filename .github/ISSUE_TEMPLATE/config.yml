@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/ArtBlocks/abx/security/advisories/new
+    about: Report vulnerabilities privately
+  - name: Documentation
+    url: https://docs.abx.io
+    about: Read the maintained ABX documentation

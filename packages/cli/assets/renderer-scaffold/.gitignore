@@ -1,0 +1,6 @@
+out/
+cache/
+broadcast/
+dependencies/
+preview-out/
+.env

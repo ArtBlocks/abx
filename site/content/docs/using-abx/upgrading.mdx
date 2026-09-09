@@ -1,0 +1,38 @@
+---
+title: "Upgrade"
+description: "Update the ABX CLI and its matching agent skill."
+---
+
+ABX is pre-1.0. Check the CLI version before debugging a missing command or unexpected address.
+
+```bash
+abx version
+```
+
+## Global install
+
+```bash
+npm install -g @artblocks/abx-cli@latest
+abx skill install
+abx doctor
+```
+
+## Project install
+
+```bash
+npm install --save-dev @artblocks/abx-cli@latest
+npx abx skill install
+npx abx doctor
+```
+
+The CLI checks npm for releases every few hours and prints a notice to stderr. It does not update
+itself. The check is disabled in CI and does nothing when offline.
+
+The skill is versioned with the CLI but copied into your agent directory. Reinstall it after every CLI
+upgrade.
+
+New releases may point new deployments at newer factories or shared contracts. Existing projects keep
+the addresses stored at deployment. Run `abx verify <address>` to inspect one.
+
+Release notes ship in the package `CHANGELOG.md` and on
+[npm](https://www.npmjs.com/package/@artblocks/abx-cli?activeTab=versions).

@@ -1,0 +1,88 @@
+{
+  "name": "abx-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ABX protocol, SDK, CLI, and reference services.",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "//test-shard": [
+    "`test:shard` exists for a CI matrix and is NOT wired into the workflow yet, on purpose.",
+    "Node's --test-shard partitions correctly (1440 tests split 479/426/535 across 3 shards), and",
+    "sharding is the right next lever because the dominant cost is CPU-BOUND tsx transpilation --",
+    "~0.35s per CLI spawn across 37 spawn-heavy files -- so extra runners add real cores, whereas",
+    "raising concurrency on one 2-core runner only time-slices the same two.",
+    "The blocker is merge GATING, not mechanics: `typescript` is the required status check. Matrixing",
+    "it renames the checks to `typescript (1/3)` etc, so the required check would never report again;",
+    "moving tests OUT of it would leave merges gated on a job that no longer runs them. Doing this",
+    "safely needs an aggregator job that keys off `needs.<shard>.result` with `if: always()`, plus a",
+    "branch-protection update -- a change to what can merge, which is the repo owner's call."
+  ],
+  "//test-concurrency": [
+    "Node defaults test concurrency to availableParallelism()-1. A standard 2-core CI runner therefore",
+    "runs the suite EFFECTIVELY SEQUENTIALLY, which is why CI's test step took 518s of a 770s job while",
+    "the same suite finishes in ~50s on a 12-core dev machine. The work here is I/O-bound, not",
+    "CPU-bound: most of it is spawning the CLI as a subprocess (~0.35s of tsx transpile each) and",
+    "waiting on RPC. So concurrency can safely exceed the core count -- the cores are not the",
+    "constraint, the waiting is. MEASURED. Six spawn-heavy files: concurrency 1 = 57.0s vs 8 = 27.8s",
+    "(2.05x), same 101 tests. Full suite on a 12-core box: default(11) = 43.9s, 8 = 41.0s,",
+    "16 = 43.2s, 24 = 46.9s -- so 8 is also the FASTEST choice locally, not a cap that penalises a",
+    "strong machine; past ~16 oversubscription costs more than it buys.",
+    "Not raised further on purpose: every concurrent file may hold RPC calls open, and more parallel",
+    "requests against a public endpoint invites the 429s that have already cost us a sweep run.",
+    "The floor is the LONGEST single file (deploy-code.test.ts, ~37s locally) -- no concurrency beats that."
+  ],
+  "scripts": {
+    "abx": "tsx packages/cli/src/bin.ts",
+    "build": "tsc -b tsconfig.build.json",
+    "clean": "tsc -b tsconfig.build.json --clean",
+    "sync-abis": "tsx packages/sdk/scripts/sync-abis.ts",
+    "test": "node --import tsx --test --test-concurrency=8 packages/sdk/test/*.test.ts packages/indexer/test/*.test.ts packages/storage-arweave/test/*.test.ts packages/storage/test/*.test.ts packages/token-api/test/*.test.ts packages/cli/test/*.test.ts packages/effects/test/*.test.ts",
+    "test:shard": "node --import tsx --test --test-concurrency=4 --test-shard=\"$ABX_TEST_SHARD\" packages/sdk/test/*.test.ts packages/indexer/test/*.test.ts packages/storage-arweave/test/*.test.ts packages/storage/test/*.test.ts packages/token-api/test/*.test.ts packages/cli/test/*.test.ts packages/effects/test/*.test.ts",
+    "check:publish-drift": "node scripts/check-publish-drift.mjs",
+    "check:hygiene": "node scripts/check-repo-hygiene.mjs",
+    "check:audit": "node scripts/check-production-audit.mjs",
+    "test:e2e": "bash scripts/e2e-remote-resolver.sh",
+    "test:e2e:wallet": "bash scripts/e2e-wallet-sign.sh",
+    "sandbox": "bash scripts/sandbox.sh",
+    "tier2": "bash scripts/tier2-packaged.sh",
+    "sandbox:cold": "bash scripts/sandbox.sh --cold",
+    "sandbox:status": "bash scripts/sandbox-clean.sh",
+    "sandbox:clean": "bash scripts/sandbox-clean.sh --void",
+    "abx-effects": "tsx packages/effects/src/main.ts",
+    "changeset": "changeset",
+    "ci:version": "changeset version && node scripts/stamp-skill-version.mjs",
+    "ci:publish": "pnpm -r publish --access public --no-git-checks"
+  },
+  "devDependencies": {
+    "@artblocks/abx-sdk": "workspace:*",
+    "@changesets/cli": "^2.31.1",
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.8.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "elliptic": "^6.6.1",
+      "secp256k1": "^5.0.1",
+      "undici": "^6.27.0",
+      "axios": "^1.18.1",
+      "ws": "^8.21.1",
+      "bigint-buffer": "^1.1.5",
+      "uuid": "^11.1.1",
+      "sharp": "^0.35.0",
+      "postcss": "^8.5.28",
+      "socket.io-parser": "^4.2.7",
+      "hono": "^4.13.5",
+      "dompurify": "^3.4.14",
+      "nanoid": "^3.3.18",
+      "qs": "^6.16.0",
+      "decode-uri-component": "^0.5.0",
+      "stream-json": "^3.5.0",
+      "js-yaml@^3": "3.15.1",
+      "js-yaml@^4": "4.3.1"
+    }
+  }
+}

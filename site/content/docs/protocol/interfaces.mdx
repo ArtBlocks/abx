@@ -1,0 +1,78 @@
+---
+title: "Interfaces"
+description: "The small read and mint interfaces shared by ABX contracts."
+---
+
+Events reconstruct history. Interfaces read the current state.
+
+## Minting
+
+```solidity
+interface IAbxSequentialMint {
+    function mint(address to) external returns (uint256 tokenId);
+}
+
+interface IAbxEditionMint {
+    function mint(address to, uint256 id, uint256 amount) external;
+}
+```
+
+Sequential minting chooses the next ERC-721 ID. Edition minting names an ERC-1155 ID and amount.
+Contracts advertise support through ERC-165.
+
+## Metadata
+
+```solidity
+interface IAbxMetadataRenderer {
+    function tokenURI(address token, uint256 tokenId) external view returns (string memory);
+    function contractURI(address token) external view returns (string memory);
+}
+
+interface IAbxFieldRenderer {
+    function render(address token, uint256 tokenId, bytes32 field)
+        external view returns (string memory contentType, bytes memory data);
+}
+
+interface IAbxOnChainReader {
+    function read(address pointer) external view returns (bytes memory);
+}
+```
+
+The metadata renderer assembles JSON. A field renderer computes one value. A reader returns stored
+bytes while hiding SSTORE2, chunking, and compression.
+
+Collection-level field rendering uses `type(uint256).max` as the token ID.
+
+## Mint seed
+
+```solidity
+interface IAbxSeedSource {
+    function seed(uint256 tokenId, address to) external returns (bytes32);
+}
+```
+
+The canonical source is deterministic after a mint but predictable during the transaction. Use a
+custom implementation for commit-reveal or VRF-backed randomness. The CLI probes a new source before
+storing its address.
+
+## Common reads
+
+All ABX contracts expose the applicable token standard plus ERC-165, ERC-7572 collection metadata,
+ERC-2981 royalties, and supply reads. Extension interfaces add:
+
+- `primaryPayee()`, `minter()`, and `paused()`
+- maximum invocation or per-ID supply
+- metadata fields, representations, and locks
+- script chunks and ordered dependencies
+- parameter schemas, values, and hooks
+- seed source and transfer validator
+- token and collection URI renderers and locks
+
+ABX does not claim ERC-721 Enumerable. Indexers enumerate ERC-721 tokens from `Transfer` events.
+
+## Batching
+
+Factories initialize a clone in one transaction. Later calls on the same contract may use
+`multicall(bytes[])`. The batch preserves `msg.sender`, rejects ETH, and reverts as one unit.
+
+Accounts such as a Safe or ERC-4337 wallet handle atomic calls across several contracts.

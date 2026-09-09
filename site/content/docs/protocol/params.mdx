@@ -1,0 +1,133 @@
+---
+title: "Parameters"
+description: "Typed, configurable state for code projects."
+---
+
+Parameters are named values on a code project. A program reads them through `tokenData`, and effects
+can react when they change.
+
+The contract enumerates and serves its own parameter state. Parameters are not copied into `tokenURI`.
+
+## Scope and values
+
+A contract value is the project-wide default. A token value overrides it for one token.
+
+Scalar values fit in `bytes32`. `String` and `Bytes` values live in an onchain blob; the scalar slot
+holds their `keccak256` hash. Each write records the address that made it.
+
+An unset value differs from an empty value. Governed `String` and `Bytes` parameters cannot be written
+with zero bytes. Use a sentinel or a companion scalar when the work needs an explicit empty state.
+
+## Schemas
+
+A schema tells wallets and applications how a parameter may be edited.
+
+| Part | Options |
+| --- | --- |
+| Type | `Bool`, `Select`, `Uint256Range`, `Int256Range`, `DecimalRange`, `HexColor`, `Timestamp`, `String`, `Bytes` |
+| Authority | `Creator`, `TokenOwner`, a named `Address`, or supported combinations |
+| Constraint | Range bounds or select options |
+| Deadline | Optional `lockAfter` timestamp |
+
+`TokenOwner` accepts delegate.xyz delegates. On an ERC-1155 edition, it means any holder of that ID.
+They all edit one shared value, not a value attached to each copy.
+
+```bash
+abx set-schema 0xYourContract \
+  --schema 'palette:Select[Ochre|Night|Sage]:TokenOwner'
+
+abx configure-param 0xYourContract 42 palette Ochre --sign
+```
+
+A schema may be replaced while it is unlocked. Replacing it does not rewrite or revalidate old values.
+The CLI requires `--force` when a change could strand a stored value.
+
+Once a deadline passes, both the value and schema are frozen. A deadline may move earlier, never later.
+`retire-param` moves it into the past. Retirement is permanent and keeps the key and old value readable.
+
+An inherited contract default is the exception: the owner can clear it after a schema locks. To make a
+value permanent for a token, write it at token scope through the governed path.
+
+## Writes
+
+Scalar and blob types use different contract calls:
+
+```solidity
+function configureTokenParam(
+    uint256 tokenId,
+    bytes32 key,
+    bytes32 value
+) external;
+
+function configureTokenParamData(
+    uint256 tokenId,
+    bytes32 key,
+    bytes calldata data
+) external;
+```
+
+Keys are readable ASCII packed into `bytes32`. Do not hash the key name. Use the CLI or SDK to avoid
+encoding mistakes.
+
+First writes cost more than updates because the contract adds the key to its enumeration. Large blob
+writes also deploy an SSTORE2 data contract. Keep holder-writable edition parameters small unless shared
+large data is the point of the work.
+
+## Enumeration
+
+These reads expose the complete key set:
+
+```solidity
+tokenParamKeys(tokenId)
+contractParamKeys()
+paramSchemaKeys()
+```
+
+Paged forms are available for larger projects. Insertion order is not canonical, so consumers should
+sort keys before serializing them. The practical design target is about 64 parameters per project.
+
+## Hooks
+
+A code project can set three hooks:
+
+| Hook | When it runs | What it can do |
+| --- | --- | --- |
+| Configure | Before a write | Inspect or reject the new value |
+| Augment | During a read | Add or replace computed token data |
+| Transfer | During mint or transfer | Update state or reject the move |
+
+A reverting transfer hook blocks the transfer. Because a mint is a transfer from the zero address, it
+can block minting too.
+
+```bash
+abx set-param-hooks 0xYourContract --transfer 0xYourHook
+abx lock-param-hooks 0xYourContract
+```
+
+`lock-param-hooks` freezes all three addresses. Freezing an empty set proves that no transfer hook can
+be added later. Freezing an active hook leaves it active. There is no permissionless way to remove a
+hook after ownership is renounced.
+
+A lock freezes the hook address, not code behind an upgradeable proxy.
+
+## Canonical decode
+
+Programs receive canonical strings in `tokenData`:
+
+- `HexColor` becomes `#rrggbb`.
+- `Timestamp` becomes Unix time.
+- `DecimalRange` uses ten decimal places.
+- `Bytes` becomes base64.
+- `String` becomes UTF-8.
+- `Select` becomes its option label.
+
+Write a `Bytes` parameter as `0x`-prefixed hex or with `--file`. Base64 is the read form, not the write
+form.
+
+## Seeds
+
+`seed` is reserved. The canonical seed source assigns it once at mint. A seed schema allows an
+authorized party to choose a replacement value; it does not draw fresh randomness.
+
+The seed schema must exist before any seed is assigned. This lets a buyer inspect whether a seed may
+change, who may change it, and when that authority ends. See [Code projects](/docs/protocol/code-projects#seeds).

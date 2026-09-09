@@ -1,0 +1,59 @@
+{
+  "name": "@artblocks/abx-effects",
+  "version": "0.1.0-alpha.33",
+  "license": "MIT",
+  "description": "Reference rendering and effects runner for ABX projects.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtBlocks/abx.git",
+    "directory": "packages/effects"
+  },
+  "homepage": "https://docs.abx.io",
+  "bugs": "https://github.com/ArtBlocks/abx/issues",
+  "keywords": [
+    "abx",
+    "nft",
+    "effects",
+    "playwright",
+    "render",
+    "art-blocks"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "bin": {
+      "abx-effects": "./dist/main.js"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "prepack": "tsc -b tsconfig.build.json"
+  },
+  "dependencies": {
+    "@artblocks/abx-sdk": "workspace:*",
+    "@artblocks/abx-storage": "workspace:*",
+    "playwright": "1.63.0",
+    "viem": "^2.56.3"
+  }
+}

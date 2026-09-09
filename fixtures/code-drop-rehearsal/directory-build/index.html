@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drift (directory build)</title>
+<style>html,body{margin:0;padding:0;overflow:hidden}canvas{display:block}</style>
+<!-- the build ships its own abx.js copy (the directory-mode convention): tokenData
+     resolves from the injected global → the ?abx= query the live-view route appends →
+     the bare-gateway coordinate floor. -->
+<script>
+(function () {
+  var abx = (window.abx = window.abx || {});
+  function fromQuery() {
+    try {
+      var q = new URLSearchParams(location.search);
+      var packed = q.get('abx');
+      if (packed) {
+        var b64 = packed.replace(/-/g, '+').replace(/_/g, '/');
+        return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); })));
+      }
+      if (q.get('contract') && q.get('tokenId')) {
+        return {chainId: Number(q.get('chainId') || 1), contractAddress: String(q.get('contract')).toLowerCase(), tokenId: String(q.get('tokenId'))};
+      }
+    } catch (e) {}
+    return null;
+  }
+  abx.tokenData = window.abxTokenData || fromQuery();
+  abx.__traits = null;
+  abx.__done = false;
+  abx.traits = function (t) { abx.__traits = t; try { document.dispatchEvent(new CustomEvent('abx:traits', {detail: t})); } catch (e) {} return t; };
+  abx.done = function () { abx.__done = true; try { document.dispatchEvent(new CustomEvent('abx:done')); } catch (e) {} };
+})();
+</script>
+</head>
+<body>
+<script src="./drift.js"></script>
+</body>
+</html>

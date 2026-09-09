@@ -1,0 +1,62 @@
+---
+title: "Onchain storage"
+description: "How ABX stores and reads larger byte payloads."
+---
+
+ABX uses reader contracts for content too large to keep in a normal storage slot. A metadata field holds
+the reader address and a pointer. The reader returns the original bytes.
+
+## Chunk store
+
+`AbxChunkStore` writes bytes with SSTORE2. The payload lives in contract bytecode, behind a small data
+contract with no mutable storage.
+
+One contract has a practical bytecode limit, so larger payloads are split across pointers. The reader
+joins them in order.
+
+```solidity
+interface IAbxOnChainReader {
+    function read(address pointer) external view returns (bytes memory);
+}
+```
+
+The pointer names an SSTORE2 manifest. That manifest names the content chunks, which the reader joins
+in order.
+
+## Compression
+
+ABX supports two different cases:
+
+- `reader-gzip` stores compressed bytes that an offchain resolver expands.
+- Onchain program templates may include a browser decompressor in the assembled document.
+
+A Solidity metadata renderer cannot gunzip arbitrary bytes. Use plain `reader` for content that must be
+returned directly from an onchain `tokenURI`.
+
+## Limits and cost
+
+Writing bytecode costs gas once. Reading and assembling it costs RPC execution on every view call. Large
+documents can pass deployment limits and still exceed a provider's `eth_call` limit.
+
+Use the CLI's dry run and gas report before choosing this route:
+
+```bash
+abx deploy ./work.png --onchain-image --dry-run
+```
+
+There is no universal RPC ceiling. A document that works through one endpoint may fail through another.
+Code projects provide piecewise reads for large generated documents.
+
+Onchain storage is a good fit when permanence and chain-only recovery justify the cost. IPFS or Arweave
+is usually simpler for large media.
+
+## Read and verify
+
+The SDK reads the pointer, calls the reader, joins chunks, and decompresses when the representation
+requires it. A resolver can then serve those bytes over HTTP without changing their custody.
+
+A field lock freezes the reader address and pointer. Use immutable readers and data contracts if the
+project claims the bytes are fixed.
+
+See [Storage](/docs/using-abx/guides/storage) for upload backends and
+[Metadata](/docs/protocol/metadata) for field representations.

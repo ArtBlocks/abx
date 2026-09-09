@@ -1,0 +1,49 @@
+---
+title: "Artifacts"
+description: "Named files and outputs beyond standard marketplace metadata."
+---
+
+ERC metadata gives special meaning to `image` and a handful of common keys. An ABX token may anchor
+more: source files, print exports, models, datasets, stems, or derived renders.
+
+Each artifact has three fields:
+
+```text
+key -> { mimeType, uri }
+```
+
+- `key` is a creator field such as `image`, or a derived name such as `render/image`.
+- `mimeType` comes from the source. It is not guessed from the bytes.
+- `uri` may use `data:`, `ipfs://`, `ar://`, or `https://`.
+
+The served token JSON lists artifacts beside standard metadata:
+
+```json
+{
+  "name": "Work 0",
+  "image": "ipfs://...",
+  "artifacts": [
+    {"key": "image", "mimeType": "image/png", "uri": "ipfs://..."},
+    {"key": "render/model", "mimeType": "model/gltf-binary", "uri": "ar://..."}
+  ]
+}
+```
+
+Consumers that do not know `artifacts` ignore it. Others get the full list without a second endpoint.
+
+Every entry includes provenance. A value may be merely labeled, anchored by a hash or content address,
+or reproducible from public code and onchain inputs. See [Metadata](/docs/protocol/metadata#provenance)
+and [Effects](/docs/protocol/effects).
+
+Nothing in this list is onchain data itself — every entry is a resolver-published projection, whether
+the bytes it names are anchored onchain or produced offchain by an effect. Read `abx tokenuri` for the
+onchain commitment; read this list for where the bytes actually are.
+
+## Reading it directly
+
+`abx artifacts <address> --token <id>` reads this list on its own, without fetching the whole served
+document, and adds what the served document deliberately omits: every registered effect output,
+current *and* stale, each labeled against the token's active `inputsHash` (see
+[Effects → Checking currency directly](/docs/protocol/effects#checking-currency-directly)).
+`--remote <name|url>` asks a hosted resolver what it actually reports — the surface that owns a hosted
+project's real artifact set — instead of this node's own local projection.

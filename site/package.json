@@ -1,0 +1,37 @@
+{
+  "name": "abx-docs",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "postinstall": "fumadocs-mdx",
+    "types:check": "fumadocs-mdx && next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "cnfast": "^0.2.0",
+    "fumadocs-core": "^16.15.7",
+    "fumadocs-mdx": "^15.4.0",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@16.15.7",
+    "lucide-react": "^1.41.0",
+    "mermaid": "^11.16.1",
+    "next": "16.3.4",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3"
+  }
+}

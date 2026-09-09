@@ -1,0 +1,78 @@
+---
+title: "Install"
+description: "Install the ABX CLI, agent skill, or SDK."
+---
+
+Most people need the CLI and its agent skill. The SDK is for application code.
+
+## CLI
+
+Install it globally if you want `abx` available everywhere.
+
+```bash
+npm install -g @artblocks/abx-cli
+abx doctor
+```
+
+Pin it inside a project when repeatable operations matter.
+
+```bash
+npm install --save-dev @artblocks/abx-cli
+npx abx doctor
+```
+
+Try it once without installing:
+
+```bash
+npx @artblocks/abx-cli@latest doctor
+```
+
+The unscoped `abx` package on npm is unrelated. Use `@artblocks/abx-cli` for one-off runs.
+
+ABX requires Node.js 22.13 or newer. `abx doctor` checks Node, RPC access, the canonical factory,
+signing, storage, and the installed skill. It does not print secrets.
+
+## Agent skill
+
+The skill ships inside the CLI, so its instructions match the installed commands.
+
+```bash
+abx skill install
+```
+
+By default, ABX writes the skill to both supported discovery paths:
+
+| Path | Agents |
+| --- | --- |
+| `.claude/skills/abx` | Claude Code |
+| `.agents/skills/abx` | Cursor, Codex CLI, Gemini CLI, GitHub Copilot |
+
+Use `--agent <name>` to target one agent or `--global` to install in your home directory. Restart the
+agent after installation. Run `abx skill install` again after upgrading the CLI.
+
+## SDK
+
+```bash
+npm install @artblocks/abx-sdk viem
+```
+
+The SDK is ESM-only and requires Node.js 22.13 or newer. See the [SDK reference](/docs/reference/sdk).
+
+## Optional Arweave dependency
+
+A default install of `@artblocks/abx-cli` does not include Arweave support. Filesystem, S3/R2, and
+IPFS storage backends work out of the box; `--backend arweave` needs one more package.
+
+Arweave upload goes through ArDrive Turbo (`@ardrive/turbo-sdk`), whose dependency tree is large —
+it pulls in a browser wallet-connector ecosystem a Node CLI never executes, and carries a couple of
+no-fix advisories in code paths ABX does not call. To keep that weight out of the default install,
+ABX ships the implementation as its own package, installed only when you actually want it:
+
+```bash
+npm install @artblocks/abx-storage-arweave
+```
+
+Install it once alongside the CLI, then use `--backend arweave` (or `ABX_STORAGE_BACKEND=arweave`)
+as normal. Without it, the CLI reports the missing package and the exact install command instead of
+a stack trace — or use `--backend arweave --provider http-bundler --upload-url <bundler>`, a
+dep-free provider that needs neither this package nor any of its dependencies.

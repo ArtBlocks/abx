@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {"rootDir": "src", "outDir": "dist"},
+  "include": ["src"],
+  "references": [
+    {"path": "../sdk/tsconfig.build.json"},
+    {"path": "../indexer/tsconfig.build.json"},
+    {"path": "../storage/tsconfig.build.json"},
+    {"path": "../token-api/tsconfig.build.json"},
+    {"path": "../effects/tsconfig.build.json"}
+  ]
+}

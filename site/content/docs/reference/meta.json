@@ -1,0 +1,11 @@
+{
+  "title": "Reference",
+  "icon": "Book",
+  "pages": [
+    "index",
+    "cli",
+    "sdk",
+    "contracts",
+    "deployments"
+  ]
+}

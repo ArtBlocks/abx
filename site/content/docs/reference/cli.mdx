@@ -1,0 +1,176 @@
+---
+title: "CLI"
+description: "A compact index of ABX commands."
+---
+
+Install the CLI globally or run it through `npx`:
+
+```bash
+npm install --global @artblocks/abx-cli
+abx help
+```
+
+Use `abx <command> --help` for every flag and example. This page is a map, not a second copy of the
+built-in help.
+
+## Start and inspect
+
+| Command | Use |
+| --- | --- |
+| `demo` | Deploy, index, and serve a test 1/1 |
+| `doctor` | Check Node, RPC, factories, storage, skill version, and optional signing setup |
+| `capabilities` | Print supported project types and irreversible choices |
+| `state` | Read owner-controlled settings and parameter schemas |
+| `verify` | Check canonical deployment, byte commitments, and render freshness |
+| `tokenuri` / `contracturi` | Read and optionally fetch the committed metadata URI |
+| `tokens` | List token state from the contract |
+| `status` | Show resolver indexing state |
+| `version` / `help` | Show the installed version or command help |
+
+## Deploy
+
+| Command | Use |
+| --- | --- |
+| `deploy` | Deploy a 1/1 image or single-work edition |
+| `deploy-series` | Deploy an image Series or multi-work image edition |
+| `deploy-code` | Deploy a code Series or code edition |
+| `inspect` | Check a script and recommend a deployment lane |
+| `scaffold solidity` | Create a Foundry workspace for renderers and hooks |
+| `predict` | Predict a deterministic address from a pinned salt |
+| `add` / `index` | Register or index a deployed project |
+| `serve` | Run a local resolver |
+| `render` / `effects` | Render once or run the effects worker |
+
+## Sell and operate
+
+| Command | Use |
+| --- | --- |
+| `mint` | Mint the next token or copies of an edition ID |
+| `minter configure` | Set fixed-price sale terms |
+| `minter show` | Read sale terms |
+| `minter buy` | Buy through the shared fixed-price minter |
+| `mint-page` | Scaffold a small mint site |
+| `submit-app` | Submit a deployed collection to the optional ABX App Store |
+| `pause` / `unpause` | Close or open non-owner minting |
+| `set-minter` | Set the authorized minter |
+| `set-primary-payee` | Set the primary-sale recipient |
+| `set-max-invocations` | Lower the ERC-721 supply cap or edition ID-space cap |
+| `set-max-supply` | Lower an edition ID's copy cap |
+| `set-royalty` | Set royalty receiver and basis points |
+| `set-royalty-cap` | Lower the project's royalty ceiling |
+| `set-transfer-validator` | Manage an enrolled transfer validator |
+| `transfer` | Transfer a token or edition copies |
+| `set-admin` | Transfer project ownership |
+
+## Metadata and code
+
+| Command | Use |
+| --- | --- |
+| `set-field` / `attach` | Set metadata or attach a named artifact |
+| `set-token-uri` / `set-contract-uri` | Change URI pointers |
+| `set-renderer` | Choose onchain or resolver metadata |
+| `set-gateway` | Change the HTTP gateway for IPFS or Arweave locators |
+| `lock-field` / `lock-uri` | Permanently freeze metadata settings |
+| `refresh` / `ping-uri` | Ask indexers to refresh metadata |
+| `preview` | Run a code project locally |
+| `configure-param` | Set a governed parameter |
+| `set-schema` / `retire-param` | Define or permanently retire a parameter |
+| `set-param-hooks` / `lock-param-hooks` | Set or freeze parameter hooks |
+| `set-seed-source` | Change the source for future code-project seeds |
+| `set-dependency` / `remove-last-dependency` | Edit code dependencies |
+| `set-dependency-registry` | Change the dependency registry |
+| `replace-script` | Safely replace an unlocked code project's onchain program |
+| `lock-dependencies` / `lock-script` | Permanently freeze code inputs |
+
+## Storage and hosting
+
+| Command | Use |
+| --- | --- |
+| `storage show` | Show the active byte-storage backend |
+| `storage upload` / `storage status` | Upload bytes or check retrieval |
+| `storage balance` / `storage topup` | Manage Arweave upload credit |
+| `storage backup-key` | Back up the managed storage key |
+| `deploy-resolver` / `deploy-effects` | Deploy self-hosted services |
+| `remote` | Inspect or test a conforming hosted service |
+| `auth login` / `auth logout` | Manage the first-party hosted-service key |
+| `feedback` | Preview or file an ABX report; nothing sends without `--yes` |
+| `migrate` | Check parity while moving between resolvers |
+| `forget` | Remove a local or remote projection without touching the chain |
+
+## Signing lanes
+
+Every write uses one lane:
+
+| Flag | Behavior |
+| --- | --- |
+| `--sign` | Open a browser wallet |
+| `--send` | Sign with the configured hot key |
+| `--unsigned` | Print an unsigned transaction |
+| `--dry-run` | Simulate without sending |
+
+Browser signing is the safest default for an interactive launch. Never paste a private key into a chat
+or prompt.
+
+A deploy preview reports the wallet approvals it will need. A predicted address is stable only when you
+reuse the displayed salt with `--salt`.
+
+### Structured deploy plan (`--dry-run --json`)
+
+Every `deploy` / `deploy-series` / `deploy-code` emit — preview and real send alike, across every
+product lane (1/1, editions, Series, code) and `deploy-code --resume` — carries a `plan` object
+alongside the existing fields, versioned with a `schemaVersion` so it can evolve without breaking a
+consumer that pins a version. It covers what the human preview already prints, structured for a
+script instead of scraped from prose: the wallet transaction/approval count and ordered signing
+stages (always ending with `"deploy"` itself when non-null), expected signer/owner/royalty/minter/
+payee roles, custody and URI-resolution choices (including the on-chain renderer address and, for a
+single-file `--onchain-image` lane, that file's byte size/staged size/MIME type/keccak256), the mint
+plan, a cost estimate where one is genuinely computed, and every warning that run raised. A field a
+given lane has no answer for is reported as `null`, never silently absent.
+
+```json
+{
+  "command": "deploy-code",
+  "address": null,
+  "plan": {
+    "schemaVersion": 2,
+    "family": "code",
+    "lane": "send",
+    "transactions": {"approvals": 2, "legs": ["chunks", "onchain-uri", "mints", "deploy"]},
+    "roles": {"signer": "0x...", "owner": "0x...", "royaltyReceiver": "0x...", "primaryPayee": null, "minter": null},
+    "royalty": {"bps": 500, "capBps": 1000, "burnable": false},
+    "custody": {"onChainUri": true, "imageOnChain": null, "backend": null, "tokenUriBase": null, "contractUriBase": null, "renderer": "0x...", "image": null},
+    "mint": {"deferred": false, "count": 1, "amountPerId": null, "recipient": "0x..."},
+    "estimate": {"ethApprox": "0.00058", "gasApprox": "546712"},
+    "warnings": [],
+    "surfaces": {"thumbnail": {"ok": false, "detail": "..."}, "traits": {"ok": true, "detail": "..."}, "postParams": {"ok": true, "detail": "..."}},
+    "dependencies": {"count": 0, "registry": null},
+    "resume": null
+  }
+}
+```
+
+`custody.image` is populated only on the single-file image lanes (`deploy --onchain-image`, with or
+without `--copies`) — a Series/Series-edition stages one file PER token, so no single-file shape fits
+and it stays `null` there even with `imageOnChain: true`.
+
+A `deploy-code` setup (the script chunks, PostParam schemas, dependency declarations, on-chain-URI
+legs, and reserve mints) rides one combined transaction when it fits — the example above. A large
+on-chain script splits that setup into several gas-bounded transactions instead of failing against
+the `eth_estimateGas` allowance, ordered chunks, then config, then mints strictly last (chunk writes
+and config setters are idempotent, so `--resume` finishes an interruption at any split point; a mint
+is not, which is why it always rides last). `transactions.approvals` always reports the real
+transaction count for the whole plan — read it rather than assuming 2 — and `legs` still names the
+GROUPS riding it, not a literal per-transaction count.
+
+This is deliberately NOT a rewrite of the human preview: the prose above it is unchanged, byte for
+byte, and is still the primary surface for a person reading a terminal. The plan object is an
+additional, machine-checkable projection of the same facts, kept in sync by a CI test that fails if a
+future change adds a value to the prose without adding it to the plan.
+
+## Agent skill and updates
+
+`abx skill install` installs the version-matched agent skill. `abx doctor` reports drift between the
+skill and CLI.
+
+The CLI may print a notice when a newer npm release exists. It never upgrades itself. Set
+`ABX_NO_UPDATE_CHECK=1` to disable the check.

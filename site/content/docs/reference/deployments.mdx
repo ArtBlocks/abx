@@ -1,0 +1,70 @@
+---
+title: "Deployments"
+description: "Canonical ABX infrastructure on Base Sepolia and Sepolia."
+---
+
+ABX has no mainnet deployment. The current alpha runs on Base Sepolia and Sepolia.
+
+The machine-readable source of truth is
+[`packages/sdk/src/deployments.ts`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/deployments.ts).
+If this page differs, the SDK manifest wins.
+
+## Shared addresses
+
+The keyless CREATE2 proxy deploys the following contracts at the same address on both testnets.
+
+| Contract | Environment override | Address |
+| --- | --- | --- |
+| `OneOfOneImageFactory` | `ABX_FACTORY` | <CopyAddress>0x2824F4b4b4301dB2FcA10b2D80D45b4d463Ba57E</CopyAddress> |
+| `SeriesImageFactory` | `ABX_SERIES_FACTORY` | <CopyAddress>0x685B4DfC835b6854590B5437C79D62BB7D52698b</CopyAddress> |
+| `SeriesCodeFactory` | `ABX_SERIES_CODE_FACTORY` | <CopyAddress>0xdDA5174A868A8e099E159E67569900a4F936CFFe</CopyAddress> |
+| `OneOfOneEditionFactory` | `ABX_ONE_OF_ONE_EDITION_FACTORY` | <CopyAddress>0x6ecc7fAd2186965BaECD0Aa215b00239a3459ddF</CopyAddress> |
+| `EditionImageFactory` | `ABX_EDITION_FACTORY` | <CopyAddress>0xB6a8f051B08A8d6Fb0B6DA53BD23006CE2da31b7</CopyAddress> |
+| `EditionCodeFactory` | `ABX_EDITION_CODE_FACTORY` | <CopyAddress>0x9441Cc75318E20Ae6237EDb213b4C3019d756Bf0</CopyAddress> |
+| `AbxMetadataRenderer` | `ABX_RENDERER` | <CopyAddress>0x85C1aE1F076d808fF7c1729F21B85038Fa16105E</CopyAddress> |
+| `AbxChunkStore` | `ABX_CHUNK_STORE` | <CopyAddress>0x1Ca63a4ADEeF5e722ADA25b892BA40E3b2bcB905</CopyAddress> |
+| `AbxSeedSource` | `ABX_SEED_SOURCE` | <CopyAddress>0xD01d4eDc17F8b4493A43A5e70DCD9813FB1b9A0A</CopyAddress> |
+| `AbxFixedPriceMinter` | `ABX_FIXED_PRICE_MINTER` | <CopyAddress>0x1E321A12386cF6BEe49d1270A5EC54DecA88db48</CopyAddress> |
+| `AbxFixedPriceMinter1155` | `ABX_FIXED_PRICE_MINTER_1155` | <CopyAddress>0x8FcC37dCb00A02367838Fa5B37347dCEec060981</CopyAddress> |
+
+Address resolution follows this order: explicit option, environment override, SDK manifest.
+
+## Chain-specific generator
+
+`AbxGenerator` includes chain-specific dependency configuration, so its address differs.
+
+| Chain | Chain ID | Address |
+| --- | --- | --- |
+| Base Sepolia | `84532` | <CopyAddress>0x2C1B7Cf6c54E4ACbcB54FCC395f7Af88eb4fc8CE</CopyAddress> |
+| Sepolia | `11155111` | <CopyAddress>0xb7104ADfa6fb5615E46e2a681A2Ff043B08fADB5</CopyAddress> |
+
+Sepolia also has the Art Blocks `DependencyRegistryV0` at
+<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base Sepolia has no canonical dependency
+registry.
+
+## Verify a project
+
+```bash
+abx verify 0xYourContract
+abx state 0xYourContract
+```
+
+Canonical status comes from a factory's `isAbxClone` record. The SDK also reports older known factory
+generations as provenance without treating them as current trust anchors.
+
+`abx verify` separately compares an already-deployed collection's ACTUAL singleton pointers — its
+`tokenURIRenderer` and its `animation_url` generator — against the addresses on this page, and
+reports each as current or not-current. Unlike the factory ladder above, this manifest keeps **no
+history** of a superseded renderer or generator address (see `deployments.ts`'s file docstring): a
+prior deployment and a fully custom implementation both read as "not current", because there is
+nothing recorded here to tell them apart. That is a deliberate scope limit, not an oversight — a
+history registry for these two singletons is a future tranche, not this one.
+
+Because existing collections read these addresses dynamically off this manifest (never storing a
+resolved value on their own for the un-pinned lane), **any change to a canonical shared singleton
+address in this file must be called out explicitly in that package's release notes** — a
+changeset that bumps `@artblocks/abx-sdk` silently is not enough for an address every deployed
+project's `abx verify` compares itself against.
+
+All listed contracts should be source-verified in the appropriate block explorer. An unverified
+canonical address is a release bug.

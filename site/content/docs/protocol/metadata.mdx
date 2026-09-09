@@ -1,0 +1,129 @@
+---
+title: "Metadata"
+description: "How ABX stores, resolves, and locks collection and token metadata."
+---
+
+ABX metadata is a field store on the collection contract. Each field has a name, a representation, and
+a value. A field may hold bytes, point to bytes, or compute them from chain state.
+
+## Fields and scope
+
+Fields live at two scopes:
+
+- Collection fields apply to the whole project and feed `contractURI`.
+- Token fields apply to one token and feed `tokenURI`.
+
+A token field overrides a collection field with the same name.
+
+Common token fields are `name`, `description`, `image`, `animation_url`, `external_url`, `attributes`,
+`background_color`, and `youtube_url`. Common collection fields include `name`, `description`,
+`banner_image`, `featured_image`, `external_link`, `creator`, `creator_links`, `display_notes`, and
+`license`.
+
+Other field names appear in the token's [artifact manifest](/docs/protocol/data-plane). The generated
+keys `artifacts` and `abx_provenance` cannot be set as fields.
+
+Parameters are separate. Read them from the contract rather than `tokenURI`. See
+[Parameters](/docs/protocol/params).
+
+## Representations
+
+| Representation | Meaning |
+| --- | --- |
+| `inline` | Bytes stored in the field |
+| `inline-gzip` | Gzipped bytes, decoded offchain |
+| `reader` | Bytes read from an onchain storage contract |
+| `reader-gzip` | Gzipped bytes read from an onchain storage contract |
+| `renderer` | Bytes computed by a contract |
+| `ipfs` | An IPFS CID |
+| `arweave` | An Arweave transaction ID |
+| `url` | A URL |
+| `url-template` | A URL with an `{id}` placeholder |
+| `keccak256` / `sha256` | An onchain commitment to bytes stored elsewhere |
+
+The representation describes the route. The contract does not fetch a URL, CID, or transaction ID.
+
+For URI fields such as `image` and `animation_url`, inline or computed content is embedded in an
+onchain metadata document. A resolver serves the same content through a URL. A renderer that returns
+`text/uri-list` is treated as a locator instead.
+
+## URI resolution
+
+Each contract chooses one of two paths:
+
+1. An onchain metadata renderer returns a `data:application/json` document.
+2. A base URL or per-token URL points to a resolver.
+
+The lookup order is:
+
+1. Onchain renderer
+2. Per-token URL override
+3. Base URL plus chain, contract, and token ID
+4. Empty string
+
+An onchain renderer can resolve `inline`, `reader`, `renderer`, `url`, `url-template`, `ipfs`, and
+`arweave`. Hash commitments and gzipped values need an offchain resolver.
+
+## Gateways
+
+Store an IPFS CID or Arweave transaction ID as the field value. Keep the HTTP gateway separate so it
+can change without changing the content address.
+
+```bash
+abx set-gateway 0xYourContract \
+  --ipfs https://your-gateway.example/ipfs/
+```
+
+The collection fields `abx_gateway_ipfs` and `abx_gateway_arweave` hold these serving preferences.
+They do not appear in the public metadata document or artifact list. Public defaults apply when they
+are unset.
+
+## Locks
+
+`lock-field` freezes one field. `lock-uri` freezes the URI configuration. Code projects have separate
+locks for scripts and dependencies. Parameters have their own schema deadlines.
+
+```bash
+abx lock-field 0xYourContract --field image
+abx lock-uri 0xYourContract
+```
+
+A lock freezes the value or address stored by the ABX contract. It cannot freeze:
+
+- bytes behind a mutable URL
+- code behind an upgradeable renderer, reader, or hook
+- a live dependency registry
+- an unlocked parameter
+
+Check the whole dependency graph before calling a project immutable. See
+[Owner powers](/docs/protocol/owner-powers).
+
+## Provenance
+
+Served metadata includes `abx_provenance`. Each entry names the field, its source, and a short note.
+The resolver also reports a status such as `on-chain`, `verified`, `mismatch`, `off-chain`, or `n/a`.
+
+The status is a resolver result. A contract cannot fetch and hash remote bytes.
+
+## Example
+
+```json
+{
+  "name": "Drift #42",
+  "image": "https://metadata.example/84532/0xabc/42/image",
+  "attributes": [{"trait_type": "Palette", "value": "Ochre"}],
+  "abx_provenance": [
+    {"field": "image", "source": "reader", "status": "on-chain"}
+  ]
+}
+```
+
+The resolver URL above may serve bytes that live onchain. Provenance describes where the bytes live;
+the URL describes how an HTTP client reaches them.
+
+## Related
+
+- [Artifacts](/docs/protocol/data-plane)
+- [Onchain storage](/docs/protocol/onchain-storage)
+- [Field renderers](/docs/protocol/renderers)
+- [Parameters](/docs/protocol/params)

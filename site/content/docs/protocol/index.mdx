@@ -1,0 +1,49 @@
+---
+title: "How ABX works"
+description: "The contracts, events, metadata, and services behind an ABX project."
+---
+
+An ABX project is one contract on one EVM chain. The contract anchors named data fields and emits the
+events needed to reconstruct them.
+
+ABX currently supports two token standards:
+
+| Shape | Standard | Meaning |
+| --- | --- | --- |
+| Series | ERC-721 | Each token ID is a unique work. |
+| Edition | ERC-1155 | Each token ID may have many copies. |
+
+The required core is small. A contract supports ERC-165 and emits `AbxDeployed`. Projects add only the
+extensions they use, such as royalties, supply caps, metadata fields, code, dependencies, or parameters.
+
+## Resolution
+
+Each metadata field may be stored onchain, computed onchain, committed by hash, or held offchain.
+
+**Onchain metadata.** A renderer reads the contract fields and returns `tokenURI` or ERC-1155 `uri`
+from one `eth_call`.
+
+**Resolver metadata.** A service replays the event log, reads contract fields, fetches offchain bytes,
+and returns the same document over HTTP.
+
+Onchain storage and a resolver can be used together. Storage answers where the bytes live. Resolution
+answers who assembles the JSON.
+
+<ArchitectureDiagram />
+
+## Read by subject
+
+- [Events](/docs/protocol/event-spine) define the replayable history.
+- [Interfaces](/docs/protocol/interfaces) expose current state.
+- [Metadata](/docs/protocol/metadata) defines fields, representations, locks, and provenance.
+- [Onchain storage](/docs/protocol/onchain-storage) covers SSTORE2, chunking, and compression.
+- [Code projects](/docs/protocol/code-projects) store programs, dependencies, and mint seeds.
+- [Parameters](/docs/protocol/params) add typed values, authorization, and hooks.
+- [Field renderers](/docs/protocol/renderers) compute images and traits in Solidity.
+- [Minting](/docs/protocol/minting) defines the shared sale contracts and events.
+- [Owner powers](/docs/protocol/owner-powers) lists what can change after a sale.
+- [Artifacts](/docs/protocol/data-plane) describes data beyond marketplace metadata.
+- [Effects](/docs/protocol/effects) describes derived offchain output.
+
+Canonical factories identify the ABX reference contracts. Anyone may implement the event and interface
+protocol; only a factory record proves that the canonical factory deployed a given clone.

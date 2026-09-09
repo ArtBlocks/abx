@@ -1,0 +1,53 @@
+---
+title: "Events"
+description: "The standard and ABX events used to reconstruct a project."
+---
+
+ABX contracts emit standard ERC events for existing tools and native ABX events for full replay.
+
+## Rules
+
+- One project is one contract. There is no project ID.
+- `AbxDeployed` is the only required ABX event.
+- Extensions advertise support through ERC-165 and version themselves independently.
+- Every current value can be derived from events or confirmed through a read interface.
+
+## Standard events
+
+| Standard | Use |
+| --- | --- |
+| ERC-721 or ERC-1155 | Ownership, minting, burning, and approvals |
+| ERC-4906 | Metadata refresh on both token standards |
+| ERC-7572 | Collection metadata refresh |
+| ERC-2981 | Royalty reads |
+| ERC-721C or ERC-1155C | Optional transfer validation |
+
+Editions also emit ERC-1155 `URI`. Since that event has no range form, an owner may call `pingURI(ids)`
+after a contract-wide metadata change. ABX emits ERC-4906 for the whole change either way.
+
+## Native events
+
+`AbxDeployed` announces the contract and enabled extension versions. Other event families cover:
+
+- royalty, payee, minter, pause state, and supply caps
+- metadata fields, URI configuration, and locks
+- scripts, dependencies, and seed sources
+- parameter schemas, values, hooks, and locks
+
+## Edition supply
+
+An ERC-1155 edition has a collection default and optional per-ID overrides:
+
+- `DefaultMaxSupplySet(cap)` sets the default. Zero means open.
+- `MaxSupplyUpdated(id, cap)` sets a lower cap for one ID.
+
+`maxSupply(id)` returns zero for both an open ID and an ID explicitly closed at zero. The event history
+distinguishes them. The SDK exposes `defaultMaxSupply`, `maxSupplyOverridden`, and `editionCapOf()`.
+
+## Discovery and trust
+
+Any contract can emit `AbxDeployed`, so the event proves discovery, not authenticity. Verify canonical
+contracts against the factory `isAbxClone` record. See [Deployments](/docs/reference/deployments).
+
+Version events keep old contracts readable when an extension changes. Standard ERC event signatures do
+not change.

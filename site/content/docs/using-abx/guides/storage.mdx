@@ -1,0 +1,95 @@
+---
+title: "Storage"
+description: "Choose where source media and rendered output live."
+---
+
+The chain commits to content by hash. A storage backend keeps the bytes available.
+
+| Backend | Use it for | Public by default |
+| --- | --- | --- |
+| `fs` | Local development | No |
+| `cloud` | S3, R2, or a CDN | With a public base URL |
+| `ipfs` | Pinata or a local Kubo node | With a gateway and pinning |
+| `arweave` | Permanent storage through Turbo | Yes, after propagation |
+
+Pass `--backend` for one command or set `ABX_STORAGE_BACKEND`. The flag wins over the environment.
+The fallback is `fs`.
+
+Keep credentials in ignored `.env`, never in commands or committed files. The root
+`.env.example` lists optional variables.
+
+## Inspect and upload
+
+```bash
+abx storage show
+abx storage upload ./art.png
+abx storage status <locator>
+```
+
+`storage status` reports:
+
+| Result | Meaning |
+| --- | --- |
+| `ready` | The configured gateway serves the bytes. |
+| `propagating` | Another gateway has the bytes; yours is behind. |
+| `unreachable` | No checked gateway can fetch the locator yet. |
+
+Upload first. Wait for `ready`. Then write the locator into a token. Re-uploading does not make a slow
+gateway catch up.
+
+## IPFS: local Kubo vs Pinata
+
+`--backend ipfs` has two modes:
+
+- `kubo` (default) — add and pin through an IPFS node you run, no third-party credential.
+- `pinata` — pin through the Pinata service. Set `ABX_IPFS_MODE=pinata` and `PINATA_JWT`.
+
+Both modes support **directory upload** — a code drop or a multi-file collection uploaded as one
+IPFS object with a single root CID, which is what powers a project's `url-template` (`<base>/{id}.<ext>`
+resolving every token from one on-chain pointer).
+
+Point `kubo` mode at a local node with:
+
+```bash
+# ABX_IPFS_API_URL=http://127.0.0.1:5001   # Kubo's RPC API (default already assumes this)
+# ABX_IPFS_GATEWAY=http://127.0.0.1:8080   # your node's gateway, or a public one for a shareable URL
+```
+
+A directory upload recurses through Kubo's `/api/v0/add`: every file's relative path is preserved
+(so `index.html` resolves at the directory root, not nested under a temp wrapper name), and the
+returned root is the CID of the wrapping directory, only once Kubo confirms every file underneath it
+landed. A dropped connection or a node error mid-upload fails the command outright rather than handing
+back a root for a partial directory — retry the upload rather than trusting a CID you're not sure is
+complete.
+
+A gateway at `127.0.0.1`/`localhost` only resolves on that machine — point `ABX_IPFS_GATEWAY` at a
+public gateway (or run one reachable from wherever the metadata gets read) before publishing.
+
+## Arweave identity
+
+`--backend arweave` needs the optional `@artblocks/abx-storage-arweave` package —
+`npm install @artblocks/abx-storage-arweave` once alongside the CLI. It is not part of the default
+install (see [Install](/docs/using-abx/installation#optional-arweave-dependency)); without it the
+CLI names the exact install command instead of failing unhelpfully.
+
+Turbo upload credits belong to the signing identity. The default `arweave` mode creates and reuses a
+key at `.abx-self-host/arweave-key.json`. Back it up before adding credits. See
+[Local data directory](/docs/using-abx/self-hosting#local-data-directory) for exactly which
+`.abx-self-host` a given command resolves to — the key always lives next to that command's SQLite
+projection, never a different one.
+
+```bash
+abx storage balance
+abx storage backup-key --out <safe-path>
+abx storage topup --usd <amount>
+```
+
+`--storage-signer eth` uses an EVM wallet as the Turbo identity. With `--sign`, the browser wallet
+signs the upload message without an onchain transaction.
+
+Fresh Arweave and IPFS content may take time to reach a given gateway. Set `ABX_ARWEAVE_GATEWAY` or
+`ABX_IPFS_GATEWAY` before publishing if the project needs a specific host.
+
+Metadata fields store bare IPFS CIDs and Arweave transaction IDs, so their preferred gateway can be
+changed later with `abx set-gateway`. Render artifacts store a finished URL. Their gateway is fixed
+when published.

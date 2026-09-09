@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "@artblocks/abx-cli": "0.1.0-alpha.39",
+    "@artblocks/abx-effects": "0.1.0-alpha.29",
+    "@artblocks/abx-indexer": "0.1.0-alpha.30",
+    "@artblocks/abx-sdk": "0.1.0-alpha.29",
+    "@artblocks/abx-storage": "0.1.0-alpha.29",
+    "@artblocks/abx-token-api": "0.1.0-alpha.32",
+    "abx-docs": "0.0.0",
+    "@artblocks/abx-storage-arweave": "0.1.0-alpha.0"
+  },
+  "changesets": [
+    "public-source-release"
+  ]
+}

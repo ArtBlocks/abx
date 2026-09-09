@@ -1,0 +1,56 @@
+{
+  "name": "@artblocks/abx-storage-arweave",
+  "version": "0.1.0-alpha.3",
+  "license": "MIT",
+  "description": "Optional ArDrive Turbo (Arweave) uploader for @artblocks/abx-storage. Install this explicitly to enable the arweave storage backend.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtBlocks/abx.git",
+    "directory": "packages/storage-arweave"
+  },
+  "homepage": "https://docs.abx.io",
+  "bugs": "https://github.com/ArtBlocks/abx/issues",
+  "keywords": [
+    "abx",
+    "nft",
+    "storage",
+    "arweave",
+    "turbo",
+    "ardrive",
+    "art-blocks"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "prepack": "tsc -b tsconfig.build.json"
+  },
+  "dependencies": {
+    "@ardrive/turbo-sdk": "^1.42.0",
+    "@dha-team/arbundles": "^1.0.4",
+    "viem": "^2.56.3"
+  }
+}

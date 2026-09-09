@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    # These updates need deliberate compatibility work, not recurring automated PRs.
+    ignore:
+      - dependency-name: "@changesets/cli"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "@types/node"
+        # The root deliberately type-checks the supported Node 22 floor while the docs use a newer
+        # type line. Dependabot otherwise normalizes both workspace manifests onto one major line.
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: changesets/action
+        update-types:
+          - version-update:semver-major

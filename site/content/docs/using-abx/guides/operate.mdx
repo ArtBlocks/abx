@@ -1,0 +1,169 @@
+---
+title: "Operate"
+description: "Manage a live ABX project."
+---
+
+Every write accepts the same [signing modes](/docs/reference/cli#signing-lanes) and `--dry-run`.
+
+## Ownership and policy
+
+```bash
+abx set-admin <address> --to 0xNewOwner
+abx set-royalty <address> --bps 500 --receiver 0xReceiver
+abx set-minter <address> --minter 0xMinter
+abx set-primary-payee <address> --payee 0xPayee
+abx pause <address>
+abx unpause <address>
+```
+
+Royalty and supply ceilings can only fall. A project enrolled in 721C or 1155C may change or suspend
+its transfer validator, but it cannot leave the standard.
+
+## Metadata
+
+```bash
+abx set-token-uri <address> --uri https://metadata.example.com
+abx set-contract-uri <address> --uri https://metadata.example.com
+abx set-renderer <address>
+abx set-renderer <address> --off
+abx set-gateway <address> --ipfs https://gateway.example/ipfs/
+abx refresh <address>
+```
+
+For an edition, run `abx ping-uri <address> --token-ids <csv-or-range>` after a contract-wide URI
+change if a consumer relies only on ERC-1155 `URI` events.
+
+Add a named file or metadata field:
+
+```bash
+abx attach <address> <key> <uri>
+abx set-field <address> --field <name> <options>
+```
+
+`abx attach` prints the canonical fetch URL for every key it stores, and checks whether a resolver
+actually answers for the project before the write lands — the on-chain field write can succeed while
+nothing is able to serve it, and this is reported as two separate facts, not one.
+
+## Replacing a code project's script
+
+```bash
+abx replace-script <address> --script <file>
+```
+
+Before `abx lock-script`, a code project's on-chain program can be replaced safely: `replace-script`
+diffs the replacement against what's on-chain (unchanged chunks are never re-sent), applies every
+change in one atomic transaction, and reads the result back to verify it reassembles exactly to the
+file before reporting success. It refuses outright on a locked script or a non-code contract.
+
+Both `replace-script` and `deploy-code` accept `--chunk-size <bytes>` to override the default
+on-chain split size (~22 KB). A smaller value forces a multi-chunk program cheaply — useful for
+testing growth or shrinkage across several chunks without a large real program.
+
+## Supply and transfers
+
+```bash
+abx mint <address>
+abx transfer <address> --token 0 --to 0xRecipient
+abx set-max-invocations <address> --max 100
+```
+
+Editions use token IDs and amounts:
+
+```bash
+abx mint <address> --token-id 0 --amount 2
+abx transfer <address> --token 0 --amount 2 --from 0xSender --to 0xRecipient
+abx set-max-supply <address> --token-id 0 --cap 100
+```
+
+## Permanent locks
+
+```bash
+abx lock-field <address> --field image
+abx lock-uri <address>
+abx lock-uri <address> --collection
+abx lock-script <address>
+abx lock-dependencies <address>
+abx lock-param-hooks <address>
+```
+
+Locks do different jobs, and each is **independent** — freezing one does nothing to any other.
+URI locks do not freeze parameters. Metadata locks do not freeze bytes held by an external dependency
+registry. `abx lock-param-hooks` freezes the three param-lifecycle hook addresses (configure /
+augment / transfer) — the one aimed at a buyer rather than at metadata, since an unfrozen transfer
+hook is a standing power to veto transfers and mints. Confirm every served field before locking.
+
+`abx lock-field` checks WHICH scope actually serves the value before it locks anything: a token-scope
+value wins over a collection-scope one when both are set (the same fallback `abx tokenuri`'s
+`abx_provenance` line reports), so a field can be visible at a scope other than the one you name.
+Locking the scope that ISN'T serving the value would report success while freezing an empty or
+overridden slot — nothing a viewer ever sees. `abx lock-field` refuses that by default and names the
+right command (`--collection` or `--token <id>`); pass `--force-field` to lock the non-serving scope
+anyway (a legitimate, deliberate move — e.g. permanently guaranteeing one token can never diverge
+from the collection default), which prints a loud warning instead of a refusal and still proceeds.
+A field genuinely unset in both scopes is never refused — there is no visible value to protect
+either way.
+
+`abx state <address>` reports every lock above in one place — token/contract URI, script,
+dependencies, param hooks, and the standard `METADATA_FIELD` set (a project's own custom field keys
+are real and lockable but are not enumerable without an indexer over `ContractFieldLocked` events) —
+distinguishing `false` (open) from unknown/unavailable, and naming the exact command that freezes
+each one.
+
+Freeze a parameter by locking its schema:
+
+```bash
+abx set-schema <address> --schema <key>:<Type>:<Auth>:lock=now
+```
+
+## Verify: integrity vs. availability
+
+`abx verify <address>` (no `--remote`) checks THIS node's own local projection, so it needs the
+project registered here first — `abx add <address>` — before it can check anything at all; that
+check runs before any scan, so an unregistered project fails fast with the exact command to run
+(rather than walking into a full historical log scan). If the project is actually served by a hosted
+resolver instead, check that directly with `abx verify <address> --remote <name>` — no local
+registration required for that lane.
+
+`abx verify <address>` answers two different questions, and its `--json` payload keeps them as two
+separate fields:
+
+- **`ok` / `contentIntegrity`** — content **integrity**, and only that: does a served byte carrying
+  an on-chain `keccak256`/`sha256` commitment still hash-match it. `ok` is `true` when every such
+  check matched or there was nothing to check (`contentIntegrity: "no-commitments"`), and `false`
+  only on a real mismatch (`contentIntegrity: "mismatch"`). **This is the only field the command's
+  exit status reflects** — `abx verify` exits non-zero if and only if a hash mismatch was found, so
+  a CI job gates on the exit code (or `ok`) and nothing else.
+- **`availability`** — a **sibling** verdict, never a rename of `ok`: is the project's content fully
+  *servable* right now. `status` is one of `available` / `partial` / `unavailable` / `unknown`. A
+  code project's status comes from render presence (a minted token with no real render anywhere
+  this command can see is `unavailable` or `partial` — genuinely missing served output, not a hash
+  question). A non-code project's `image` field stored as a bare locator (`ipfs`/`arweave`/`url`/
+  `url-template`) is a real commitment this command does not re-fetch and re-hash, so it reports
+  `unknown` rather than silently reading as "nothing to check" — `contentChecks` carries it as a
+  `verified: null` entry, the same tri-state slot a hash check uses. **A missing render or an
+  unconfirmed locator never fails the command** — only an integrity mismatch does.
+
+`abx verify <address> --remote <name|url>` checks what a HOSTED resolver actually serves instead of
+this machine's own store, and emits the same JSON shape under `--json` (`ok`, `contentIntegrity`,
+`availability`, `renders`). Its `contentIntegrity` has one additional value the local lane doesn't
+need — `"not-checked"` — when byte integrity genuinely wasn't asked (no `--remote-token`, a
+rejected credential, or an older resolver without the `/verify` route). That's a different fact from
+`"no-commitments"` (the route answered and there was nothing to check): "we didn't ask" is not "we
+asked and it was fine".
+
+`abx verify` also compares the project's actual singleton pointers — the `animation_url`
+generator and the `tokenURIRenderer` — against the chain's current canonical ones (reusing the same
+version probes the CLI's own deploy lane uses). A pointer that doesn't match is reported as
+**not current**, never as broken: an older-but-working renderer or generator still serves fine, it
+just predates a later capability. The comparison is binary by design — current or not — because
+neither manifest keeps a history of superseded singleton addresses to further classify a mismatch as
+"an old one we recognize" vs. "fully custom" (the factory-generation ladder that deploys clones
+*does* keep that history; the shared renderer/generator singletons deliberately do not — see
+[deployments](/docs/reference/deployments)). A canonical singleton-address change is always called
+out in that package's release notes.
+
+## Local state
+
+`abx state <address>` reads the contract, including every irreversible lock (see "Permanent locks"
+above). `abx tokens <address>` lists indexed tokens. `abx forget <address>` removes only the local
+registration; it does not touch the chain.

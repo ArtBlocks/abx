@@ -1,0 +1,149 @@
+# Validate every pull request with the same pinned Node, pnpm, and lockfile used for releases.
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes an in-flight run on the same ref (but never cancels a `main` run).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Changesets compares pending releases with the configured base branch.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Packages run this same build during prepack.
+      - run: pnpm build
+
+      # Chain-reading tests fall back to the SDK's PUBLIC default endpoints when these are unset,
+      # which is both slow (GitHub's shared egress) and rate-limited — the same HTTP 429s that
+      # derailed an agent sweep. Optional on purpose: a fork PR has no access to secrets, and the
+      # suite must still pass there, so these are a speed/reliability upgrade rather than a
+      # requirement. If a secret is absent the value is empty and the SDK's default applies.
+      - run: pnpm test
+        env:
+          ABX_RPC_URLS_SEPOLIA: ${{ secrets.ABX_RPC_URLS_SEPOLIA }}
+          ABX_RPC_URLS_BASE_SEPOLIA: ${{ secrets.ABX_RPC_URLS_BASE_SEPOLIA }}
+
+      - run: pnpm check:hygiene
+
+      # Fail on new production advisories. Two no-fix advisories in optional Turbo dependency paths
+      # are matched exactly and documented by the audit wrapper.
+      - run: pnpm check:audit
+
+      # Ensure every changed published package has a changeset. Runs after build so generated output
+      # participates in the comparison.
+      - run: pnpm check:publish-drift
+
+  # Split out of `typescript` so it runs CONCURRENTLY rather than adding to that job's wall clock.
+  # It shares no state with the test suite, so serialising them only ever cost time. The `typescript`
+  # job KEEPS its name on purpose: it is the required status check, and renaming it would leave
+  # branch protection waiting forever for a check that no longer reports.
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The site imports the workspace packages, so it needs them built first.
+      - run: pnpm build
+
+      # The documentation site is the canonical public documentation surface.
+      - run: pnpm --dir site build
+
+  # Also split out: `tier2` packs every workspace package and installs it into a clean consumer, which
+  # is slow and completely independent of the unit suite. It is the ONLY gate that can catch a
+  # packaging bug (a Tier 1 run resolves workspace source, so it cannot), which is why it stays a
+  # required part of CI rather than moving to release-only.
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # `pnpm pack` does run each package's own prepack (tsc -b), so on a fresh checkout this is
+      # redundant. Kept anyway: `tsc -b` is INCREMENTAL, so a dist that exists while its
+      # .tsbuildinfo claims to be current is silently not rebuilt, and pack then ships an empty
+      # dist — the failure surfaces as "skill install failed", nowhere near its cause. 17s to
+      # remove that class, and this job is not the critical path.
+      - run: pnpm build
+
+      # Exercise the CLI and skill from packed artifacts, matching an end-user installation.
+      - run: pnpm tier2
+
+  solidity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: 1.4.3 # pinned: contracts/.foundry-version — the version every committed size and
+          # metadata hash was produced under. See contracts/README.md on why `forge fmt` is NOT run here.
+
+      - name: Install pinned Solidity dependencies
+        working-directory: contracts
+        run: forge soldeer install
+
+      - name: Build
+        working-directory: contracts
+        run: forge build
+
+      # The CLI scaffold installs this exact tree as `abx-contracts`. Keep packaging in CI so
+      # a Soldeer-ignore or layout edit cannot make the next protocol release uninstallable.
+      - name: Validate Soldeer package
+        working-directory: contracts
+        run: |
+          solidity_version="$(tr -d '[:space:]' < VERSION)"
+          forge soldeer push "abx-contracts~${solidity_version}" . --dry-run
+          unzip -l contracts.zip | grep -q 'src/interfaces/IAbxSequentialMint.sol'
+          unzip -l contracts.zip | grep -q 'src/reference/TransferCounterHook.sol'
+          unzip -l contracts.zip | grep -q 'src/extensions/dependencies/Dependencies.sol'
+          package_dir="$(mktemp -d)"
+          unzip -q contracts.zip -d "$package_dir"
+          cd "$package_dir"
+          forge soldeer install
+          forge build
+
+      # Includes the EIP-170 margin guard. When it fails, do NOT raise the floor — externalize bytes
+      # into a delegatecalled library.
+      - name: Test
+        working-directory: contracts
+        run: forge test

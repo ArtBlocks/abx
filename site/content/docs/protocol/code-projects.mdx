@@ -1,0 +1,116 @@
+---
+title: "Code projects"
+description: "Programs, seeds, token data, rendering, and traits."
+---
+
+A code project stores or points to a program. Its output follows a simple contract:
+
+```text
+content + parameters + environment -> output
+```
+
+## Code custody
+
+ABX supports two forms:
+
+| Mode | Code location | Entry point |
+| --- | --- | --- |
+| Directory | IPFS, Arweave, or a URL | `index.html` |
+| Template | Onchain script chunks and dependencies | Assembled by `AbxGenerator` |
+
+A directory project stores a locator in its `code` collection field. A template project stores script
+chunks through the code extensions. Dependency index 0 is the runtime by convention.
+
+## Token data
+
+The program receives one object called `tokenData`:
+
+```json
+{
+  "chainId": 84532,
+  "contractAddress": "0x1a2b...",
+  "tokenId": "42",
+  "seed": "0x9f31...",
+  "palette": "Ochre",
+  "density": "0.85"
+}
+```
+
+Contract parameters provide defaults. Token parameters override them. An augment hook may add or replace
+values at read time.
+
+The reserved keys are `chainId`, `contractAddress`, `tokenId`, and `seed`. Keys are sorted and
+serialized as compact UTF-8 JSON. This canonical form is used when effect inputs are hashed.
+
+The program can receive token data through an injected `window.abxTokenData`, an `abx` URL parameter,
+or an RPC read. The small `abx.js` helper resolves those paths and exposes:
+
+```js
+abx.traits({Palette: 'Ochre'});
+abx.done();
+```
+
+Preview the same document shape before deployment:
+
+```bash
+abx preview --script ./index.html
+```
+
+## Seeds
+
+The token asks its seed-source contract for a seed at mint and stores the result. The shared
+`AbxSeedSource` uses the project address, token ID, and current block values.
+
+This source is pseudorandom, not secret or lottery-grade randomness. Contract callers and block builders
+can inspect or influence transaction execution. Use a commitment scheme or VRF-backed source when one
+outcome has material prize value.
+
+On an ERC-721 Series, minting is sequential. The buyer accepts or rejects the next outcome. On an
+edition, the buyer names the ID. A code edition assigns its seed on that ID's first mint, so an unminted
+ID is a selection input.
+
+A custom `IAbxSeedSource` can use different rules:
+
+```bash
+abx set-seed-source 0xYourContract 0xYourSeedSource
+```
+
+This affects future mints only.
+
+A seed is settled after assignment unless the project declared a seed parameter schema before minting
+began. That schema lets an authorized party choose a value. It is not a new random draw.
+
+## Rendering
+
+`AbxGenerator` produces the program document.
+
+For a template, it combines token data, `abx.js`, dependencies, and script chunks. For a directory, it
+returns the code locator with token data attached.
+
+`onChainStatus(token)` reports the chosen path, whether all bytes are reachable from chain, and any
+unresolved dependencies.
+
+A large generated document may exceed an RPC provider's `eth_call` limit. Clients can read it in parts:
+
+| Read | Result |
+| --- | --- |
+| `tokenDataJson` | Canonical token data |
+| `dependencyTag` | One dependency tag |
+| `registryScriptChunk` | One registry chunk |
+| `abxJs` / `gunzipScript` | Shared runtime bytes |
+
+A chain-complete project can still change if it uses a mutable dependency registry. An `OnChain`
+dependency points to fixed SSTORE2 bytes.
+
+## Images and traits
+
+A program produces the live `animation_url`. A still image normally comes from the `render.image`
+[effect](/docs/protocol/effects). Until that effect lands, the resolver returns a deterministic
+placeholder.
+
+A script reports traits with `abx.traits()`. A project may also compute `attributes` with a Solidity
+[field renderer](/docs/protocol/renderers). When both exist, onchain traits win when the same trait name
+appears twice.
+
+Parameters do not become marketplace traits automatically. Report the values that belong in the public
+trait list.

@@ -1,0 +1,40 @@
+---
+title: "Agent setup"
+description: "How ABX gives coding agents the right commands and guardrails."
+---
+
+The CLI works by itself. The skill teaches a coding agent how to choose commands, explain permanent
+settings, and stop for wallet approvals.
+
+## Install the matching skill
+
+```bash
+abx skill install
+```
+
+The skill version is stamped when the CLI ships. `abx doctor` warns when the installed copy no longer
+matches. Run the install command again after each CLI upgrade.
+
+The default install covers Claude Code, Cursor, Codex CLI, Gemini CLI, and GitHub Copilot. To limit the
+install, use one of these:
+
+```bash
+abx skill install --agent codex
+abx skill install --agent cursor
+abx skill install --global
+```
+
+Restart the agent after installation.
+
+## Keep signing human
+
+Use `--sign` for browser-wallet approval. The agent prepares each transaction and opens the signing
+page. It never needs your private key.
+
+`--send` uses a key from the environment and is meant for unattended testnet automation. `--dry-run`
+simulates a write without sending it. See [signing modes](/docs/reference/cli#signing-lanes).
+
+## What the skill does not do
+
+The skill does not choose your edition size, storage permanence, royalty terms, or sale price. It
+should ask, show the resulting plan, and wait for your approval.

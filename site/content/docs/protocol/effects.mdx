@@ -1,0 +1,52 @@
+---
+title: "Effects"
+description: "Derived output produced from ABX events and token state."
+---
+
+An effect is an offchain process that watches project events and writes derived output. Rendering a
+code project to a still image is the reference effect. Effects never hold source files.
+
+## Addressing
+
+An effect declares a key, triggers, outputs, and an environment. ABX hashes the content, canonical
+token data, and environment ID into `inputsHash`.
+
+```text
+{chainId}/{address}/{tokenId}/{effectKey}/{inputsHash}/{outputKey}
+```
+
+The address makes deterministic work idempotent. A restarted worker can ask storage what is missing.
+
+## Triggers
+
+| Change | Event |
+| --- | --- |
+| Mint | `Transfer` from zero |
+| Parameter value | `TokenParamConfigured` or `ContractParamConfigured` |
+| Parameter schema | `ParamSchemaConfigured` |
+| Owner-sensitive output | `Transfer` |
+| Manual render | Operator request |
+
+## Metadata binding
+
+`render.image` fills `image` only when the project did not set one. `render.traits` merges into
+`attributes`, with onchain traits winning duplicate names. Other outputs appear in the artifact list.
+
+A worker may post a hash or locator back to an authorized parameter and lock it later. Write-back is
+optional.
+
+The reference worker loads the live document in Chromium, waits for `abx.done()` or a configured delay,
+and captures the image and traits. Run it with `abx effects`, `abx render`, or `abx deploy-effects`.
+
+## Checking currency directly
+
+`abx artifacts <address> --token <id>` reads a token's artifact set without fetching and parsing the
+whole served document. It reports the same entries the metadata would serve, plus every registered
+effect row — current and stale — each labeled against the token's active `inputsHash`. A stale row (a
+parameter changed since it rendered) is silently absent from the served `artifacts` list, but stays
+visible here so a param change that re-addressed a render is diagnosable rather than invisible.
+
+`--remote <name|url>` asks a hosted resolver what it actually reports, rather than this node's own
+local projection — the same split as `abx verify` / `abx verify --remote`. A hosted project's real
+artifact set lives on the resolver that serves it, which may run its own implementation of this same
+manifest logic; the report says which surface answered.

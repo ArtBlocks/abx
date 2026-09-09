@@ -1,0 +1,172 @@
+---
+title: "SDK"
+description: "Typed ABX reads, deployments, transactions, and service clients."
+---
+
+`@artblocks/abx-sdk` is the ESM-only TypeScript library under the CLI. It uses viem and requires Node.js
+22.13 or newer.
+
+Use the CLI for a person or coding agent at a terminal. Use the SDK inside applications, workers, and
+repeatable jobs.
+
+## Install
+
+```bash
+npm install @artblocks/abx-sdk viem
+```
+
+```ts
+import {makePublicClient, reconstructProject} from '@artblocks/abx-sdk';
+
+const client = makePublicClient({chainKey: 'base-sepolia'});
+const project = await reconstructProject(client, {
+  address: '0xYourContract',
+  fromBlock: 12345678n,
+});
+```
+
+The main entry is safe to bundle for browsers. Import `@artblocks/abx-sdk/node` only from Node code.
+That subpath contains `.env` loading.
+
+## Configuration
+
+Pass explicit options when possible. SDK fallbacks include:
+
+| Setting | Environment variable |
+| --- | --- |
+| Chain | `ABX_CHAIN` |
+| RPC list | `ABX_RPC_URLS_<CHAIN>` or `ABX_RPC_URLS` |
+| Hot signing key | `ABX_DEPLOYER_PK` |
+| Canonical address overrides | Matching `ABX_*` deployment variable |
+
+The SDK never loads `.env` through its main entry. A host may call `loadDotEnv()` from the Node subpath.
+
+## Transactions
+
+Write helpers return `PreparedTx`. The object contains the destination, calldata, value, chain ID, and
+a human summary. Your application decides how to simulate, batch, sign, and send it.
+
+```ts
+import {
+  makePublicClient,
+  makeWalletClient,
+  makeHotSender,
+  prepareSetRoyalty,
+  runPrepared,
+} from '@artblocks/abx-sdk';
+
+const publicClient = makePublicClient({chainKey: 'base-sepolia'});
+const {wallet, account} = makeWalletClient({chainKey: 'base-sepolia'});
+const send = makeHotSender({wallet, account, publicClient});
+
+await runPrepared([
+  prepareSetRoyalty({
+    contract: '0xYourContract',
+    receiver: account.address,
+    bps: 500,
+    chainId: 84532,
+  }),
+], send);
+```
+
+Browser wallets, Safes, ERC-4337 accounts, and transaction queues can implement the same `SendTx`
+function. Do not use `makeHotSender` in browser code.
+
+`batchOps()` combines compatible operations into same-contract multicalls. Cross-contract calls stay
+separate unless the signing account provides its own batching.
+
+## Deployments
+
+High-level deployment functions include:
+
+- `deployOneOfOne`, `deploySeries`, `deployOneOfOneEdition`, `deployEditionImage`, and `deployEditionCode`
+- `predictClone` and guarded `saltFor`
+- `ensureFactory`, `ensureSeriesFactory`, and the other canonical infrastructure checks
+
+Factories create deterministic EIP-1167 clones. The deploy result includes the clone address,
+transaction hash, and block number.
+
+The lower-level `prepareDeploy*` functions return unsigned transactions without sending.
+
+## Owner operations and sales
+
+The `prepare*` family covers transfers, mints, URI configuration, fields, locks, royalties, supply,
+minters, parameters, code, dependencies, seeds, and transfer validators.
+
+Sale helpers include:
+
+- `prepareConfigureSale` and `preparePurchase` for ERC-721
+- `prepareConfigureSale1155` and `preparePurchase1155` for editions
+- `readSaleConfig` and `readSaleConfig1155`
+
+## Read and reconstruct
+
+`reconstructProject()` replays the ABX event history and confirms live contract state. The result holds
+identity, ownership, token type, canonical status, URI configuration, fields, policy, code, parameters,
+and token rows.
+
+For a watcher, use `reconstructIncremental()` with the previous state or `reconstructFromLogs()` with
+logs fetched by a shared process. `getLogsAdaptive()` handles RPC range limits.
+
+By default both `reconstructProject()` and `reconstructIncremental()` scan through the chain's
+current head (`toBlock: 'latest'`, the default — existing callers are unaffected). Pass
+`toBlock: 'safe'` or `toBlock: 'finalized'` instead to stop at that tag, which the SDK resolves to a
+concrete block number *before* scanning and stores as that number — never the tag itself — in the
+returned `ProjectState.toBlock`. Not every RPC serves these tags (pre-merge chains have no
+post-merge finality; some non-archive or indexer-backed endpoints answer neither); when the RPC
+can't resolve one, the call throws `BlockTagUnavailableError` rather than silently falling back to
+`latest`.
+
+Other common reads:
+
+| Function | Result |
+| --- | --- |
+| `listTokens` | Current owner, supply, seed, and parameter rows |
+| `buildTokenData` | Canonical input for rendering |
+| `readParamSchema` | Typed parameter rules |
+| `readCollectionPolicy` | Burnability and royalty ceiling |
+| `verifyCanonical` | Current factory trust result |
+| `verifyProvenance` | Current or prior factory generation |
+| `onChainUriReport` | Whether URI resolution is fully onchain |
+
+ERC-721 lifecycle values are `unminted`, `live`, and terminal `burned`. ERC-1155 editions use `live`
+or `no-live-copies`; an ID with zero copies can mint again.
+
+## Resolver client
+
+`AbxServiceClient` speaks the public service descriptor and version 1 control plane.
+
+```ts
+import {AbxServiceClient, isAccepted} from '@artblocks/abx-sdk';
+
+const service = new AbxServiceClient({
+  baseUrl: 'https://metadata.example.com',
+  token: process.env.ABX_REMOTE_MYPROVIDER_TOKEN,
+});
+
+const result = await service.registerProject({
+  chainId: 84532,
+  address: '0xYourContract',
+});
+
+if (isAccepted(result)) {
+  await service.awaitIndexed(84532, '0xYourContract');
+}
+```
+
+The client also lists, removes, and reindexes projects and publishes effect status. See
+[Hosted services](/docs/using-abx/remote-services).
+
+## Storage package
+
+Byte storage lives in `@artblocks/abx-storage`. Its `StorageBackend` interface covers filesystem,
+S3/R2, IPFS, and Arweave. The Arweave (Turbo) uploader is a separate, optional package —
+`npm install @artblocks/abx-storage-arweave` — so a default `@artblocks/abx-storage` install stays
+free of Turbo's dependency tree. `ArweaveBackend` lazily resolves it only on an actual
+upload/balance/top-up.
+
+Use `locatorStatus()` or `awaitLocatorReady()` before placing a new locator in token metadata. An
+accepted upload may not be available through every gateway yet.
+
+The package source and exported types are in
+[`packages/sdk`](https://github.com/ArtBlocks/abx/tree/main/packages/sdk).

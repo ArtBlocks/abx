@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    {"path": "packages/sdk/tsconfig.build.json"},
+    {"path": "packages/storage-arweave/tsconfig.build.json"},
+    {"path": "packages/storage/tsconfig.build.json"},
+    {"path": "packages/indexer/tsconfig.build.json"},
+    {"path": "packages/token-api/tsconfig.build.json"},
+    {"path": "packages/effects/tsconfig.build.json"},
+    {"path": "packages/cli/tsconfig.build.json"}
+  ]
+}

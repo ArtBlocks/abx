@@ -1,0 +1,85 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["dependencies"]
+test = "test"
+script = "script"
+solc = "0.8.28"
+evm_version = "paris"          # broad multi-chain compat (no PUSH0/cancun assumptions); bump per-chain as needed
+optimizer = true
+optimizer_runs = 1_000_000     # implementation is cloned once, called forever → optimize runtime
+via_ir = false
+fs_permissions = [
+    { access = "read", path = "./out" },
+    { access = "read", path = "./assets" }, # generator runtime assets (abx.js + gunzip bootstrap)
+]
+
+# SeriesCode composes the full code-project extension set and rides the EIP-170 ceiling even
+# with the write paths externalized (AbxParamsLib / AbxCodeLib). Its compilation unit (the
+# implementation + the factory that `new`s it) compiles at lower runs to fit; every other
+# contract keeps max-runs runtime optimization. AbxGenerator (the on-chain generator
+# singleton) also rides the ceiling at max runs — and is a pure view surface (eth_call
+# lane), where runtime-gas optimization buys nothing — so it compiles at the same 200-run
+# floor (the owner's floor: never below 200; below-ceiling growth moves to external libs).
+# AbxMetadataRenderer joined the floor at spec v4: the abx_params emission left it ~600 B
+# under the ceiling at max runs, and it is the same pure eth_call surface — the floor buys
+# the next spec version its headroom.
+additional_compiler_profiles = [
+    { name = "clone-impl", optimizer_runs = 200 },
+]
+compilation_restrictions = [
+    { paths = "src/tokens/SeriesCode.sol", optimizer_runs = 200 },
+    { paths = "src/factories/SeriesCodeFactory.sol", optimizer_runs = 200 },
+    { paths = "src/renderers/AbxGenerator.sol", optimizer_runs = 200 },
+    { paths = "src/renderers/AbxMetadataRenderer.sol", optimizer_runs = 200 },
+    # EditionCode composes the full code-project extension set on top of the 1155 sale stack —
+    # the same EIP-170 risk as SeriesCode, so it joins the 200-run floor for the same reason.
+    { paths = "src/tokens/EditionCode.sol", optimizer_runs = 200 },
+    { paths = "src/factories/EditionCodeFactory.sol", optimizer_runs = 200 },
+    # The two forkable in-chain renderer examples. Pinned for the same reason as AbxMetadataRenderer
+    # and AbxGenerator — pure `eth_call` view surfaces, where runtime-gas optimization buys nothing
+    # and smaller code is the useful axis. Pinned ALSO because leaving them unrestricted made
+    # `forge build` and `forge create` disagree: the artifact in `out/` was the 1,000,000-run build
+    # while a `forge create` deploy landed the 200-run one, so the deployed contract did not match
+    # the artifact anyone would compare it against, and the mismatch read as "the deployment is
+    # stale" when the source was identical. Declaring the profile makes the two agree by
+    # construction — and a creator forking these compiles them in their own project anyway.
+    { paths = "src/renderers/examples/SeedSvgRenderer.sol", optimizer_runs = 200 },
+    { paths = "src/renderers/examples/SeedTraitsRenderer.sol", optimizer_runs = 200 },
+]
+
+[lint]
+# Deliberate style choices, excluded so `forge lint` stays signal:
+#  - public immutables use lowerCamelCase for clean getter ABI (implementation(), not IMPLEMENTATION())
+#  - keccak256 over inline asm in the one-time deterministic-salt path (clarity > micro-gas)
+#  - ERC/Solady-style acronym casing in identifiers (URI, ID) — e.g. _initSingleTokenURI,
+#    consistent with tokenURI / contractURI; renaming to ...Uri would be the inconsistent option
+exclude_lints = [
+    "screaming-snake-case-immutable",
+    "asm-keccak256",
+    "mixed-case-variable",
+    "mixed-case-function",
+]
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+
+# Etherscan source verification for the canonical contracts (factory + implementation,
+# renderer, chunk store). This is a one-time maintainer step done with forge — NOT the
+# self-host CLI's job (it only stamps out EIP-1167 clones, which Etherscan auto-recognizes):
+#   forge script script/Deploy.s.sol --rpc-url <rpc> --broadcast --verify   # factory + impl
+#   forge verify-contract <addr> src/renderers/AbxChunkStore.sol:AbxChunkStore --chain sepolia
+# Key comes from the ETHERSCAN_API_KEY env (kept in .env, never committed); one V2 key covers all chains.
+[etherscan]
+sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 11155111}
+base-sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 84532}
+
+[soldeer]
+remappings_generate = false    # we manage remappings.txt by hand for a clean monorepo lift
+
+[dependencies]
+solady = "0.1.26"
+forge-std = "1.16.1"

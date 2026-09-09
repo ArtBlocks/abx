@@ -1,0 +1,132 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+:root {
+  --abx-rust: #a33e25;
+  --abx-sun: #e3a047;
+  --abx-ridge: #c8a77f;
+  --abx-ink: #211c16;
+  --abx-paper: #f6efe3;
+  --color-fd-background: #f2eadc;
+  --color-fd-card: #f8f2e8;
+  --color-fd-muted: #e5dac9;
+  --color-fd-muted-foreground: #625a50;
+  --color-fd-border: #cfc2af;
+}
+
+.dark {
+  --abx-rust: #dc7958;
+  --abx-sun: #c47737;
+  --abx-ridge: #513d2d;
+  --abx-ink: #f0e5d3;
+  --abx-paper: #18130f;
+  --color-fd-background: #17130f;
+  --color-fd-card: #201a15;
+  --color-fd-muted: #2b231c;
+  --color-fd-muted-foreground: #b7aa98;
+  --color-fd-border: #3a3027;
+}
+
+@theme inline {
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --color-fd-primary: var(--abx-rust);
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-ring: var(--abx-rust);
+}
+.dark {
+  --color-fd-primary: var(--abx-rust);
+  --color-fd-primary-foreground: #17130f;
+  --color-fd-ring: var(--abx-rust);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.02em;
+}
+code,
+pre,
+kbd {
+  font-family: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+.prompt-card {
+  position: relative;
+  max-width: 720px;
+  margin-top: 2rem;
+  padding: 1.25rem 7.25rem 1.25rem 1.25rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-fd-card) 88%, transparent);
+}
+
+.prompt-card-label {
+  margin-bottom: 0.55rem;
+  color: var(--abx-rust);
+  font-family: var(--font-mono-face), ui-monospace, monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.prompt-card p {
+  margin: 0;
+  font-family: var(--font-mono-face), ui-monospace, monospace;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.prompt-card button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 2px;
+  background: var(--color-fd-background);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.prompt-card button:hover {
+  background: var(--color-fd-muted);
+}
+
+.prompt-card button svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+@media (max-width: 560px) {
+  .prompt-card {
+    padding-right: 1.25rem;
+    padding-bottom: 4rem;
+  }
+
+  .prompt-card button {
+    top: auto;
+    right: auto;
+    bottom: 1rem;
+    left: 1.25rem;
+  }
+}
