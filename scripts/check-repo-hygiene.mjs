@@ -88,6 +88,13 @@ if (readFileSync(resolve(root, 'CLAUDE.md'), 'utf8').trim() !== '@AGENTS.md') {
   errors.push('CLAUDE.md must import the canonical AGENTS.md guide');
 }
 
+const rootPackage = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+if (rootPackage.scripts?.['ci:publish'] !== 'changeset publish') {
+  errors.push(
+    'package.json ci:publish must use `changeset publish` so releases create package tags and GitHub Releases',
+  );
+}
+
 const secretPatterns = [
   ['private-key block', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
   ['AWS access key', /AKIA[0-9A-Z]{16}/],

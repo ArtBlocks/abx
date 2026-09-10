@@ -43,7 +43,9 @@ jobs:
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
           version: pnpm ci:version # bump versions + regenerate CHANGELOGs (into the PR)
-          publish: pnpm ci:publish # pnpm -r publish over OIDC (only when no changesets remain)
+          # `changeset publish` emits the package/version records the action uses to create tags and
+          # GitHub Releases. It delegates each package to pnpm, which performs the OIDC publish.
+          publish: pnpm ci:publish
           commit: "chore(release): version packages"
           title: "chore(release): version packages"
         env:
