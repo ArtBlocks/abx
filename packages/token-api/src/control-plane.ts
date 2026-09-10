@@ -15,11 +15,14 @@ import {fileURLToPath} from 'node:url';
 import type {IncomingMessage, ServerResponse} from 'node:http';
 import {
   discoverDeployBlock,
+  findAnchorGenerationById,
+  findAnchorGenerationForProject,
   isBoundOutput,
   locatorRejectionReason,
   normalizeAttributes,
   renderArtifactKey,
   resolveChain,
+  summarizeAnchorGeneration,
   BOUND_ARTIFACT_MAX_BYTES,
   CONTROL_PLANE_INTERFACE,
   TOKEN_API_INTERFACE,
@@ -198,9 +201,29 @@ function tokenCounts(s: ProjectState): {mintedCount: number; burnedCount?: numbe
   return {mintedCount: live, ...(burned ? {burnedCount: burned} : {})};
 }
 
+/** Explicit adapter/support claim for this service build. Append only after its tests pass. */
+export const SUPPORTED_CONTRACT_GENERATION_IDS = ['abx-core-v2'] as const;
+const supportedGenerationIds = new Set<string>(SUPPORTED_CONTRACT_GENERATION_IDS);
+
+function supportedContractGenerations() {
+  return SUPPORTED_CONTRACT_GENERATION_IDS.map((id) => {
+    const generation = findAnchorGenerationById(id);
+    if (!generation) throw new Error(`Unknown supported contract generation: ${id}`);
+    return summarizeAnchorGeneration(generation);
+  });
+}
+
+function contractGenerationOf(s: ProjectState) {
+  const generation = findAnchorGenerationForProject(s);
+  return generation && supportedGenerationIds.has(generation.id)
+    ? summarizeAnchorGeneration(generation)
+    : undefined;
+}
+
 /** The one-line project summary shared by `GET /api/projects` and the register/reindex responses. */
 export function summarize(s: ProjectState) {
   const copies = copiesOf(s);
+  const contractGeneration = contractGenerationOf(s);
   return {
     address: s.address,
     name: s.name,
@@ -208,6 +231,7 @@ export function summarize(s: ProjectState) {
     owner: s.owner,
     abxVersion: s.abxVersion,
     isCanonical: s.isCanonical,
+    ...(contractGeneration ? {contractGeneration} : {}),
     extensions: s.extensions.map((e) => e.name),
     eventCount: s.eventCount,
     tokenCount: s.tokens.length,
@@ -317,6 +341,7 @@ export async function serviceDescriptor(ctx: ControlPlaneContext): Promise<Servi
     service: {name: process.env.ABX_SERVICE_NAME ?? pkg.name, version: pkg.version},
     interfaces: controlPlane ? [TOKEN_API_INTERFACE, CONTROL_PLANE_INTERFACE] : [TOKEN_API_INTERFACE],
     chains: [ctx.chainId],
+    contractGenerations: supportedContractGenerations(),
     baseUrl: ctx.baseUrl,
   };
   if (controlPlane) {
@@ -573,6 +598,7 @@ function listProjects(res: ServerResponse, ctx: ControlPlaneContext): void {
     // "3 live, 1 backfilling, 1 failed (rpc_rate_limited)" without a round trip per project.
     const life = lifecycle(ctx, reg.address);
     const copies = state ? copiesOf(state) : undefined;
+    const contractGeneration = state ? contractGenerationOf(state) : undefined;
     return {
       chainId,
       address: reg.address,
@@ -584,6 +610,7 @@ function listProjects(res: ServerResponse, ctx: ControlPlaneContext): void {
       tokenCount: state?.tokens.length ?? 0,
       ...(state ? tokenCounts(state) : {mintedCount: 0}),
       ...(copies !== undefined ? {copies} : {}),
+      ...(contractGeneration ? {contractGeneration} : {}),
       reconstructedAt: state?.reconstructedAt ?? null,
     };
   });
@@ -621,6 +648,7 @@ async function projectStatus(res: ServerResponse, ctx: ControlPlaneContext, addr
   // percentage, and when it's most likely to be polling) ⇒ read head once, cached.
   const head = watcherHead ?? (await cachedHead(ctx, reg.chainKey));
   const copies = state ? copiesOf(state) : undefined;
+  const contractGeneration = state ? contractGenerationOf(state) : undefined;
   return sendJson(res, 200, {
     chainId: ctx.chainId,
     address: reg.address,
@@ -632,6 +660,7 @@ async function projectStatus(res: ServerResponse, ctx: ControlPlaneContext, addr
     tokenCount: state?.tokens.length ?? 0,
     ...(state ? tokenCounts(state) : {mintedCount: 0}),
     ...(copies !== undefined ? {copies} : {}),
+    ...(contractGeneration ? {contractGeneration} : {}),
     reconstructedAt: state?.reconstructedAt ?? null,
     watcher: {
       watching: pollAt !== null,

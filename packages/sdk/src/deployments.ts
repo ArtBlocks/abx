@@ -33,11 +33,14 @@ export {
   currentAnchorGeneration,
   findAnchorGenerationByCoreVersion,
   findAnchorGenerationByFactory,
+  findAnchorGenerationForProject,
   findAnchorGenerationById,
+  summarizeAnchorGeneration,
   supportsGenerationOperation,
 } from './contract-generations.js';
 export type {
   AnchorGeneration,
+  ContractGenerationSummary,
   GenerationLifecycle,
   GenerationOperation,
   GenerationSupport,

@@ -39,6 +39,14 @@ export interface AnchorGeneration {
   readonly note?: string;
 }
 
+/** Compact generation facts suitable for service responses and logs. */
+export interface ContractGenerationSummary {
+  readonly id: string;
+  readonly coreVersion: number;
+  readonly lifecycle: GenerationLifecycle;
+  readonly support: GenerationSupport;
+}
+
 const FACTORY_KEYS = [
   'factory',
   'seriesFactory',
@@ -129,6 +137,27 @@ export function findAnchorGenerationByFactory(factory: Address): AnchorGeneratio
   return ANCHOR_GENERATIONS.find((generation) =>
     Object.values(generation.factories).some((candidate) => candidate.toLowerCase() === needle),
   );
+}
+
+/** Resolve official generation provenance from reconstructed project facts.
+ *  A self-reported core version or caller-supplied factory alone is not enough. */
+export function findAnchorGenerationForProject(project: {
+  readonly abxVersion: number | null;
+  readonly factory: Address | null;
+  readonly isCanonical: boolean | null;
+}): AnchorGeneration | undefined {
+  if (project.isCanonical !== true || !project.factory || project.abxVersion === null) return undefined;
+  const generation = findAnchorGenerationByFactory(project.factory);
+  return generation?.coreVersion === project.abxVersion ? generation : undefined;
+}
+
+export function summarizeAnchorGeneration(generation: AnchorGeneration): ContractGenerationSummary {
+  return {
+    id: generation.id,
+    coreVersion: generation.coreVersion,
+    lifecycle: generation.lifecycle,
+    support: generation.support,
+  };
 }
 
 export function supportsGenerationOperation(
