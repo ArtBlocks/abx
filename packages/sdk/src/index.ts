@@ -13,6 +13,7 @@ export type {Address, Hex, PublicClient, WalletClient, Account} from 'viem';
 
 export * from './types.js';
 export * from './spine.js';
+export * from './chain-support.js';
 export * from './chains.js';
 export * from './clients.js';
 export * from './ops.js';

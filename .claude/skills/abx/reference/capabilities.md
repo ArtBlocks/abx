@@ -160,7 +160,8 @@ salt/deployer and predicted address before deploying either side.
 
 The toolkit currently does not provide:
 
-- mainnet deployment or unsupported-chain recipes;
+- operation on a chain whose capability entry is `disabled`, including all production networks in
+  the current release;
 - a secondary-market listing/order-book feature;
 - Solidity compilation/deployment through `abx`;
 - CLI replacement of a deployed code project's script;

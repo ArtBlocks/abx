@@ -24,8 +24,9 @@ typed errors outrank remembered prose.
   inspect configuration safely.
 - Use `pnpm abx …` inside the ABX source repository. Use `abx …` in a creator project or installed
   environment. Run `abx version` if provenance is uncertain.
-- Operate only on chains reported by `abx capabilities`; the toolkit is testnet-only today. Select
-  the chain with `ABX_CHAIN=<chain>`; there is deliberately no `--chain` flag.
+- Read the full `chains` array from `abx capabilities --json` before choosing a network. Never
+  operate on a `disabled` chain. Call out `experimental` or `beta` status and its risks before a
+  transaction. Select with `ABX_CHAIN=<chain>`; there is deliberately no `--chain` flag.
 - Run `abx help <command>` immediately before composing a non-trivial command. Do not recover flag
   syntax from this skill.
 - Never infer that a capability is absent because a flag is absent. Run `abx capabilities --json`,

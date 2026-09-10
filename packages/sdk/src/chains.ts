@@ -1,5 +1,6 @@
-import {sepolia, baseSepolia} from 'viem/chains';
+import {arbitrum, arbitrumSepolia, base, baseSepolia, mainnet, sepolia} from 'viem/chains';
 import type {Chain} from 'viem';
+import {CHAIN_SUPPORT, CHAIN_SUPPORT_REGISTRY, isChainSelectable} from './chain-support.js';
 import {readEnv} from './util.js';
 
 /**
@@ -10,19 +11,36 @@ import {readEnv} from './util.js';
 export const CHAINS: Record<string, Chain> = {
   'base-sepolia': baseSepolia,
   sepolia,
+  'arbitrum-sepolia': arbitrumSepolia,
+  base,
+  'arbitrum-one': arbitrum,
+  ethereum: mainnet,
 };
 
-/** Every chain key this toolkit ships, for validating an `ABX_CHAIN` before anything tries to use it. */
-export const KNOWN_CHAIN_KEYS = Object.keys(CHAINS);
+for (const support of CHAIN_SUPPORT) {
+  const chain = CHAINS[support.key];
+  if (!chain || chain.id !== support.chainId) {
+    throw new Error(`Chain metadata mismatch for ${support.key}: registry=${support.chainId}, viem=${chain?.id ?? 'missing'}`);
+  }
+}
 
+/** Every recognized chain, including production networks that are deliberately disabled. */
+export const ALL_CHAIN_KEYS = CHAIN_SUPPORT.map((chain) => chain.key);
 
-export const DEFAULT_CHAIN_KEY = 'base-sepolia';
+/** Chains this release permits callers to select with `ABX_CHAIN`. */
+export const SUPPORTED_CHAIN_KEYS = CHAIN_SUPPORT.filter(isChainSelectable).map((chain) => chain.key);
+
+/** Backward-compatible name for the CLI-selectable chain list. */
+export const KNOWN_CHAIN_KEYS = SUPPORTED_CHAIN_KEYS;
+
+export const DEFAULT_CHAIN_KEY = CHAIN_SUPPORT_REGISTRY.defaultChain;
 
 // Public, keyless endpoints per chain — overridable. A self-hoster points these at
 // their own node; nothing about resolution depends on a particular provider.
 const DEFAULT_RPC_URLS: Record<string, string> = {
   'base-sepolia': 'https://sepolia.base.org',
   sepolia: 'https://ethereum-sepolia-rpc.publicnode.com',
+  'arbitrum-sepolia': 'https://sepolia-rollup.arbitrum.io/rpc',
 };
 
 export function resolveChain(key: string = DEFAULT_CHAIN_KEY): Chain {
