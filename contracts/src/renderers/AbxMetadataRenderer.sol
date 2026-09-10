@@ -50,8 +50,8 @@ interface ICollectionName {
 ///      contentType `text/uri-list` is a computed LOCATOR: its bytes land verbatim as the
 ///      field's value (never data-wrapped) — the canonical generator's directory branch
 ///      rides this.
-/// @dev v2 adds the data plane's `artifacts` manifest (specs/protocol/data-plane.md): one
-///      namespaced array of `{key, mimeType, uri}` entries, emitted only when non-empty. The spec
+/// @dev v2 adds the data plane's `artifacts` manifest: one namespaced array of
+///      `{key, mimeType, uri}` entries, emitted only when non-empty. The protocol
 ///      lets an on-chain renderer omit entries that duplicate reserved keys it already emits — "an
 ///      EVM-efficiency reduction, never a semantic one" — and **as of v9 this renderer takes that
 ///      allowance for every reserved key**, so on the on-chain lanes the manifest is empty and the
@@ -135,10 +135,10 @@ interface ICollectionName {
 ///      seams, the `artifacts` listing, a collection `image` courtesy drawn from a representative
 ///      token (a contract has no token id on `contractURI`), `image_data`, and any value behind an
 ///      off-chain load or decode (`keccak256` / `sha256` / `*-gzip`).
-///      `specs/protocol/onchain-metadata.md` carries the authoritative three-list table. What must
+///      The maintained metadata documentation carries the authoritative three-list table. What must
 ///      NOT happen is the two planes disagreeing on a key BOTH can emit — that sibling drift is what
 ///      produced the computed-`image` wrapping bug and the `abx_params` duplication.
-/// @dev **v5 (audit remediation):** the `abx_provenance` `note` is JSON-escaped. Before it was not,
+/// @dev **v5:** the `abx_provenance` `note` is JSON-escaped. Before it was not,
 ///      and `note` carries up to 32 raw bytes of a field's owner-chosen `representation` — enough to
 ///      close the JSON string and write new structure: 23 bytes flipped `onChain` from false to true
 ///      while keeping the document valid, 28 injected a top-level `"image"` that shadowed the real
@@ -395,7 +395,7 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
                 // emitted TWICE — once as `image`, once inside `artifacts` — and then the entire
                 // document was base64-encoded around both. On the on-chain-SVG lane that roughly
                 // doubled the inner payload of the exact read this protocol most wants to stay
-                // cheap. `specs/protocol/data-plane.md` anticipates this: an on-chain renderer MAY
+                // cheap. The data-plane rules allow an on-chain renderer to
                 // omit entries that duplicate reserved keys it already emits — "an EVM-efficiency
                 // reduction, never a semantic one". Nothing is lost by taking it, because a
                 // `data:` URI already carries its own mediatype; the duplicate entry's only unique
@@ -682,8 +682,7 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
     }
 
 
-    /// @dev One `artifacts` manifest entry — exactly `{key, mimeType, uri}`, nothing optional
-    ///      (specs/protocol/data-plane.md → The artifact).
+    /// @dev One `artifacts` manifest entry — exactly `{key, mimeType, uri}`, nothing optional.
     function _artifactEntry(string memory key, string memory mimeType, string memory uri)
         private
         pure

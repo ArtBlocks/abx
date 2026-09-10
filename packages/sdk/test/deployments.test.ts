@@ -21,8 +21,8 @@ import {isAddress} from 'viem';
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
-const GENERATOR = '0xb7104ADfa6fb5615E46e2a681A2Ff043B08fADB5';
-const RENDERER = '0x85C1aE1F076d808fF7c1729F21B85038Fa16105E';
+const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
+const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 
 // Every recorded address must be a VALID EIP-55 checksum, not merely 40 hex characters.
 //
@@ -43,7 +43,7 @@ test('manifest: every address is a valid EIP-55 checksum', () => {
 });
 
 // The manifest is the zero-state trust root: the canonical generator + the CURRENT renderer
-// rev (spec v9 — CREATE2, route-only field provenance, no abx_params, no duplicated image artifact) must
+// rev (spec v11) must
 // resolve with no env and no flags.
 test('manifest: sepolia ships the canonical generator + the current renderer rev', () => {
   assert.equal(DEPLOYMENTS[SEPOLIA].generator, GENERATOR);
@@ -114,7 +114,7 @@ test('isCurrentGenerator: null (not false) when the chain has no canonical gener
   assert.equal(isCurrentGenerator(8453, GENERATOR), null);
 });
 
-// ── anchor generations: the identity that makes "canonically ABX v2" sayable ──────────────────
+// ── anchor generations: stable identity for current and prior canonical deployments ───────────
 //
 // The manifest records which generation of the trust anchors deployed a clone, keyed by the CORE
 // VERSION those anchors stamp — so a collection can prove what it is by reading its own
@@ -171,7 +171,7 @@ test('generations: exactly one is current, and it is first', () => {
 
 test('generations: stable identity and factory lookups resolve the current generation', () => {
   const current = currentAnchorGeneration();
-  assert.equal(current.id, 'abx-core-v2');
+  assert.equal(current.id, 'abx-core-v3');
   assert.equal(findAnchorGenerationById(current.id), current);
   assert.equal(findAnchorGenerationByCoreVersion(current.coreVersion), current);
   assert.equal(findAnchorGenerationByFactory(current.factories.editionCodeFactory), current);

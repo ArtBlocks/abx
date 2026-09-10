@@ -18,8 +18,8 @@ import {OnChainMetadataStorage} from "../../libraries/OnChainMetadataStorage.sol
 ///         on-chain `reader`. Owner-settable; freezable per `(scope, field)`.
 /// @dev Read surface → non-zero ERC-165 id (advertised in addition to the beacon's
 ///      `extensionVersion`). Storage is ERC-7201 (`OnChainMetadataStorage`). The `bytes32` keys
-///      are opaque here — field/representation meaning + the resolution rules are protocol
-///      convention (`specs/protocol/onchain-metadata.md`), never baked into the contract. The
+///      are opaque here — field and representation meaning plus the resolution rules are protocol
+///      convention, never baked into the contract. The
 ///      store NEVER decodes; on-chain decoding is delegated to an `IAbxOnChainReader` referenced
 ///      from a `"reader"` field's value. Token existence is not enforced (owner-gated).
 /// @dev **Refresh signals.** Every write below changes what `tokenURI`/`uri(id)` resolves to, so

@@ -18,8 +18,7 @@ import {TokenDataLib} from "../libraries/TokenDataLib.sol";
 import {DynamicBuffer} from "../libraries/DynamicBuffer.sol";
 
 /// @title AbxGenerator — the canonical on-chain generator (the `animation` field renderer)
-/// @notice One per-chain singleton serving BOTH code-custody modes
-///         (`specs/protocol/code-projects.md` → "The canonical generator — AbxGenerator"):
+/// @notice One per-chain singleton serving BOTH code-custody modes:
 ///
 ///         - **Template branch** (script chunks present — wins when both): assembles the full
 ///           HTML document from chain, byte-shaped like the off-chain resolver's reference
@@ -62,9 +61,9 @@ import {DynamicBuffer} from "../libraries/DynamicBuffer.sol";
 ///      The augment hook remains the read-time compute seam either way (its entries append
 ///      last, augment-wins).
 ///
-///      Assembly patterns (measure-then-allocate-once, in-place base64, verbatim gzip'd dep
-///      carriage + gunzip bootstrap) are ported from Art Blocks' GenArt721GeneratorV0 and
-///      scripty.sol V2 — see docs/research/onchain-generator-internals.md.
+///      Assembly patterns (measure-then-allocate-once, in-place base64, verbatim gzip'd dependency
+///      carriage + gunzip bootstrap) are adapted from Art Blocks' GenArt721GeneratorV0 and
+///      scripty.sol V2.
 contract AbxGenerator is IAbxFieldRenderer {
     // ── branch ids (the {onChainStatus} vocabulary) ─────────────────────────--
     uint8 public constant BRANCH_NONE = 0;

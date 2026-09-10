@@ -19,9 +19,8 @@ import {IAbxMetadataRenderer} from "../IAbxMetadataRenderer.sol";
 ///         One strategy serves a 1/1 (token id 0) and a many-token contract identically —
 ///         cardinality is not a type. The route prefix (`/t`) lives in the configured base,
 ///         not in bytecode, so the host owns its routing; the contract only ever appends the
-///         trailing coordinates. The grammar is pinned in
-///         `specs/protocol/onchain-metadata.md` (the canonical contract between any strategy
-///         and any resolver). The owner can re-point the base, set/clear overrides, toggle
+///         trailing coordinates. The path grammar is `{base}/{chainId}/{address}/{tokenId}`.
+///         The owner can re-point the base, set/clear overrides, toggle
 ///         the renderer (each pings ERC-4906), and `lockTokenURI` to freeze all of it forever.
 /// @dev `where it resolves` (off-chain base / per-token override / on-chain renderer) is
 ///      runtime config, not a separate type. **The renderer address is the toggle** —

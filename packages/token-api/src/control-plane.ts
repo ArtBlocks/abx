@@ -202,7 +202,7 @@ function tokenCounts(s: ProjectState): {mintedCount: number; burnedCount?: numbe
 }
 
 /** Explicit adapter/support claim for this service build. Append only after its tests pass. */
-export const SUPPORTED_CONTRACT_GENERATION_IDS = ['abx-core-v2'] as const;
+export const SUPPORTED_CONTRACT_GENERATION_IDS = ['abx-core-v3', 'abx-core-v2'] as const;
 const supportedGenerationIds = new Set<string>(SUPPORTED_CONTRACT_GENERATION_IDS);
 
 function supportedContractGenerations() {

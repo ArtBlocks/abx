@@ -17,7 +17,7 @@ library SupplyStorage {
     /// @custom:storage-location erc7201:abx.storage.supply
     struct Layout {
         uint256 totalSupply; // tokens currently in existence (minted − burned)
-        // Opt-in burn (B44): false unless the creator enabled it at deploy. Appended after
+        // Opt-in burn: false unless the creator enabled it at deploy. Appended after
         // `totalSupply`, so the existing slot layout is unchanged. When true, the core `burn` path
         // is open (owner-or-approved); when false there is no way to destroy a token. Set once at
         // init, immutable after — a project's burnability is a fixed, buyer-readable property.

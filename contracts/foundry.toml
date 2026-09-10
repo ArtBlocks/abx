@@ -76,6 +76,7 @@ int_types = "long"
 [etherscan]
 sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 11155111}
 base-sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 84532}
+arbitrum-sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 421614}
 
 [soldeer]
 remappings_generate = false    # we manage remappings.txt by hand for a clean monorepo lift

@@ -37,7 +37,7 @@ abstract contract Params is AbxBeaconCore, Ownable, IAbxParams {
 
     // ── owner writes (guarded) ──────────────────────────────────────────────--
 
-    // The owner WRITE shells are raw-calldata passthroughs to {AbxParamsLib} (B22 step 3), exactly
+    // The owner WRITE shells are raw-calldata passthroughs to {AbxParamsLib}, exactly
     // like the read shells below. The gate that lived here — `onlyOwner` + the `_checkParamWrite`
     // schema-governance check — moved into the library front doors of the same selector
     // ({AbxParamsLib-_requireOwner} / {AbxParamsLib-_requireUngoverned}); a typed shell that

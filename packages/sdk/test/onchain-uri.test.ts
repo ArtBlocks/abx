@@ -22,7 +22,7 @@ import {
   readSetParamKeys,
 } from '../src/onchain-uri.ts';
 
-const GENERATOR = '0xb7104AdFa6Fb5615e46E2a681A2Ff043B08fADB5' as Address; // the manifest's sepolia generator
+const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17' as Address; // the manifest's Sepolia generator
 const RENDERER = '0x4D222Af14840FB49040aF73efc311D21Ba45aB50' as Address;
 const TOKEN = '0x4861cAc4B3D97903e6A0Ea1AfF3923302445298f' as Address;
 

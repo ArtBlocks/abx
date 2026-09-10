@@ -121,19 +121,19 @@ const CANONICAL = {
   //      than by forge's automatic linking at salt zero.
   //
   // Implementations are noted inline because a factory's implementation is the code a clone runs;
-  // `abxVersion()` reads 2 on all six, and `specVersion()` reads 11 on the renderer.
-  factory: '0x2824F4b4b4301dB2FcA10b2D80D45b4d463Ba57E', // impl 0x58b5CA27C76c0a1FA00b6ebe28d55d3A98eB1425
-  seriesFactory: '0x685B4DfC835b6854590B5437C79D62BB7D52698b', // impl 0x1A8d16407247E801bf15e3c6Dbf2000673Ff474d
-  seriesCodeFactory: '0xdDA5174A868A8e099E159E67569900a4F936CFFe', // impl 0xdaEF4B7068c07E380068895aCb48a210cdA30297
-  oneOfOneEditionFactory: '0x6ecc7fAd2186965BaECD0Aa215b00239a3459ddF', // impl 0xCbD54eb6781F7A430C974fcbe125B48d4dF1f415
-  editionFactory: '0xB6a8f051B08A8d6Fb0B6DA53BD23006CE2da31b7', // impl 0x90A674bce7540eBae92CAa3Ea77ccE1b7eb15f61
-  editionCodeFactory: '0x9441Cc75318E20Ae6237EDb213b4C3019d756Bf0', // impl 0x68E57D289288dcAf31256d91c64583254bBb6601
+  // `abxVersion()` reads 3 on all six, and `specVersion()` reads 11 on the renderer.
+  factory: '0x2ff8828a9150401225bB217CAA8b9b5e666a1c97', // impl 0x71D8aeB80Ee9baeAa56Eadc4D4956B1A11E2a0e1
+  seriesFactory: '0x83222f791cA243FEb0c1Fef93a8732eCe3001b4b', // impl 0x2a548E83E106c6DdA42076042755ca1E2F15aDCe
+  seriesCodeFactory: '0xEAB8a19fEada0DDba2FDE324715eBbB6234B5616', // impl 0x785CD3F74e86E4495c178B5FFCD047c57e699270
+  oneOfOneEditionFactory: '0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E', // impl 0x60aB775BfE06C063aEA7095BdB2Bf2d8E66F152B
+  editionFactory: '0xCC29eD68f26693dc9Aa5f090B21F37985206cc19', // impl 0x656794e3608e179088155499f4c25baAF9f19a59
+  editionCodeFactory: '0x86f9CFe597ab145452f4A66ac102291d54e8EB46', // impl 0x752533e77F5f6EF87b72B51eb453B631Eb0FbafA
 
-  renderer: '0x85C1aE1F076d808fF7c1729F21B85038Fa16105E', // spec v11
+  renderer: '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417', // spec v11
   chunkStore: '0x1Ca63a4ADEeF5e722ADA25b892BA40E3b2bcB905',
   seedSource: '0xD01d4eDc17F8b4493A43A5e70DCD9813FB1b9A0A',
-  fixedPriceMinter: '0x1E321A12386cF6BEe49d1270A5EC54DecA88db48',
-  fixedPriceMinter1155: '0x8FcC37dCb00A02367838Fa5B37347dCEec060981',
+  fixedPriceMinter: '0xfb5C61274a3A7dA83CcDD88DdEC914438244E2c9',
+  fixedPriceMinter1155: '0x2af9f0c477c34a23cBeC646a3b6BC0cA4Df5d37f',
 
   // The delegatecalled write-path libraries. Every one of the six token implementations links
   // `AbxMetadataLib` — the on-chain metadata field store is external as of this generation, which is
@@ -143,33 +143,30 @@ const CANONICAL = {
   // `AbxEditionLib` itself links `AbxParamsLib`, which is why it is deployed after it).
   // Recomputable via `predictMetadataLib()` / `predictParamsLib()` / `predictCodeLib()` /
   // `predictEditionLib()`.
-  metadataLib: '0x02b819Bb9065cAf0c598A5CB2f5D37A4eb07460f',
-  paramsLib: '0x396848cD90aDAbE1F463Cb825ed6507A026dC833',
-  codeLib: '0x8dF597246C851E2DF264C8a322c07657395415fc',
-  editionLib: '0x7c7D213383D6FC3F1e26A0cB3Ad554c1Aa0011dA',
+  metadataLib: '0x404B48AA9784FCC042B317c64bE917390Ec4b55F',
+  paramsLib: '0x7200fAb33E5CbDAAb00d0b5ED3b27174F11bCf90',
+  codeLib: '0xD6b9cbC480D172B7Ba3f475f73bB197Dd20B047C',
+  editionLib: '0x277FE8B9302FC8d015EE5DE7c98E669F8cC19E2c',
 } as const satisfies Omit<ChainDeployment, 'generator'>;
 
 export const DEPLOYMENTS: Record<number, ChainDeployment> = {
   // Sepolia (testnet). Generator wired to Art Blocks' Sepolia DependencyRegistryV0
   // (0x5Fcc415BCFb164C5F826B5305274749BeB684e9b); SSTORE2 asset pointers
-  // abxJsPointer 0xe34D9e7054c85E5dCfAFBD0c1E8ff48E206ebBf7,
-  // gunzipScriptPointer 0xC8739F87eDE0278532ACE0f51936b4A3fA8d5C55.
+  // abxJsPointer 0x16998723deD1AedB8987745db52E782d2AF62f7e,
+  // gunzipScriptPointer 0xEAEc86c34E02684c23236f53f9C95FEBE68DD6B0.
   11155111: {
     ...CANONICAL,
-    // Replaces 0xf099C8fc301340dE2C4D1D2b76fcA05D852dF14A: the directory branch reads the
-    // collection's `abx_gateway_*` field instead of the `display.gateway` param. Redeployed with the
-    // pointers above PINNED, so only the generator moved — the assets did not have to be rewritten.
-    generator: '0xb7104ADfa6fb5615E46e2a681A2Ff043B08fADB5',
+    generator: '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17',
   },
   // Base Sepolia (testnet). No Art Blocks DependencyRegistry on this chain, so the generator is
   // deployed with defaultDependencyRegistry = address(0) — collections point at their own. SSTORE2
-  // asset pointers: abxJsPointer 0xF5c9CE4486574c962fA61EdB297845085B6736Ab,
-  // gunzipScriptPointer 0xB162Fa1B55b9Ad6e1c211c02f4c3f60c87036f03. Recorded here because they are
+  // asset pointers: abxJsPointer 0x8E13Dc62B2668253337366806449a23a021Bd1A6,
+  // gunzipScriptPointer 0x5DF349Dc68561a5E61e04f55BF4669a930dE8b92. Recorded here because they are
   // the ONLY way to re-run `DeployAbxGenerator` idempotently — without them the script writes fresh
   // pointers, which moves the generator's CREATE2 address and quietly deploys a second one.
   84532: {
     ...CANONICAL,
-    generator: '0x2C1B7Cf6c54E4ACbcB54FCC395f7Af88eb4fc8CE',
+    generator: '0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2',
   },
 };
 

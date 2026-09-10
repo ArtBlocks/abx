@@ -263,7 +263,7 @@ contract OneOfOneEdition is
     // ── {Uri1155} / {CreatorToken1155} / {EditionSupply} bodies, delegated ────────
     //
     // The same extraction {EditionCode} and {EditionImage} perform, for the same reason: the ERC-4906
-    // refresh emissions added by the audit remediation pushed this contract under its EIP-170 policy
+    // refresh emissions pushed this contract under its EIP-170 policy
     // floor, and the floor exists to force exactly this decision rather than be lowered. Access
     // control (`onlyOwner`) stays on these overrides; the library assumes its caller already gated.
     //

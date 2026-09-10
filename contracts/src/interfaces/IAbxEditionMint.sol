@@ -16,8 +16,8 @@ pragma solidity 0.8.28;
 ///      ids/amounts is multicall's job, not the primitive's.
 ///      [`OneOfOneEdition`](../tokens/OneOfOneEdition.sol) keeps this same uniform signature but
 ///      reverts unless `id == 0` — its id space is fixed to the single work. How a minter
-///      *uses* this — price, allocation, ETH vs ERC-20, sale events — is the Minter spine
-///      (`specs/protocol/minter-spine.md`), a sibling convention, still off-protocol.
+///      *uses* this — price, allocation, ETH vs ERC-20, sale events — is a separate sale-contract
+///      concern; see the maintained minting documentation.
 interface IAbxEditionMint {
     /// @notice Mint `amount` copies of `id` to `to`.
     /// @param to Recipient of the freshly minted copies.

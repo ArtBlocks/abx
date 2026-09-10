@@ -15,6 +15,6 @@ fs_permissions = [{ access = "read-write", path = "./preview-out" }]
 
 # Dependencies are fetched with soldeer (`forge soldeer install`), pinned here.
 [dependencies]
-abx-contracts = "2.0.0"
+abx-contracts = "3.0.0"
 solady = "0.1.26"
 forge-std = "1.16.1"

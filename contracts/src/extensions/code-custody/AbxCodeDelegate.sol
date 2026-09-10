@@ -8,7 +8,7 @@ import {AbxCodeLib} from "../../libraries/AbxCodeLib.sol";
 ///         always composed together and always by a token that already links {AbxCodeLib}. It
 ///         exists so the passthrough plumbing is compiled into the token **once** instead of once
 ///         per mixin.
-/// @dev Why a raw passthrough and not a typed shell: B22 step 1 measured a typed shell
+/// @dev Why a raw passthrough and not a typed shell: a typed shell
 ///      (`return AbxCodeLib.f(...)`) *growing* the token, because decoding the library's return
 ///      value and re-encoding it at the call site costs more bytes than the extracted body saves.
 ///      Forwarding the calldata verbatim and returning the return data untouched costs a fixed ~2

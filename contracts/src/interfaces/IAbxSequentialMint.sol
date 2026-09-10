@@ -15,8 +15,7 @@ pragma solidity 0.8.28;
 ///      one-shot, owner-only 1/1 ({OneOfOneImage}) deliberately does **not** implement it: a
 ///      fixed-price minter targets open, sequential drops (a 1/1 is pre-minted and sold on the
 ///      secondary market). How a minter *uses* this — price, allocation, ETH vs ERC-20, sale
-///      events — is the Minter spine (`specs/protocol/minter-spine.md`), a sibling convention,
-///      still off-protocol.
+///      events — is a separate sale-contract concern; see the maintained minting documentation.
 interface IAbxSequentialMint {
     /// @notice Mint the next sequential token to `to`.
     /// @param to Recipient of the freshly minted token.

@@ -334,7 +334,7 @@ export function remoteFlag(flags: Flags): RemoteTarget | null {
  */
 export function canonicalLabel(isCanonical: boolean | null | undefined, provenance?: ProvenanceResult): string {
   if (isCanonical === true) {
-    // Say WHICH generation stamped it, and its core version — "canonically ABX v2" is a thing a
+    // Say WHICH generation stamped it, and its core version — "canonically ABX v3" is a thing a
     // consumer can repeat, and `abxVersion()` on the clone is where they can verify it themselves.
     const v = provenance?.coreVersion !== null && provenance?.coreVersion !== undefined ? ` — ABX v${provenance.coreVersion}` : '';
     if (provenance?.generation === 'prior') {

@@ -7,9 +7,9 @@ pragma solidity 0.8.28;
 ///         convention `bytes32` tag: "inline", "reader", "keccak256", "url", …) and the
 ///         payload — at per-token and contract-wide (collection) scopes, with a per-field
 ///         freeze. `value` rides each event, so the full set reconstructs from logs alone.
-/// @dev The `bytes32` keys are opaque on-chain; field/representation meaning + the
-///      resolution rules are protocol convention (`specs/protocol/onchain-metadata.md`), never
-///      baked into the contract. On-chain decoding (e.g. decompression) is delegated to a separate
+/// @dev The `bytes32` keys are opaque on-chain; field and representation meaning plus the
+///      resolution rules are protocol convention, never baked into the contract. On-chain decoding
+///      (e.g. decompression) is delegated to a separate
 ///      {IAbxOnChainReader} contract referenced from a field's `value` — see the "reader"
 ///      representation; the storage here never decodes anything.
 interface IAbxOnChainMetadata {

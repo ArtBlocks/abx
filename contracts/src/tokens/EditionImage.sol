@@ -286,7 +286,7 @@ contract EditionImage is
     // ── {Uri1155} / {CreatorToken1155} / {EditionSupply} bodies, delegated ────────
     //
     // Same extraction {EditionCode} performs, for the same reason and by the same pattern: the
-    // ERC-4906 refresh emissions the audit remediation added pushed this contract under its EIP-170
+    // ERC-4906 refresh emissions pushed this contract under its EIP-170
     // policy floor, and the floor is the point. Access control (`onlyOwner`) stays on these
     // overrides; the library assumes its caller already gated.
     //

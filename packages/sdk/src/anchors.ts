@@ -110,7 +110,7 @@ export type AnchorEvent = {anchor: AnchorKind} & (
 /** `AbxVersion.CORE_VERSION` in `contracts/src/libraries/AbxVersion.sol`. MUST move in lockstep with
  *  it — the Solidity constant's own NatSpec says so, and `test/anchor-version.test.ts` pins the two
  *  together so a bump on one side cannot ship alone. */
-export const ABX_CORE_VERSION = 2n;
+export const ABX_CORE_VERSION = 3n;
 
 /** Is this implementation built from the current core?
  *
@@ -779,7 +779,7 @@ export interface ProvenanceResult {
   generationLifecycle: GenerationLifecycle | null;
   /** Operations ABX software supports for this generation. */
   support: GenerationSupport | null;
-  /** The core spec version that generation stamps — the sayable identity ("canonically ABX v2").
+  /** The core spec version that generation stamps — the sayable identity (for example, "canonically ABX v3").
    *  Cross-check it against the clone's own `abxVersion()`, which is where it is verifiable. */
   coreVersion: number | null;
   /** The anchor that claimed it, when one did. */
@@ -811,6 +811,20 @@ export async function verifyProvenance(
   opts: {factories?: Address[]} = {},
 ): Promise<ProvenanceResult> {
   const live = opts.factories ?? canonicalFactories(chainId);
+  // Generation addresses are cross-chain deterministic, but that does not mean ABX deployed them
+  // on every EVM chain. The live manifest is the chain-coverage boundary; without it, probing prior
+  // addresses on an unshipped chain can turn "nothing configured" into a false verdict.
+  if (!opts.factories && live.length === 0) {
+    return {
+      canonical: null,
+      generation: null,
+      generationId: null,
+      generationLifecycle: null,
+      support: null,
+      coreVersion: null,
+      anchorsAnswered: 0,
+    };
+  }
   const current = await askAnchors(publicClient, address, live);
   if (current.hit) {
     // A caller-supplied trust set may contain non-ABX factories. It can establish trust for that

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 // Created By: Art Blocks Inc.
 //
-// Trimmed for ABX to the two load-bearing reads (specs/protocol/dependency-registry.md
-// "The resolution seam") from Art Blocks' IDependencyRegistryV0
+// Trimmed for ABX to the two load-bearing reads used by code projects from Art Blocks'
+// IDependencyRegistryV0
 // (github.com/ArtBlocks/artblocks-contracts, contracts/interfaces/v0.8.x/
 // IDependencyRegistryV0.sol). Signatures are byte-identical to AB's — the hard
 // compatibility rule: any registry ABX consumers read from speaks this shape.

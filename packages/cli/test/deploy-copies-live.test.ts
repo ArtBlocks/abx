@@ -37,9 +37,9 @@ writeFileSync(joinPath(mediaDir, '0.svg'), '<svg xmlns="http://www.w3.org/2000/s
 
 // The canonical edition anchors (identical on both chains — see reference/deployments.mdx; the
 // manifest in packages/sdk/src/deployments.ts is the source of truth these must agree with).
-const ONE_OF_ONE_EDITION_FACTORY = '0x6ecc7fAd2186965BaECD0Aa215b00239a3459ddF';
-const EDITION_FACTORY = '0xB6a8f051B08A8d6Fb0B6DA53BD23006CE2da31b7';
-const EDITION_CODE_FACTORY = '0x9441Cc75318E20Ae6237EDb213b4C3019d756Bf0';
+const ONE_OF_ONE_EDITION_FACTORY = '0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E';
+const EDITION_FACTORY = '0xCC29eD68f26693dc9Aa5f090B21F37985206cc19';
+const EDITION_CODE_FACTORY = '0x86f9CFe597ab145452f4A66ac102291d54e8EB46';
 
 test('deploy --copies open: resolves the canonical OneOfOneEditionFactory, clean dry-run stop, exit 0', () => {
   const {code, out} = run(['deploy', '--copies', 'open', '--for', FOR, '--dry-run']);
@@ -66,19 +66,8 @@ test('deploy-code --copies 25: resolves the canonical EditionCodeFactory, clean 
   assert.match(out, new RegExp(EDITION_CODE_FACTORY, 'i'));
 });
 
-// KNOWN RED until the pre-launch redeploy, and deliberately not relaxed.
-//
-// The anchor freshness probes now gate on `abxVersion()` (`ABX_CORE_VERSION`, bumped to 2 by the
-// older implementation) instead of asking whether the implementation exposes some feature —
-// a shape question every pre-remediation build also passed, which is why a stale anchor used to
-// report as `resolved`. The `OneOfOneEditionFactory` recorded in the manifest predates that
-// remediation, so the CLI correctly refuses it:
-//
-//   ✗ factory 0xe8b18A7D... is an older/incompatible version.
-//
-// That refusal is the control working. Do not soften this test, pin an override, or lower the gate
-// to make it green — it goes green when the current contracts are deployed and the manifest is
-// repointed, and staying red until then is the whole point of having the gate.
+// The anchor freshness probes gate on `abxVersion()` rather than asking whether the implementation
+// exposes some feature. These live dry runs prove the current manifest anchors pass that gate.
 test('predict --copies (1/1 lane): prints a deterministic clone address from the live factory', () => {
   const {code, out} = run(['predict', '--copies', 'open', '--for', FOR]);
   assert.equal(code, 0);

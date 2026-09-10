@@ -123,7 +123,7 @@ test('the 721 lane is unchanged: a bare mint dry-run on the fixture never mentio
 // on-chain-SVG OneOfOneEdition from the current OneOfOneEditionFactory, with the shared minter
 // assigned, a payee set, and an allocation of 10 on the open sale.
 const EDITION_FIXTURE = '0x0a0AE8a00544654ca7848117E6DA9C44b39ebc08'; // sepolia, OneOfOneEdition
-const EDITION_MINTER = '0x8FcC37dCb00A02367838Fa5B37347dCEec060981'; // canonical AbxFixedPriceMinter1155
+const EDITION_MINTER = '0x8FcC37dCb00A02367838Fa5B37347dCEec060981'; // v2 minter assigned to this supported fixture
 const FIXTURE_OWNER = '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C';
 
 function runSepolia(args: string[]): {code: number; out: string} {
