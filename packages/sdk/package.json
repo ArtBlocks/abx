@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-sdk",
-  "version": "0.1.0-alpha.33",
+  "version": "0.1.0-alpha.34",
   "license": "MIT",
   "description": "Typed SDK for ABX protocol reads, deployments, operations, reconstruction, and verification.",
   "type": "module",

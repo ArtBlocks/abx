@@ -12,6 +12,9 @@
     "@artblocks/abx-storage-arweave": "0.1.0-alpha.0"
   },
   "changesets": [
-    "public-source-release"
+    "calm-desert-turbo",
+    "plain-sky-generations",
+    "public-source-release",
+    "quiet-stars-generation-services"
   ]
 }
