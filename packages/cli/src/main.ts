@@ -71,7 +71,14 @@
  * itself keeps only: startup (env, update check), flag parsing, the dispatch table, and help text.
  */
 import {loadDotEnv} from '@artblocks/abx-sdk/node';
-import {type Address, DEFAULT_CHAIN_KEY, KNOWN_CHAIN_KEYS, redactRpcUrlsInText, resolveRpcUrls} from '@artblocks/abx-sdk';
+import {
+  type Address,
+  chainSupportByKey,
+  DEFAULT_CHAIN_KEY,
+  KNOWN_CHAIN_KEYS,
+  redactRpcUrlsInText,
+  resolveRpcUrls,
+} from '@artblocks/abx-sdk';
 import {DEFAULT_PORT} from '@artblocks/abx-token-api';
 import {
   cmdAdd,
@@ -168,14 +175,23 @@ import {checkForCliUpdate, compareVersions, installedLegacySkillCopies, installe
 function assertKnownChainEnv(): void {
   const key = process.env.ABX_CHAIN;
   if (!key || KNOWN_CHAIN_KEYS.includes(key)) return;
-  const mainnetish = /^(mainnet|ethereum|homestead|base|eth|1|8453)$/i.test(key.trim());
-  process.stderr.write(
-    `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a chain this toolkit ships. Known: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
-      (mainnetish
-        ? `  Mainnet is not supported yet \u2014 ABX is testnet-only today. Use base-sepolia (the default) or sepolia;\n` +
-          `  a testnet launch exercises the real thing end to end, just without real money.\n\n`
-        : `  Unset it to use the default (${DEFAULT_CHAIN_KEY}), or set one of the above.\n\n`),
-  );
+  const support = chainSupportByKey(key);
+  if (support) {
+    process.stderr.write(
+      `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is recognized but ${support.supportLevel} ` +
+        `(${support.name}, chain ${support.chainId}, ${support.environment}).\n` +
+        `  This release will not operate on it. Qualify the paired ${support.pairedChain} network and wait for an enabled release.\n\n`,
+    );
+  } else {
+    const mainnetish = /^(mainnet|homestead|eth|1|8453)$/i.test(key.trim());
+    process.stderr.write(
+      `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
+        (mainnetish
+          ? `  Production networks are disabled in this release. Use base-sepolia (the default), sepolia, or arbitrum-sepolia;\n` +
+            `  a testnet launch exercises the real thing end to end, just without real money.\n\n`
+          : `  Unset it to use the default (${DEFAULT_CHAIN_KEY}), or set one of the above.\n\n`),
+    );
+  }
   process.exit(1);
 }
 assertKnownChainEnv();

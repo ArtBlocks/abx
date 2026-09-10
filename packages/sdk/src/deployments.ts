@@ -20,8 +20,9 @@
  *     shipped yet, or a private deployment — the operator declares it, the tool never writes it)
  *   - manifest: the canonical address below
  *
- * ALPHA SCOPE: the npm alpha supports Base Sepolia (the default, chainId 84532) and Sepolia
- * (11155111). Mainnet entries are absent until canonical infrastructure is deployed and recorded.
+ * DEPLOYMENT SCOPE: canonical infrastructure is live on Base Sepolia (the default, chainId 84532)
+ * and Sepolia (11155111). `chain-support.json` separately records networks that are recognized for
+ * qualification or planned production support; absence here always means no canonical deployment.
  *
  * Changing a contract → redeploy → repoint here: see contracts/README.md#changing-a-contract.
  */

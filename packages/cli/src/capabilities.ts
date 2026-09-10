@@ -1,4 +1,4 @@
-import {KNOWN_CHAIN_KEYS} from '@artblocks/abx-sdk';
+import {CHAIN_SUPPORT, DEFAULT_CHAIN_KEY, KNOWN_CHAIN_KEYS} from '@artblocks/abx-sdk';
 import type {Flags} from './flags.js';
 
 /**
@@ -11,7 +11,10 @@ import type {Flags} from './flags.js';
  * matrices in prose.
  */
 export const ABX_CAPABILITIES = {
-  schemaVersion: 1,
+  schemaVersion: 2,
+  defaultChain: DEFAULT_CHAIN_KEY,
+  chains: CHAIN_SUPPORT,
+  /** Compatibility field for consumers that only need selectable chain keys. */
   supportedChains: [...KNOWN_CHAIN_KEYS],
   deploymentCommands: {
     deploy: {
@@ -106,7 +109,7 @@ export const ABX_CAPABILITIES = {
     'ERC-721C/ERC-1155C enrollment (--721c)',
   ],
   unsupportedToday: [
-    'mainnet deployment through the toolkit',
+    'production networks (recognized in the chain registry, but disabled in this release)',
     'unsupported chains',
     'secondary-market listings or an order book',
     'compiling or deploying custom Solidity through abx',
@@ -126,7 +129,14 @@ export function cmdCapabilities(flags: Flags): void {
     return;
   }
 
-  console.log('ABX capability contract v1\n');
+  console.log('ABX capability contract v2\n');
+  console.log(`Default chain: ${ABX_CAPABILITIES.defaultChain}`);
+  console.log('Networks:');
+  for (const chain of ABX_CAPABILITIES.chains) {
+    console.log(
+      `  ${chain.key} (${chain.chainId}): ${chain.environment} · ${chain.supportLevel} · contracts ${chain.contractStatus}`,
+    );
+  }
   console.log('Native deployment lanes:');
   for (const [name, lane] of Object.entries(ABX_CAPABILITIES.deploymentCommands)) {
     console.log(`  ${name}: ${lane.artifact}`);

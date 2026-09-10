@@ -4,8 +4,9 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX is in alpha and currently targets Base Sepolia and Sepolia. Do not use it for mainnet assets
-without independently reviewing the contracts, deployment configuration, and operational risks.
+ABX is in alpha. Canonical contracts are deployed on Base Sepolia and Sepolia; Arbitrum Sepolia is
+available for explicit qualification work but does not yet have canonical ABX infrastructure.
+Production networks are recognized but disabled in this release.
 
 ## Quickstart
 
@@ -25,10 +26,11 @@ The complete user guide, protocol reference, deployment addresses, and API docum
 
 ## Deployed contracts
 
-ABX is testnet-only. The canonical infrastructure is deployed via the keyless CREATE2 proxy, so every
-address below **except the generator** is identical on every chain. The machine-readable source of
-truth is [`packages/sdk/src/deployments.ts`](packages/sdk/src/deployments.ts); the current public
-address reference is at
+Production networks are disabled. The canonical infrastructure below is deployed on Base Sepolia
+and Sepolia via the keyless CREATE2 proxy, so every address **except the generator** is identical on
+both chains. Network lifecycle is defined by
+[`packages/sdk/src/chain-support.json`](packages/sdk/src/chain-support.json), addresses by
+[`packages/sdk/src/deployments.ts`](packages/sdk/src/deployments.ts), and the current public reference is at
 [docs.abx.io/docs/reference/deployments](https://docs.abx.io/docs/reference/deployments).
 
 | Contract | Env override | Address (Sepolia · Base Sepolia) |

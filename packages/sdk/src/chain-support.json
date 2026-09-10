@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "defaultChain": "base-sepolia",
+  "chains": [
+    {
+      "key": "base-sepolia",
+      "chainId": 84532,
+      "name": "Base Sepolia",
+      "environment": "testnet",
+      "pairedChain": "base",
+      "contractStatus": "deployed",
+      "supportLevel": "supported"
+    },
+    {
+      "key": "sepolia",
+      "chainId": 11155111,
+      "name": "Sepolia",
+      "environment": "testnet",
+      "pairedChain": "ethereum",
+      "contractStatus": "deployed",
+      "supportLevel": "supported"
+    },
+    {
+      "key": "arbitrum-sepolia",
+      "chainId": 421614,
+      "name": "Arbitrum Sepolia",
+      "environment": "testnet",
+      "pairedChain": "arbitrum-one",
+      "contractStatus": "not-deployed",
+      "supportLevel": "experimental"
+    },
+    {
+      "key": "base",
+      "chainId": 8453,
+      "name": "Base",
+      "environment": "production",
+      "pairedChain": "base-sepolia",
+      "contractStatus": "not-deployed",
+      "supportLevel": "disabled"
+    },
+    {
+      "key": "arbitrum-one",
+      "chainId": 42161,
+      "name": "Arbitrum One",
+      "environment": "production",
+      "pairedChain": "arbitrum-sepolia",
+      "contractStatus": "not-deployed",
+      "supportLevel": "disabled"
+    },
+    {
+      "key": "ethereum",
+      "chainId": 1,
+      "name": "Ethereum",
+      "environment": "production",
+      "pairedChain": "sepolia",
+      "contractStatus": "not-deployed",
+      "supportLevel": "disabled"
+    }
+  ]
+}

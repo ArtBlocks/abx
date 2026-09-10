@@ -1,17 +1,35 @@
 ---
-title: "Deployments"
-description: "Canonical ABX infrastructure on Base Sepolia and Sepolia."
+title: "Networks and deployments"
+description: "ABX network support and canonical contract addresses."
 ---
 
-ABX has no mainnet deployment. The current alpha runs on Base Sepolia and Sepolia.
+Production networks are disabled in this release. Start on Base Sepolia. Sepolia is also fully
+deployed; Arbitrum Sepolia is available for explicit qualification work, but has no canonical ABX
+contracts yet.
 
-The machine-readable source of truth is
-[`packages/sdk/src/deployments.ts`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/deployments.ts).
-If this page differs, the SDK manifest wins.
+| Network | Chain ID | Support | Canonical contracts |
+| --- | ---: | --- | --- |
+| Base Sepolia | `84532` | supported · default | deployed |
+| Sepolia | `11155111` | supported | deployed |
+| Arbitrum Sepolia | `421614` | experimental | not deployed |
+| Base | `8453` | disabled | not deployed |
+| Arbitrum One | `42161` | disabled | not deployed |
+| Ethereum | `1` | disabled | not deployed |
+
+“Experimental” means the SDK and CLI recognize the network for qualification. Commands that require
+canonical infrastructure will stop until those contracts are deployed and recorded. “Disabled” means
+the CLI refuses to operate on the network.
+
+The machine-readable sources of truth are
+[`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)
+for network status and
+[`deployments.ts`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/deployments.ts) for
+addresses. If this page differs, the SDK data wins.
 
 ## Shared addresses
 
-The keyless CREATE2 proxy deploys the following contracts at the same address on both testnets.
+The keyless CREATE2 proxy deploys the following contracts at the same address on Base Sepolia and
+Sepolia.
 
 | Contract | Environment override | Address |
 | --- | --- | --- |

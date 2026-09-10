@@ -77,6 +77,26 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
       return (err.stdout ?? '') + (err.stderr ?? '');
     }
   });
-  assert.match(out, /is not a chain this toolkit ships/);
-  assert.match(out, /Mainnet is not supported yet/, 'a mainnet-ish typo gets the mainnet explanation');
+  assert.match(out, /is not a recognized chain/);
+  assert.match(out, /Production networks are disabled/, 'a mainnet-ish alias gets the production explanation');
+});
+
+test('a recognized but disabled production chain is REFUSED with its registry status', () => {
+  const out = withDotEnv('ABX_CHAIN=base\n', (dir) => {
+    try {
+      execFileSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'doctor'], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
+        timeout: 60_000,
+      });
+      return '';
+    } catch (e) {
+      const err = e as {stdout?: string; stderr?: string};
+      return (err.stdout ?? '') + (err.stderr ?? '');
+    }
+  });
+  assert.match(out, /ABX_CHAIN="base" is recognized but disabled/);
+  assert.match(out, /chain 8453, production/);
+  assert.match(out, /paired base-sepolia network/);
 });
