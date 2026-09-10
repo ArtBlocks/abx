@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-storage",
-  "version": "0.1.0-alpha.33",
+  "version": "0.1.0-alpha.34",
   "license": "MIT",
   "description": "Storage adapters for ABX content using filesystem, S3-compatible, IPFS, or Arweave backends.",
   "type": "module",

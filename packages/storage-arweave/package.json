@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-storage-arweave",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "license": "MIT",
   "description": "Optional ArDrive Turbo (Arweave) uploader for @artblocks/abx-storage. Install this explicitly to enable the arweave storage backend.",
   "type": "module",
