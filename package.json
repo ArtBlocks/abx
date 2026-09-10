@@ -54,7 +54,7 @@
     "abx-effects": "tsx packages/effects/src/main.ts",
     "changeset": "changeset",
     "ci:version": "changeset version && node scripts/stamp-skill-version.mjs",
-    "ci:publish": "pnpm -r publish --access public --no-git-checks"
+    "ci:publish": "changeset publish"
   },
   "devDependencies": {
     "@artblocks/abx-sdk": "workspace:*",
