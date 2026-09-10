@@ -3,6 +3,7 @@
   "icon": "Cpu",
   "pages": [
     "index",
+    "versioning",
     "metadata",
     "onchain-storage",
     "code-projects",

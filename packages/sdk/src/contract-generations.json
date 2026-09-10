@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "generations": [
+    {
+      "id": "abx-core-v2",
+      "coreVersion": 2,
+      "lifecycle": "current",
+      "deployed": "2026-08-20",
+      "support": {
+        "newDeployments": true,
+        "reads": true,
+        "writes": true,
+        "serving": true
+      },
+      "factories": {
+        "factory": "0x2824F4b4b4301dB2FcA10b2D80D45b4d463Ba57E",
+        "seriesFactory": "0x685B4DfC835b6854590B5437C79D62BB7D52698b",
+        "seriesCodeFactory": "0xdDA5174A868A8e099E159E67569900a4F936CFFe",
+        "oneOfOneEditionFactory": "0x6ecc7fAd2186965BaECD0Aa215b00239a3459ddF",
+        "editionFactory": "0xB6a8f051B08A8d6Fb0B6DA53BD23006CE2da31b7",
+        "editionCodeFactory": "0x9441Cc75318E20Ae6237EDb213b4C3019d756Bf0"
+      },
+      "note": "Current canonical factory generation."
+    }
+  ]
+}

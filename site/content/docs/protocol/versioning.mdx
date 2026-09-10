@@ -1,0 +1,43 @@
+---
+title: "Contract versions"
+description: "How ABX identifies and supports deployed contract generations."
+---
+
+ABX contracts are immutable. A new contract generation is published only when the contract runtime
+must change—not on a schedule.
+
+Every collection reports a core version through `abxVersion()`. The SDK maps that version and its six
+factory addresses to a stable generation ID, such as `abx-core-v2`, in
+`packages/sdk/src/contract-generations.json`.
+
+## Compatibility
+
+Generation identity never changes. Its lifecycle and support policy may.
+
+| Lifecycle | Meaning |
+| --- | --- |
+| `current` | Used for new deployments. |
+| `supported` | Superseded, but still supported. |
+| `deprecated` | Still readable and serviceable; writes may warn or be disabled. |
+| `quarantined` | Restricted because of a specific security or correctness risk. |
+
+Software must use the generation's `support` flags for behavior. The lifecycle is an explanation,
+not an allowlist. Canonical provenance is also separate from currentness: an older official ABX
+collection remains attributable to its factory without becoming eligible for new deployments.
+
+The SDK exports `ANCHOR_GENERATIONS`, lookup helpers by ID, core version, and factory, and
+`supportsGenerationOperation`. `verifyProvenance` returns the matching generation and its support
+policy.
+
+## Publishing a new generation
+
+A contract change that requires new runtime bytecode must:
+
+1. bump `AbxVersion.CORE_VERSION`;
+2. deploy and source-verify the complete factory generation on every supported chain;
+3. prepend the new immutable identity to the registry and mark the old generation `supported`;
+4. retain read, reconstruction, indexing, and serving behavior for the old generation; and
+5. test both generations before enabling new deployments.
+
+Do not edit or remove a published generation's ID, core version, or factory addresses. A quarantine
+is the exception to normal compatibility and must describe a concrete risk.

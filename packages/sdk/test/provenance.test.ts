@@ -46,6 +46,10 @@ test('a current-generation clone answers `current` with the core version — "ca
   const res = await verifyProvenance(mockClient([], anchor), CLONE, SEPOLIA);
   assert.equal(res.canonical, true);
   assert.equal(res.generation, 'current');
+  assert.equal(res.generationId, currentAnchorGeneration().id);
+  assert.equal(res.generationLifecycle, 'current');
+  assert.equal(res.support?.reads, true);
+  assert.equal(res.support?.serving, true);
   assert.equal(res.coreVersion, currentAnchorGeneration().coreVersion);
   assert.equal(res.factory, anchor);
   assert.equal(res.anchorsAnswered, 6);
@@ -55,6 +59,9 @@ test('a foreign contract is a settled `false` — anchors answered, none claimed
   const res = await verifyProvenance(mockClient([]), FOREIGN, SEPOLIA);
   assert.equal(res.canonical, false);
   assert.equal(res.generation, null);
+  assert.equal(res.generationId, null);
+  assert.equal(res.generationLifecycle, null);
+  assert.equal(res.support, null);
   assert.equal(res.coreVersion, null);
   assert.ok(res.anchorsAnswered > 0, 'a settled `false` requires that something actually answered');
 });
@@ -82,20 +89,31 @@ test('an explicit trust set REPLACES the manifest — a pinned gate never widens
   assert.deepEqual(probed[1], pinned);
 });
 
-test('the gate never consults retired generations — provenance is not trust', async () => {
-  // Retired anchors answer for `verifyProvenance` only. This asserts the *wiring*, not the data: with
-  // no generation retired yet, `verifyCanonical` still probes exactly the six live anchors and nothing
+test('a custom trusted factory does not manufacture ABX generation provenance', async () => {
+  const res = await verifyProvenance(mockClient([], FOREIGN), CLONE, SEPOLIA, {factories: [FOREIGN]});
+  assert.equal(res.canonical, true);
+  assert.equal(res.factory, FOREIGN);
+  assert.equal(res.generation, null);
+  assert.equal(res.generationId, null);
+  assert.equal(res.generationLifecycle, null);
+  assert.equal(res.support, null);
+  assert.equal(res.coreVersion, null);
+});
+
+test('the gate never consults prior generations — provenance is not trust', async () => {
+  // Prior anchors answer for `verifyProvenance` only. This asserts the *wiring*, not the data: with
+  // no prior generation yet, `verifyCanonical` still probes exactly the six live anchors and nothing
   // else, and it keeps holding as generations accumulate.
   const probed: Address[][] = [];
   await verifyCanonical(mockClient(probed), CLONE, SEPOLIA);
   assert.deepEqual(probed, [canonicalFactories(SEPOLIA)]);
-  const retiredAddrs = new Set(
-    ANCHOR_GENERATIONS.filter((g) => g.retired)
+  const priorAddrs = new Set(
+    ANCHOR_GENERATIONS.filter((g) => g.lifecycle !== 'current')
       .flatMap((g) => Object.values(g.factories))
       .map((a) => a.toLowerCase()),
   );
   for (const probedAddr of probed.flat()) {
-    assert.ok(!retiredAddrs.has(probedAddr.toLowerCase()), `the gate probed a retired anchor: ${probedAddr}`);
+    assert.ok(!priorAddrs.has(probedAddr.toLowerCase()), `the gate probed a prior anchor: ${probedAddr}`);
   }
 });
 
