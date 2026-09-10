@@ -28,6 +28,21 @@
 import type {Address} from 'viem';
 import {readEnv} from './util.js';
 
+export {
+  ANCHOR_GENERATIONS,
+  currentAnchorGeneration,
+  findAnchorGenerationByCoreVersion,
+  findAnchorGenerationByFactory,
+  findAnchorGenerationById,
+  supportsGenerationOperation,
+} from './contract-generations.js';
+export type {
+  AnchorGeneration,
+  GenerationLifecycle,
+  GenerationOperation,
+  GenerationSupport,
+} from './contract-generations.js';
+
 export interface ChainDeployment {
   factory?: Address; // OneOfOneImageFactory (1/1 trust anchor)
   seriesFactory?: Address; // SeriesImageFactory (multi-token trust anchor)
@@ -50,46 +65,6 @@ export interface ChainDeployment {
   paramsLib?: Address; // AbxParamsLib — params + configurable-params write paths
   codeLib?: Address; // AbxCodeLib — script + dependencies write paths (code projects)
   editionLib?: Address; // AbxEditionLib — the shared ERC-1155 body (all three edition types)
-}
-
-/**
- * One generation of the six trust anchors — a single redeploy batch of the token layer.
- *
- * **Identified by the on-chain core version**, and that choice is the whole design. `abxVersion()`
- * is on every clone and in its `AbxDeployed` beacon, so a collection can say what it is by reading
- * *itself* — which keeps working after its factory is retired, and cannot be an assertion our
- * manifest makes on a contract's behalf. The alternative (a semver label we mint here) would be a
- * third version dial next to core v2 and renderer spec v11, and unverifiable.
- *
- * The invariant that makes the identity work — **one core version, one anchor generation** — is a
- * step in the redeploy checklist (`contracts/README.md`) and is enforced by `deployments.test.ts`:
- * the recorded generations must have unique, increasing `coreVersion`s, and the newest must match
- * `AbxVersion.CORE_VERSION` in the contracts. A batch that forgets to bump fails the suite instead
- * of shipping two generations that both claim to be v2.
- *
- * Not backfilled. The generations that preceded this one were testnet-only and are deliberately
- * unenumerated (greenfield: a pre-launch collection re-registers or redeploys, and reads as
- * not-canonical until it does). The shape ships now so the *forward* answer exists from the first
- * batch that retires one.
- */
-export interface AnchorGeneration {
-  /** The core spec version clones of this generation report as `abxVersion()`. */
-  coreVersion: number;
-  /** ISO date the batch went live on chain (same date on every chain — CREATE2). */
-  deployed: string;
-  /** ISO date it was superseded. Absent ⇒ this is the current generation. */
-  retired?: string;
-  /** The six trust anchors, and nothing else. Never libraries or shared singletons. */
-  factories: {
-    factory: Address;
-    seriesFactory: Address;
-    seriesCodeFactory: Address;
-    oneOfOneEditionFactory: Address;
-    editionFactory: Address;
-    editionCodeFactory: Address;
-  };
-  /** What this generation is, for a human reading a provenance answer. Never dispatched on. */
-  note?: string;
 }
 
 /**
@@ -123,9 +98,9 @@ export interface AnchorGeneration {
  * factory bound to an un-manifested library is the exact failure this file exists to prevent. So:
  *
  *   · The live record ({@link CANONICAL} + the per-chain blocks) holds only what is current. A
- *     superseded address may appear beside it as a `replaces 0x…` note, which is prose, and inside
- *     {@link ANCHOR_GENERATIONS}, which is typed to hold nothing but the six FACTORY anchors — never
- *     a library, renderer, minter or seed source, the entries where a wrong bind would do damage.
+ *     superseded address may appear beside it as a `replaces 0x…` note, which is prose, and in the
+ *     contract-generation registry, which holds only the six FACTORY anchors — never a library,
+ *     renderer, minter or seed source, the entries where a wrong bind would do damage.
  *   · {@link ANCHOR_GENERATIONS} is **provenance, never trust.** It answers "was this deployed by an
  *     ABX factory, and which generation" — it must never widen an allowlist or feed
  *     `verifyCanonical`.
@@ -169,36 +144,6 @@ const CANONICAL = {
   codeLib: '0x8dF597246C851E2DF264C8a322c07657395415fc',
   editionLib: '0x7c7D213383D6FC3F1e26A0cB3Ad554c1Aa0011dA',
 } as const satisfies Omit<ChainDeployment, 'generator'>;
-
-/**
- * Every anchor generation, newest first. `[0]` is current (no `retired` date).
- *
- * The addresses are *referenced* from {@link CANONICAL} rather than re-typed, so the current
- * generation cannot drift from the live record — there is one literal per address in this file. When
- * a batch retires this generation, its six literals move into a new entry below (the only place a
- * superseded anchor is allowed to appear), it gains a `retired` date, and the new batch takes the
- * live record. See {@link AnchorGeneration} for why the core version is the identity.
- */
-export const ANCHOR_GENERATIONS: readonly AnchorGeneration[] = [
-  {
-    coreVersion: 2,
-    deployed: '2026-08-20',
-    factories: {
-      factory: CANONICAL.factory,
-      seriesFactory: CANONICAL.seriesFactory,
-      seriesCodeFactory: CANONICAL.seriesCodeFactory,
-      oneOfOneEditionFactory: CANONICAL.oneOfOneEditionFactory,
-      editionFactory: CANONICAL.editionFactory,
-      editionCodeFactory: CANONICAL.editionCodeFactory,
-    },
-    note: 'Current canonical testnet factory generation.',
-  },
-];
-
-/** The generation currently stamping clones — {@link ANCHOR_GENERATIONS}`[0]`, by construction. */
-export function currentAnchorGeneration(): AnchorGeneration {
-  return ANCHOR_GENERATIONS[0];
-}
 
 export const DEPLOYMENTS: Record<number, ChainDeployment> = {
   // Sepolia (testnet). Generator wired to Art Blocks' Sepolia DependencyRegistryV0

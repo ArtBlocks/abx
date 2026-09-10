@@ -13,6 +13,7 @@ import {
 import {
   ANCHOR_GENERATIONS,
   currentAnchorGeneration,
+  findAnchorGenerationByFactory,
   resolveFactory,
   resolveSeriesFactory,
   resolveRenderer,
@@ -22,6 +23,7 @@ import {
   resolveEditionFactory,
   resolveEditionCodeFactory,
 } from './deployments.js';
+import type {GenerationLifecycle, GenerationSupport} from './contract-generations.js';
 import {
   predictRenderer,
   predictSeedSource,
@@ -771,6 +773,12 @@ export interface ProvenanceResult {
   /** `'current'` = the live anchors. `'prior'` = a retired generation (canonically ABX, older).
    *  `null` = no generation claimed it (or nothing answered). */
   generation: 'current' | 'prior' | null;
+  /** Stable identifier for the matching generation. */
+  generationId: string | null;
+  /** Human-facing state. Dispatch on `support`, not this label. */
+  generationLifecycle: GenerationLifecycle | null;
+  /** Operations ABX software supports for this generation. */
+  support: GenerationSupport | null;
   /** The core spec version that generation stamps — the sayable identity ("canonically ABX v2").
    *  Cross-check it against the clone's own `abxVersion()`, which is where it is verifiable. */
   coreVersion: number | null;
@@ -805,25 +813,50 @@ export async function verifyProvenance(
   const live = opts.factories ?? canonicalFactories(chainId);
   const current = await askAnchors(publicClient, address, live);
   if (current.hit) {
+    // A caller-supplied trust set may contain non-ABX factories. It can establish trust for that
+    // caller, but it cannot manufacture ABX generation provenance.
+    const generation = opts.factories
+      ? findAnchorGenerationByFactory(current.hit)
+      : currentAnchorGeneration();
     return {
       canonical: true,
-      generation: 'current',
-      coreVersion: currentAnchorGeneration().coreVersion,
+      generation: generation ? (generation.lifecycle === 'current' ? 'current' : 'prior') : null,
+      generationId: generation?.id ?? null,
+      generationLifecycle: generation?.lifecycle ?? null,
+      support: generation?.support ?? null,
+      coreVersion: generation?.coreVersion ?? null,
       factory: current.hit,
       anchorsAnswered: current.answered,
     };
   }
-  // An explicit trust set is exactly that: don't quietly widen the search to retired generations.
-  const retired = opts.factories ? [] : ANCHOR_GENERATIONS.filter((g) => g.retired);
+  // An explicit trust set is exactly that: don't quietly widen the search to prior generations.
+  const prior = opts.factories ? [] : ANCHOR_GENERATIONS.filter((g) => g.lifecycle !== 'current');
   let answered = current.answered;
-  for (const gen of retired) {
+  for (const gen of prior) {
     const res = await askAnchors(publicClient, address, Object.values(gen.factories));
     answered += res.answered;
     if (res.hit) {
-      return {canonical: true, generation: 'prior', coreVersion: gen.coreVersion, factory: res.hit, anchorsAnswered: answered};
+      return {
+        canonical: true,
+        generation: 'prior',
+        generationId: gen.id,
+        generationLifecycle: gen.lifecycle,
+        support: gen.support,
+        coreVersion: gen.coreVersion,
+        factory: res.hit,
+        anchorsAnswered: answered,
+      };
     }
   }
-  return {canonical: answered > 0 ? false : null, generation: null, coreVersion: null, anchorsAnswered: answered};
+  return {
+    canonical: answered > 0 ? false : null,
+    generation: null,
+    generationId: null,
+    generationLifecycle: null,
+    support: null,
+    coreVersion: null,
+    anchorsAnswered: answered,
+  };
 }
 
 /** Progress from {@link resolveScanFloor}'s on-chain discovery fallback, so a caller can narrate

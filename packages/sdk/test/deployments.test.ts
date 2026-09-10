@@ -4,11 +4,15 @@ import {readFileSync} from 'node:fs';
 import {
   ANCHOR_GENERATIONS,
   currentAnchorGeneration,
+  findAnchorGenerationByCoreVersion,
+  findAnchorGenerationByFactory,
+  findAnchorGenerationById,
   DEPLOYMENTS,
   getDeployment,
   isCurrentGenerator,
   resolveGenerator,
   resolveRenderer,
+  supportsGenerationOperation,
 } from '../src/deployments.js';
 import {predictChunkStore, predictRenderer, predictFixedPriceMinter, predictSeedSource} from '../src/create2.js';
 import {isAddress} from 'viem';
@@ -129,34 +133,46 @@ test('generations: core versions are unique and increasing — one core version,
   assert.deepEqual(versions, ascending, 'ANCHOR_GENERATIONS must be newest-first (descending coreVersion)');
 });
 
-test('generations: `prior` is unreachable until a generation retires, and that is a state, not a gap', () => {
+test('generations: `prior` is unreachable until a generation is superseded, and that is a state, not a gap', () => {
   // Today ANCHOR_GENERATIONS holds exactly one entry, so `verifyProvenance` can only answer
   // 'current' or nothing — the prior-generation lane is built and untravelled. That is deliberate
   // (pre-launch testnet generations are disposable and not backfilled), but it is worth asserting so
   // nobody reads the feature's presence as evidence it has ever answered, and so the day a batch
   // retires an anchor set this test is what says the lane went live.
-  const retired = ANCHOR_GENERATIONS.filter((g) => g.retired);
-  if (retired.length === 0) {
-    assert.equal(ANCHOR_GENERATIONS.length, 1, 'no retired generations, so there should be exactly one entry');
+  const prior = ANCHOR_GENERATIONS.filter((g) => g.lifecycle !== 'current');
+  if (prior.length === 0) {
+    assert.equal(ANCHOR_GENERATIONS.length, 1, 'no prior generations, so there should be exactly one entry');
     return;
   }
-  // Once a generation HAS retired: every retired entry must carry a full six-anchor set, or a
+  // Once a generation HAS been superseded: every prior entry must carry a full six-anchor set, or a
   // provenance lookup would silently skip whichever family is missing — the same hole that once made
   // every canonical edition read `canonical: NO`.
-  for (const gen of retired) {
+  for (const gen of prior) {
+    assert.ok(gen.retired, `prior generation ${gen.id} must record when it was retired`);
+    assert.equal(gen.support.newDeployments, false, `prior generation ${gen.id} cannot accept new deployments`);
     assert.equal(
       Object.keys(gen.factories).length,
       6,
-      `retired generation v${gen.coreVersion} lists ${Object.keys(gen.factories).length} anchors, not 6`,
+      `prior generation v${gen.coreVersion} lists ${Object.keys(gen.factories).length} anchors, not 6`,
     );
   }
 });
 
 test('generations: exactly one is current, and it is first', () => {
-  const current = ANCHOR_GENERATIONS.filter((g) => !g.retired);
-  assert.equal(current.length, 1, 'exactly one generation may lack a `retired` date — the live one');
+  const current = ANCHOR_GENERATIONS.filter((g) => g.lifecycle === 'current');
+  assert.equal(current.length, 1, 'exactly one generation may be current');
   assert.equal(ANCHOR_GENERATIONS[0], current[0]);
   assert.equal(currentAnchorGeneration(), current[0]);
+  assert.equal(current[0].retired, undefined);
+  assert.equal(supportsGenerationOperation(current[0], 'newDeployments'), true);
+});
+
+test('generations: stable identity and factory lookups resolve the current generation', () => {
+  const current = currentAnchorGeneration();
+  assert.equal(current.id, 'abx-core-v2');
+  assert.equal(findAnchorGenerationById(current.id), current);
+  assert.equal(findAnchorGenerationByCoreVersion(current.coreVersion), current);
+  assert.equal(findAnchorGenerationByFactory(current.factories.editionCodeFactory), current);
 });
 
 test('generations: the current one matches AbxVersion.CORE_VERSION in the contracts', () => {
@@ -184,21 +200,20 @@ test('generations: the current generation IS the live trust set — no drift bet
   });
 });
 
-test('generations: a retired generation never leaks into the live record (provenance is not trust)', () => {
-  // One retired generation predates the V-01/V-02 remediation, so a trust set that accepted it would
-  // be accepting known-vulnerable implementations. The type forbids libraries/singletons here at all;
-  // this forbids the addresses overlapping.
+test('generations: a prior generation never leaks into the live record (provenance is not trust)', () => {
+  // Prior generations are provenance only. The type forbids libraries/singletons here at all; this
+  // check keeps their retired factory addresses out of the live trust set.
   const liveAddrs = new Set(
     Object.values(DEPLOYMENTS)
       .flatMap((d) => Object.values(d))
       .filter((v): v is string => typeof v === 'string')
       .map((a) => a.toLowerCase()),
   );
-  for (const gen of ANCHOR_GENERATIONS.filter((g) => g.retired)) {
+  for (const gen of ANCHOR_GENERATIONS.filter((g) => g.lifecycle !== 'current')) {
     for (const [name, addr] of Object.entries(gen.factories)) {
       assert.ok(
         !liveAddrs.has(addr.toLowerCase()),
-        `retired generation v${gen.coreVersion}'s ${name} (${addr}) is still in the live manifest`,
+        `prior generation v${gen.coreVersion}'s ${name} (${addr}) is still in the live manifest`,
       );
     }
   }
