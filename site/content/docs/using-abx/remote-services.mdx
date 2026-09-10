@@ -42,7 +42,8 @@ A named remote reads only its matching token. It never falls back to your self-h
 ## What a compatible service exposes
 
 `GET /.well-known/abx-service` returns the supported chains, interface versions, authentication
-method, and rendering support. Inspect it with `abx remote <name-or-url>` before registration.
+method, rendering support, and the contract generations the implementation understands. Inspect it
+with `abx remote <name-or-url>` before registration.
 
 The version 1 control plane uses bearer authentication:
 
@@ -59,6 +60,11 @@ Registration may return `202` while a cold replay continues. `abx add` waits by 
 
 The status words are `queued`, `backfilling`, `live`, `stale`, and `failed`. A stale service keeps
 serving its last indexed state.
+
+Once indexing verifies both the factory and the on-chain core version, project list and status
+responses include `contractGeneration` with its stable ID, lifecycle, and operation support. A
+missing field means the service has not established official generation provenance; it is not
+permission to guess from `abxVersion()` alone.
 
 ## Public reads
 

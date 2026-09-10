@@ -11,6 +11,7 @@
 
 import type {Hex} from 'viem';
 import type {OpenSeaAttribute} from './traits.js';
+import type {ContractGenerationSummary} from './contract-generations.js';
 import {linearBackoffDelay, sleep} from './util.js';
 
 export const WELL_KNOWN_SERVICE_PATH = '/.well-known/abx-service';
@@ -199,6 +200,8 @@ export interface ServiceDescriptor {
   interfaces: string[];
   /** EIP-155 chain ids served; the control plane rejects others with `unsupported_chain`. */
   chains: number[];
+  /** Contract generations this implementation understands, with operation-specific policy. */
+  contractGenerations?: ContractGenerationSummary[];
   /** Present iff the control plane is enabled. `signupUrl` is provider-specific human
    * onboarding/recovery and `docsUrl` is provider documentation; OAuth discovery is separate. */
   auth?: {scheme: 'bearer'; signupUrl?: string; docsUrl?: string};
@@ -316,6 +319,8 @@ export interface RegisterProjectSummary {
     eventCount: number;
     tokenCount: number;
     mintedCount: number;
+    /** Official generation, once the indexed factory and on-chain core version agree. */
+    contractGeneration?: ContractGenerationSummary;
     /** Sum of every token's current supply — ERC-1155 editions only; absent for a 721 project. */
     copies?: string;
     status?: IndexStatus;
@@ -351,6 +356,8 @@ export interface RemoteProjectSummary {
   eventCount?: number;
   tokenCount?: number;
   mintedCount?: number;
+  /** Official generation, once the indexed factory and on-chain core version agree. */
+  contractGeneration?: ContractGenerationSummary;
   /** Sum of every token's current supply — ERC-1155 editions only; absent for a 721 project. */
   copies?: string;
   reconstructedAt?: string | null;
@@ -375,6 +382,8 @@ export interface RemoteProjectStatus {
   eventCount: number;
   tokenCount: number;
   mintedCount: number;
+  /** Official generation, once the indexed factory and on-chain core version agree. */
+  contractGeneration?: ContractGenerationSummary;
   /** Sum of every token's current supply — ERC-1155 editions only; absent for a 721 project. */
   copies?: string;
   reconstructedAt: string | null;

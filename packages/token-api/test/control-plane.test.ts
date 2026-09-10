@@ -7,11 +7,18 @@ import {createServer, type Server} from 'node:http';
 import {mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {resolveChain, CONTROL_PLANE_INTERFACE, TOKEN_API_INTERFACE, type ProjectState, type ServiceDescriptor} from '@artblocks/abx-sdk';
+import {
+  currentAnchorGeneration,
+  resolveChain,
+  CONTROL_PLANE_INTERFACE,
+  TOKEN_API_INTERFACE,
+  type ProjectState,
+  type ServiceDescriptor,
+} from '@artblocks/abx-sdk';
 import {SelfHostIndexer, SqliteStore} from '@artblocks/abx-indexer';
 import type {StorageBackend, StoredContent} from '@artblocks/abx-storage';
 import {createTokenApiServer} from '../src/server.js';
-import {summarize} from '../src/control-plane.js';
+import {summarize, SUPPORTED_CONTRACT_GENERATION_IDS} from '../src/control-plane.js';
 
 const CHAIN_KEY = process.env.ABX_CHAIN ?? 'base-sepolia';
 const CHAIN_ID = resolveChain(process.env.ABX_CHAIN).id;
@@ -127,6 +134,8 @@ test('descriptor: a token-less node honestly advertises NO control plane; a toke
       const d = body as ServiceDescriptor;
       assert.deepEqual(d.interfaces, [TOKEN_API_INTERFACE]);
       assert.deepEqual(d.chains, [CHAIN_ID]);
+      assert.deepEqual(d.contractGenerations?.map((generation) => generation.id), [...SUPPORTED_CONTRACT_GENERATION_IDS]);
+      assert.equal(d.contractGenerations?.[0].support.serving, true);
       assert.equal(d.auth, undefined);
       assert.equal(d.render, undefined);
       assert.ok(d.service?.version);
@@ -285,6 +294,45 @@ test('summarize: copies sums every token supply for an edition project, and is a
 
   const oneOfOne = {...edition, contractType: '1of1' as const, tokens: [{tokenId: '0', lifecycle: 'live', owner: ADDR as never, tokenURI: null, fields: [], lockedFields: []}]};
   assert.equal('copies' in summarize(oneOfOne), false);
+});
+
+test('summarize: generation requires canonical factory proof and a matching on-chain version', () => {
+  const generation = currentAnchorGeneration();
+  const official = {
+    ...editionProjectState(ADDR, []),
+    abxVersion: generation.coreVersion,
+    factory: generation.factories.editionFactory,
+    isCanonical: true,
+  };
+  assert.deepEqual(summarize(official).contractGeneration, {
+    id: generation.id,
+    coreVersion: generation.coreVersion,
+    lifecycle: generation.lifecycle,
+    support: generation.support,
+  });
+  assert.equal('contractGeneration' in summarize({...official, isCanonical: false}), false);
+  assert.equal('contractGeneration' in summarize({...official, abxVersion: generation.coreVersion + 1}), false);
+});
+
+test('list and status expose the verified contract generation without a database migration', async () => {
+  await withNode(async (base, indexer) => {
+    const generation = currentAnchorGeneration();
+    const state = {
+      ...editionProjectState(ADDR, []),
+      abxVersion: generation.coreVersion,
+      factory: generation.factories.editionFactory,
+      isCanonical: true,
+    };
+    indexer.register({address: ADDR, chainKey: CHAIN_KEY, fromBlock: '100', factory: state.factory});
+    indexer.store.putProject(state);
+    await withEnv({ABX_RESOLVER_ADMIN_TOKEN: 'tok'}, async () => {
+      const list = await getJson(base, '/v1/projects', {headers: auth('tok')});
+      assert.equal(list.body.projects[0].contractGeneration.id, generation.id);
+      const status = await getJson(base, `/v1/projects/${CHAIN_ID}/${ADDR}/status`, {headers: auth('tok')});
+      assert.equal(status.body.contractGeneration.id, generation.id);
+      assert.equal(status.body.contractGeneration.support.serving, true);
+    });
+  });
 });
 
 test('the list and status routes carry copies for an edition project through to the wire', async () => {

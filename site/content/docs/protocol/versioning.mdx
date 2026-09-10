@@ -29,6 +29,10 @@ The SDK exports `ANCHOR_GENERATIONS`, lookup helpers by ID, core version, and fa
 `supportsGenerationOperation`. `verifyProvenance` returns the matching generation and its support
 policy.
 
+Compatible services explicitly advertise understood generations in `/.well-known/abx-service`. Their project
+list and status responses include a generation only after the recorded factory, its clone check, and
+the collection's `abxVersion()` agree. No extra database field is required.
+
 ## Publishing a new generation
 
 A contract change that requires new runtime bytecode must:

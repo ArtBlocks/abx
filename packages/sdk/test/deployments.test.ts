@@ -6,6 +6,7 @@ import {
   currentAnchorGeneration,
   findAnchorGenerationByCoreVersion,
   findAnchorGenerationByFactory,
+  findAnchorGenerationForProject,
   findAnchorGenerationById,
   DEPLOYMENTS,
   getDeployment,
@@ -13,6 +14,7 @@ import {
   resolveGenerator,
   resolveRenderer,
   supportsGenerationOperation,
+  summarizeAnchorGeneration,
 } from '../src/deployments.js';
 import {predictChunkStore, predictRenderer, predictFixedPriceMinter, predictSeedSource} from '../src/create2.js';
 import {isAddress} from 'viem';
@@ -173,6 +175,32 @@ test('generations: stable identity and factory lookups resolve the current gener
   assert.equal(findAnchorGenerationById(current.id), current);
   assert.equal(findAnchorGenerationByCoreVersion(current.coreVersion), current);
   assert.equal(findAnchorGenerationByFactory(current.factories.editionCodeFactory), current);
+  assert.equal(
+    findAnchorGenerationForProject({
+      abxVersion: current.coreVersion,
+      factory: current.factories.editionCodeFactory,
+      isCanonical: true,
+    }),
+    current,
+  );
+  assert.deepEqual(summarizeAnchorGeneration(current), {
+    id: current.id,
+    coreVersion: current.coreVersion,
+    lifecycle: current.lifecycle,
+    support: current.support,
+  });
+});
+
+test('generations: project lookup requires factory proof and a matching on-chain core version', () => {
+  const current = currentAnchorGeneration();
+  const project = {
+    abxVersion: current.coreVersion,
+    factory: current.factories.factory,
+    isCanonical: true,
+  };
+  assert.equal(findAnchorGenerationForProject({...project, isCanonical: false}), undefined);
+  assert.equal(findAnchorGenerationForProject({...project, abxVersion: current.coreVersion + 1}), undefined);
+  assert.equal(findAnchorGenerationForProject({...project, factory: null}), undefined);
 });
 
 test('generations: the current one matches AbxVersion.CORE_VERSION in the contracts', () => {
