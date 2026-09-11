@@ -19,9 +19,10 @@ import {Test} from "forge-std/Test.sol";
 ///      obeyed. Each floor is tight enough to trip on any real feature addition.
 ///
 ///      **When this fails, do not raise the floor.** The floor is the point. Externalize bytes into a
-///      delegatecalled library (the `AbxParamsLib` / `AbxCodeLib` pattern) — the extraction order is
-///      recorded in `docs/10-backlog.md`. Extraction moves the implementation address, and
-///      therefore the factory and its trust anchor, so it rides a redeploy that was happening anyway.
+///      delegatecalled library (the `AbxParamsLib` / `AbxCodeLib` pattern). The maintained guidance
+///      lives under "Maintenance invariants" in `contracts/README.md`. Extraction moves the
+///      implementation address, and therefore the factory and its trust anchor, so it rides a
+///      redeploy that was happening anyway.
 contract CodeSizeTest is Test {
     /// EIP-170: the maximum deployed (runtime) code size for a contract.
     uint256 internal constant EIP170_LIMIT = 24_576;
@@ -46,7 +47,7 @@ contract CodeSizeTest is Test {
                     " bytes of the EIP-170 limit (floor ",
                     vm.toString(floor),
                     "). Do NOT lower the floor: externalize a surface into a delegatecalled library"
-                    " instead (see docs/10-backlog.md for the recommended extraction order)."
+                    " instead (see the Maintenance invariants in contracts/README.md)."
                 )
             );
         }
