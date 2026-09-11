@@ -1,6 +1,6 @@
 // ERC-1155 editions: CREATE2 predictions are stable + independent of call order, and the four new
 // ChainDeployment fields resolve override → env → manifest exactly like every existing resolver
-// (deployments.test.ts is the model). CANONICAL carries identical edition anchors on both chains,
+// (deployments.test.ts is the model). CANONICAL carries identical edition anchors on every shipped chain,
 // so the manifest leg resolves to the recorded addresses and
 // env/override must still WIN over it (the harder precedence case than an empty manifest).
 import {test} from 'node:test';
@@ -16,6 +16,7 @@ import {predictOneOfOneEditionFactory, predictEditionFactory, predictFixedPriceM
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
+const ARBITRUM_SEPOLIA = 421614;
 
 // The canonical edition anchors (see deployments.ts CANONICAL + reference/deployments.mdx).
 const ONE_OF_ONE_EDITION_FACTORY = '0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E';
@@ -32,8 +33,8 @@ test('edition CREATE2 predictions are stable (pure functions of fixed bytecode +
   assert.notEqual(predictOneOfOneEditionFactory(), predictFixedPriceMinter1155());
 });
 
-test('manifest: the canonical edition anchors are recorded, identical on both chains', () => {
-  for (const chainId of [SEPOLIA, BASE_SEPOLIA]) {
+test('manifest: the canonical edition anchors are recorded, identical on all shipped chains', () => {
+  for (const chainId of [SEPOLIA, BASE_SEPOLIA, ARBITRUM_SEPOLIA]) {
     const deployment = getDeployment(chainId);
     assert.equal(deployment.oneOfOneEditionFactory, ONE_OF_ONE_EDITION_FACTORY);
     assert.equal(deployment.editionFactory, EDITION_FACTORY);

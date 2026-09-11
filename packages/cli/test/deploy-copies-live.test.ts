@@ -1,5 +1,5 @@
 // `--copies` routes `deploy`/`deploy-series`/`deploy-code`/`predict` to their ERC-1155 edition
-// twins' factories — CREATE2-canonical on both supported chains.
+// twins' factories — CREATE2-canonical across the shipped testnets.
 // These tests spawn the real CLI (matching the pattern in stray-flags.test.ts) against the live
 // manifest + live default chain: a --copies dry run must resolve the REAL canonical edition
 // factory (never a stale/absent one) and stop cleanly at the dry-run gate; predict must print a
@@ -35,7 +35,7 @@ function run(args: string[]): {code: number; out: string} {
 const mediaDir = mkdtempSync(joinPath(tmpdir(), 'abx-edition-fixture-'));
 writeFileSync(joinPath(mediaDir, '0.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
 
-// The canonical edition anchors (identical on both chains — see reference/deployments.mdx; the
+// The canonical edition anchors (identical across shipped chains — see reference/deployments.mdx; the
 // manifest in packages/sdk/src/deployments.ts is the source of truth these must agree with).
 const ONE_OF_ONE_EDITION_FACTORY = '0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E';
 const EDITION_FACTORY = '0xCC29eD68f26693dc9Aa5f090B21F37985206cc19';

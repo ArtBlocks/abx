@@ -20,9 +20,10 @@
  *     shipped yet, or a private deployment — the operator declares it, the tool never writes it)
  *   - manifest: the canonical address below
  *
- * DEPLOYMENT SCOPE: canonical infrastructure is live on Base Sepolia (the default, chainId 84532)
- * and Sepolia (11155111). `chain-support.json` separately records networks that are recognized for
- * qualification or planned production support; absence here always means no canonical deployment.
+ * DEPLOYMENT SCOPE: canonical infrastructure is live on Base Sepolia (the default, chainId 84532),
+ * Sepolia (11155111), and Arbitrum Sepolia (421614). `chain-support.json` separately records
+ * networks that are recognized for qualification or planned production support; absence here
+ * always means no canonical deployment.
  *
  * Changing a contract → redeploy → repoint here: see contracts/README.md#changing-a-contract.
  */
@@ -56,7 +57,7 @@ export interface ChainDeployment {
   fixedPriceMinter?: Address; // AbxFixedPriceMinter (shared ownerless sale singleton)
   seedSource?: Address; // AbxSeedSource (canonical pseudorandom mint-time randomizer)
   generator?: Address; // AbxGenerator (canonical on-chain generator — the animation_url field renderer)
-  // ERC-1155 editions — deployed and canonical on both chains.
+  // ERC-1155 editions — deployed and canonical on all shipped chains.
   oneOfOneEditionFactory?: Address; // OneOfOneEditionFactory (1/1-edition trust anchor)
   editionFactory?: Address; // EditionImageFactory (multi-work edition trust anchor)
   editionCodeFactory?: Address; // EditionCodeFactory (code-project edition trust anchor)
@@ -112,7 +113,7 @@ export interface ChainDeployment {
  */
 const CANONICAL = {
   // Superseded addresses stay out of the live manifest. Two properties hold for every entry:
-  //   1. Identical on Sepolia and Base Sepolia — CREATE2 through the keyless proxy at the canonical
+  //   1. Identical on every shipped chain — CREATE2 through the keyless proxy at the canonical
   //      salts in `AbxSalts.sol` / `ABX_SALT`. Only `generator` differs per chain (its constructor
   //      bakes chain-specific immutables), which is why it lives in the per-chain blocks below.
   //   2. Recomputable from this build alone — `predictFactory()`, `predictRenderer()`,
@@ -167,6 +168,14 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
   84532: {
     ...CANONICAL,
     generator: '0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2',
+  },
+  // Arbitrum Sepolia (testnet). No Art Blocks DependencyRegistry on this chain, so the generator is
+  // deployed with defaultDependencyRegistry = address(0) — collections point at their own. SSTORE2
+  // asset pointers: abxJsPointer 0x3417C691C34d5b0b23fB339a2da0DeDf99729402,
+  // gunzipScriptPointer 0x59FaD0D88cC121F0F8c58F6a1AaeC2B7276AeADB.
+  421614: {
+    ...CANONICAL,
+    generator: '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84',
   },
 };
 

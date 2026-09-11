@@ -24,7 +24,7 @@ test('chain registry separates recognized networks from selectable networks', ()
   ]);
   assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'arbitrum-sepolia']);
   assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 3);
-  assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'not-deployed');
+  assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
   for (const key of ['base', 'arbitrum-one', 'ethereum']) {
     assert.equal(chainSupportByKey(key)?.supportLevel, 'disabled');
   }

@@ -21,7 +21,9 @@ import {isAddress} from 'viem';
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
+const ARBITRUM_SEPOLIA = 421614;
 const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
+const ARBITRUM_GENERATOR = '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84';
 const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 
 // Every recorded address must be a VALID EIP-55 checksum, not merely 40 hex characters.
@@ -30,7 +32,7 @@ const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 // one wrong nibble of casing in the manifest turns into `Address "0x…" is invalid` at the point of
 // use — and the manifest is the one place nobody re-derives it. Both AbxGenerator entries shipped
 // that way once (the address was right, the casing was mangled in transcription), which broke every
-// on-chain-URI read on both testnets while the per-entry equality tests below stayed green, because
+// on-chain-URI read on both original testnets while the per-entry equality tests below stayed green, because
 // they compared against the same mangled string. A property over the whole manifest is what catches
 // the next one.
 test('manifest: every address is a valid EIP-55 checksum', () => {
@@ -58,7 +60,7 @@ test('manifest: sepolia ships the canonical generator + the current renderer rev
 // The CREATE2 invariant: the deterministic address the CLI's lazy deployers land at (and self-heal
 // to) MUST equal the manifest address — otherwise `ensureRenderer`/`ensureChunkStore` would deploy a
 // duplicate at a different address. Guards against salt-string or bytecode drift vs. AbxSalts.sol.
-test('lazy-deploy CREATE2 predictions equal the manifest addresses (both chains)', () => {
+test('lazy-deploy CREATE2 predictions equal the manifest addresses (all shipped chains)', () => {
   assert.equal(predictRenderer(), DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(predictChunkStore(), DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(predictFixedPriceMinter(), DEPLOYMENTS[SEPOLIA].fixedPriceMinter);
@@ -66,6 +68,9 @@ test('lazy-deploy CREATE2 predictions equal the manifest addresses (both chains)
   // canonical infra is cross-chain-identical, so the same prediction serves every chain
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].generator, ARBITRUM_GENERATOR);
 });
 
 // Precedence is override → env → manifest — identical to every other resolver (resolveRenderer

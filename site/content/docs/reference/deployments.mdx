@@ -3,22 +3,20 @@ title: "Networks and deployments"
 description: "ABX network support and canonical contract addresses."
 ---
 
-Production networks are disabled in this release. Start on Base Sepolia. Sepolia is also fully
-deployed; Arbitrum Sepolia is available for explicit qualification work, but has no canonical ABX
-contracts yet.
+Production networks are disabled in this release. Start on Base Sepolia. Sepolia is also supported;
+Arbitrum Sepolia has canonical contracts for explicit qualification work.
 
 | Network | Chain ID | Support | Canonical contracts |
 | --- | ---: | --- | --- |
 | Base Sepolia | `84532` | supported · default | deployed |
 | Sepolia | `11155111` | supported | deployed |
-| Arbitrum Sepolia | `421614` | experimental | not deployed |
+| Arbitrum Sepolia | `421614` | experimental | deployed |
 | Base | `8453` | disabled | not deployed |
 | Arbitrum One | `42161` | disabled | not deployed |
 | Ethereum | `1` | disabled | not deployed |
 
-“Experimental” means the SDK and CLI recognize the network for qualification. Commands that require
-canonical infrastructure will stop until those contracts are deployed and recorded. “Disabled” means
-the CLI refuses to operate on the network.
+“Experimental” means the network is ready for deliberate qualification, but is not yet a recommended
+default. “Disabled” means the CLI refuses to operate on the network.
 
 The machine-readable sources of truth are
 [`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)
@@ -28,8 +26,8 @@ addresses. If this page differs, the SDK data wins.
 
 ## Shared addresses
 
-The keyless CREATE2 proxy deploys the current `abx-core-v3` contracts at the same address on Base
-Sepolia and Sepolia.
+The keyless CREATE2 proxy deploys the current `abx-core-v3` contracts at the same address on all
+three testnets.
 
 | Contract | Environment override | Address |
 | --- | --- | --- |
@@ -59,10 +57,11 @@ Address resolution follows this order: explicit option, environment override, SD
 | --- | --- | --- |
 | Base Sepolia | `84532` | <CopyAddress>0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2</CopyAddress> |
 | Sepolia | `11155111` | <CopyAddress>0x7fcf8118D400FF004fF0772a37c24196D9aA7b17</CopyAddress> |
+| Arbitrum Sepolia | `421614` | <CopyAddress>0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84</CopyAddress> |
 
 Sepolia also has the Art Blocks `DependencyRegistryV0` at
-<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base Sepolia has no canonical dependency
-registry.
+<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base Sepolia and Arbitrum Sepolia have no
+canonical dependency registry.
 
 ## Contract generations
 
