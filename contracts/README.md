@@ -11,10 +11,6 @@ shared renderer, reader, minter, and seed-source singletons. See the maintained
 > independent third-party audit. Review the source, tests, deployed bytecode, owner powers, and
 > [security policy](../SECURITY.md) before relying on it.
 
-Historical NatSpec phrases such as “independent audit” describe review findings, not a published
-third-party audit. They remain in deployed contract sources so the repository preserves the source
-hashes and compiler metadata associated with those deployments.
-
 ## Install as a Solidity dependency
 
 The same tree is published to Soldeer as `abx-contracts`. Exact-pin the protocol-compatible release;
@@ -22,12 +18,12 @@ do not copy interface files into each project:
 
 ```toml
 [dependencies]
-abx-contracts = "2.0.0"
+abx-contracts = "3.0.0"
 ```
 
 Then run `forge soldeer install` and import, for example,
-`abx-contracts/src/extensions/configurable-params/IAbxParamHooks.sol`. The package version follows
-protocol compatibility (core v2 → package 2.x), independently of CLI prerelease versions. See
+`abx-contracts/src/extensions/configurable-params/IAbxParamHooks.sol`. The package major follows
+the core protocol version, independently of CLI prerelease versions. See
 [`SOLDEER.md`](SOLDEER.md) for packaging and release policy.
 
 ## Layout — organized by the spine's abstractions
@@ -269,9 +265,13 @@ forge script script/DeployLibraries.s.sol --rpc-url <RPC> --broadcast
 forge script script/Deploy.s.sol            --rpc-url <RPC> --broadcast  # OneOfOneImageFactory
 forge script script/DeploySeries.s.sol      --rpc-url <RPC> --broadcast  # SeriesImageFactory
 forge script script/DeploySeriesCode.s.sol  --rpc-url <RPC> --broadcast  # SeriesCodeFactory (needs STEP 0)
+forge script script/DeployOneOfOneEdition.s.sol --rpc-url <RPC> --broadcast # OneOfOneEditionFactory (needs STEP 0)
+forge script script/DeployEdition.s.sol      --rpc-url <RPC> --broadcast  # EditionImageFactory (needs STEP 0)
+forge script script/DeployEditionCode.s.sol  --rpc-url <RPC> --broadcast  # EditionCodeFactory (needs STEP 0)
 forge script script/DeploySeedSource.s.sol  --rpc-url <RPC> --broadcast  # AbxSeedSource (standalone — see note)
 forge script script/DeployRenderer.s.sol    --rpc-url <RPC> --broadcast  # AbxMetadataRenderer
 forge script script/DeployMinter.s.sol      --rpc-url <RPC> --broadcast  # AbxFixedPriceMinter
+forge script script/DeployMinter1155.s.sol  --rpc-url <RPC> --broadcast  # AbxFixedPriceMinter1155
 forge script script/DeployChunkStore.s.sol  --rpc-url <RPC> --broadcast  # AbxChunkStore
 forge script script/DeployAbxGenerator.s.sol --rpc-url <RPC> --broadcast # AbxGenerator (per-chain, not cross-chain-identical)
 ```
@@ -356,21 +356,14 @@ edit a contract, walk this list — an agent making the change is expected to do
      `AbxMetadataRenderer.SPEC_VERSION` **and** the CLI's `isCurrentRenderer` check in lockstep, so
      `ensureRenderer` treats deployed-but-behind renderers as stale.
    - **A runtime change to the token layer is a new anchor generation → bump
-     `AbxVersion.CORE_VERSION`**, move the SDK's `isCurrent*` probes in `packages/sdk/src/anchors.ts`
-     in lockstep (the constant's own docstring says so, and it was not read), and record the
-     generation in step 6. This is what makes `abxVersion()` a *capability* answer: adding
-     `burn()`, `burnable()`, `maxRoyaltyBps()` and `reduceMaxRoyaltyBps()` to the CORE
-     base — burn is not an extension, so no extension version moved either — and left the constant
-     at 2, so `abxVersion() == 2` cannot tell a burn-capable token from a pre-burn one and every
-     consumer has to probe getters to find out. One core version, one generation; you cannot record
-     a new generation without bumping, because `deployments.test.ts` fails.
-   - **Comment/metadata only** (SPDX/license header, NatSpec) → runtime is byte-identical; **do not**
-     redeploy. Redeploying factories churns the trust anchors platforms allowlist for zero functional
-     gain. The cost of not redeploying is that the deployed bytecode keeps the **old** metadata hash,
-     so a later `forge verify-contract` from `HEAD` will fail on that contract with a
-     bytecode-mismatch — verify it from the commit it was deployed at (`git stash` / a worktree at
-     that SHA), or leave the existing verification in place. Resolved naturally at the next fresh
-     (e.g. mainnet) deploy.
+     `AbxVersion.CORE_VERSION`**, move the SDK's `ABX_CORE_VERSION` gate in
+     `packages/sdk/src/anchors.ts` in lockstep, and record the generation in step 6. One core
+     version identifies one immutable generation.
+   - **Comment/metadata only** (SPDX/license header, NatSpec) → runtime is byte-identical, but
+     creation bytecode and its CREATE2 address change. Existing deployments do not need replacing.
+     Verify them from the source commit they were deployed from. Before adding a new supported chain,
+     either deploy that same source commit or cut a new generation; never publish one generation as
+     if two different source builds shared an identity.
 4. **Redeploy + verify** (if step 3 said so) — deploy on each chain with `script/Deploy*.s.sol` (CREATE2
    canonical salts, so the new address is identical cross-chain and predictable; see [Deterministic
    addresses](#deterministic-addresses-create2) for the `SeriesCode` `--libraries` pin and the
@@ -409,7 +402,7 @@ forge verify-contract <addr> src/renderers/AbxChunkStore.sol:AbxChunkStore \
   --chain sepolia --compilation-profile default --watch
 ```
 
-Run it for each chain (`--chain sepolia`, `--chain base-sepolia`). `--compilation-profile default` is
+Run it for each chain (`--chain sepolia`, `--chain base-sepolia`, `--chain arbitrum-sepolia`). `--compilation-profile default` is
 required whenever the build cache holds more than one profile (otherwise forge stops with *"Ambiguous
 compilation profiles found in cache"*).
 
@@ -446,9 +439,9 @@ snapshot and will age:
 ```bash
 forge verify-contract <addr> src/tokens/SeriesCode.sol:SeriesCode \
   --chain sepolia --compilation-profile default --optimizer-runs 200 \
-  --libraries src/libraries/AbxMetadataLib.sol:AbxMetadataLib:0x02b819Bb9065cAf0c598A5CB2f5D37A4eb07460f \
-  --libraries src/libraries/AbxParamsLib.sol:AbxParamsLib:0x396848cD90aDAbE1F463Cb825ed6507A026dC833 \
-  --libraries src/libraries/AbxCodeLib.sol:AbxCodeLib:0x8dF597246C851E2DF264C8a322c07657395415fc \
+  --libraries src/libraries/AbxMetadataLib.sol:AbxMetadataLib:0x404B48AA9784FCC042B317c64bE917390Ec4b55F \
+  --libraries src/libraries/AbxParamsLib.sol:AbxParamsLib:0x7200fAb33E5CbDAAb00d0b5ED3b27174F11bCf90 \
+  --libraries src/libraries/AbxCodeLib.sol:AbxCodeLib:0xD6b9cbC480D172B7Ba3f475f73bB197Dd20B047C \
   --watch
 ```
 

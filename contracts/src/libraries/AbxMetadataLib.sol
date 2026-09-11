@@ -9,9 +9,8 @@ import {OnChainMetadataStorage} from "./OnChainMetadataStorage.sol";
 /// @notice The sibling of {AbxParamsLib} / {AbxCodeLib} / {AbxEditionLib}, and the first one every
 ///         token type links: {OnChainMetadata} is composed by ALL SIX deployable tokens, so its
 ///         bodies were the largest block of code inlined six times over. Externalizing them buys
-///         EIP-170 headroom everywhere at once, which is what the 2026-08-14 independent audit asked
-///         for before any further remediation was stacked onto contracts sitting at 187 and 249
-///         bytes of margin.
+///         EIP-170 headroom everywhere at once, before further hardening is stacked onto contracts
+///         that once sat at 187 and 249 bytes of margin.
 ///
 /// @dev Delegatecalled, so every storage write lands in the TOKEN's own ERC-7201 namespace and every
 ///      event logs from the token address — the spine is byte-identical to the inlined version this

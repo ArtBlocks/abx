@@ -2,12 +2,34 @@
   "schemaVersion": 1,
   "generations": [
     {
-      "id": "abx-core-v2",
-      "coreVersion": 2,
+      "id": "abx-core-v3",
+      "coreVersion": 3,
       "lifecycle": "current",
-      "deployed": "2026-08-20",
+      "deployed": "2026-09-10",
       "support": {
         "newDeployments": true,
+        "reads": true,
+        "writes": true,
+        "serving": true
+      },
+      "factories": {
+        "factory": "0x2ff8828a9150401225bB217CAA8b9b5e666a1c97",
+        "seriesFactory": "0x83222f791cA243FEb0c1Fef93a8732eCe3001b4b",
+        "seriesCodeFactory": "0xEAB8a19fEada0DDba2FDE324715eBbB6234B5616",
+        "oneOfOneEditionFactory": "0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E",
+        "editionFactory": "0xCC29eD68f26693dc9Aa5f090B21F37985206cc19",
+        "editionCodeFactory": "0x86f9CFe597ab145452f4A66ac102291d54e8EB46"
+      },
+      "note": "Current production-candidate factory generation. Runtime behavior matches the final v2 generation apart from its reported core version."
+    },
+    {
+      "id": "abx-core-v2",
+      "coreVersion": 2,
+      "lifecycle": "supported",
+      "deployed": "2026-08-20",
+      "retired": "2026-09-10",
+      "support": {
+        "newDeployments": false,
         "reads": true,
         "writes": true,
         "serving": true
@@ -20,7 +42,7 @@
         "editionFactory": "0xB6a8f051B08A8d6Fb0B6DA53BD23006CE2da31b7",
         "editionCodeFactory": "0x9441Cc75318E20Ae6237EDb213b4C3019d756Bf0"
       },
-      "note": "Current canonical factory generation."
+      "note": "Prior supported testnet generation. Existing collections remain readable, writable, indexable, and serveable."
     }
   ]
 }

@@ -338,7 +338,8 @@ library AbxEditionLib {
         address hook = ConfigurableParamsStorage.layout().transferHook;
         if (hook == address(0)) return;
         // Nothing moved ⇒ nothing to notify. Both skips close a permissionless spoof an independent
-        // audit reproduced: Solady allows `safeTransferFrom(from, to, id, 0, "")` from any caller
+        // Adversarial testing reproduced: Solady allows `safeTransferFrom(from, to, id, 0, "")`
+        // from any caller
         // (zero is not greater than a zero balance), so a stranger holding no copy could fire the
         // lifecycle for any id, and a hook storing transfer-derived state would rewrite params
         // shared by every real holder. A self-transfer is the same shape with a real balance: the

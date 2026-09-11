@@ -117,7 +117,7 @@ library AbxCodeLib {
 
     // ── reads ───────────────────────────────────────────────────────────────--
     // The `IAbxOnChainScript` and `IAbxDependencies` views, externalized from the mixins for the
-    // same reason as the writes above (EIP-170 — B22 step 2 in docs/10-backlog.md), which also puts
+    // same EIP-170 reason as the writes above, which also puts
     // each read next to the write it mirrors. Pure reads over the token's own namespaces; the extra
     // delegatecall hop rides the eth_call lane, never a gas-metered write path.
     //

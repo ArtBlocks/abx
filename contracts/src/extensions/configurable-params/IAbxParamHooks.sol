@@ -82,7 +82,7 @@ interface IAbxTransferHook {
     ///      allowlist when one hook intentionally serves multiple token contracts.
     ///
     /// @dev `operator` and `amount` exist because without them a hook on a shared-supply ERC-1155
-    ///      cannot tell a real transfer from a no-op. An independent audit showed the consequence:
+    ///      cannot tell a real transfer from a no-op. Adversarial review showed the consequence:
     ///      Solady permits `safeTransferFrom(from, to, id, 0, "")` from any caller who owns nothing,
     ///      so a stranger could fire the lifecycle for an id they hold no copy of, and a hook that
     ///      stored "the most recent mover" would rewrite shared params for every real holder. The

@@ -17,7 +17,7 @@ Foundry, then hand the deployed address(es) to `abx deploy-code`, which verifies
   the image by construction.
 - `src/MyHooks.sol` — small wrappers around one reference implementation for each PostParam hook
   role. Fork a role independently; do not merge their authority just because they share a workspace.
-- `abx-contracts~2.0.0` — the exact-pinned canonical interfaces, 721/1155 fixed-price minters,
+- `abx-contracts~3.0.0` — the exact-pinned canonical interfaces, 721/1155 fixed-price minters,
   reference hooks, token implementations and real-clone test harness. The scaffold carries no
   hand-copied ABX interface.
 - `test/MyRenderer.t.sol` — proves `render()` never reverts (incl. no-seed, no-palette, the

@@ -41,7 +41,7 @@ test('canonicalFactories is the one enumeration: six anchors, deduped', () => {
   assert.equal(new Set(set.map((a) => a.toLowerCase())).size, 6);
 });
 
-test('a current-generation clone answers `current` with the core version — "canonically ABX v2"', async () => {
+test('a current-generation clone answers `current` with its core version', async () => {
   const anchor = currentAnchorGeneration().factories.seriesFactory;
   const res = await verifyProvenance(mockClient([], anchor), CLONE, SEPOLIA);
   assert.equal(res.canonical, true);

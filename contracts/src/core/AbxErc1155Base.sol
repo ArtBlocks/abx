@@ -34,9 +34,8 @@ import {Erc1155SupplyStorage} from "../libraries/Erc1155SupplyStorage.sol";
 ///      Per-id supply lives in `Erc1155SupplyStorage` — a freestanding ERC-7201 library, not a
 ///      base-owned public getter: this base maintains the counter unconditionally (every 1155
 ///      token, mirroring `SupplyStorage`'s core-level role for 721), but the PUBLIC
-///      `totalSupply(id)`/`exists(id)` reads belong to the opt-in `EditionSupply` extension
-///      (`specs/protocol/interfaces.md` attributes them to "the Edition Supply extension's read
-///      surface", unlike 721's unconditional `totalSupply()`). Any mixin — the extension, or a
+///      `totalSupply(id)`/`exists(id)` reads belong to the opt-in `EditionSupply` extension,
+///      unlike 721's unconditional `totalSupply()`. Any mixin — the extension, or a
 ///      composing token's own id-space floor — reads the same library directly; no inheritance
 ///      coupling between the base and the extension is needed for a plain library.
 ///

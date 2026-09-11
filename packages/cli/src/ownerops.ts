@@ -3108,6 +3108,22 @@ async function ensureFixedPriceMinter1155(override?: string): Promise<Address> {
   return minter;
 }
 
+/** Prefer the minter an existing token already trusts. This preserves configured sales across
+ *  contract generations; an explicit override still wins, and an unassigned token falls back to
+ *  the current manifest singleton. */
+async function preferredFixedPriceMinter(token: Address, override?: string): Promise<Address | null> {
+  if (override !== undefined) return fixedPriceMinterAddress(override);
+  const assigned = await readSeries<Address>(token, 'minter').catch(() => zeroAddress);
+  return assigned !== zeroAddress ? assigned : fixedPriceMinterAddress();
+}
+
+/** Edition twin of {@link preferredFixedPriceMinter}. */
+async function preferredFixedPriceMinter1155(token: Address, override?: string): Promise<Address | null> {
+  if (override !== undefined) return fixedPriceMinter1155Address(override);
+  const assigned = await readEdition<Address>(token, 'minter').catch(() => zeroAddress);
+  return assigned !== zeroAddress ? assigned : fixedPriceMinter1155Address();
+}
+
 /** A minter write (configure/buy). No re-index — the sale lives on the minter, not the token
  *  projection; the token's own state is unchanged by a sale config.
  *
@@ -3156,11 +3172,11 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
 
   if (kind.isEdition) {
     const tokenId = parseEditionCountFlag(requireFlag(flags, 'token-id', usage), 'token-id');
-    const knownMinter = fixedPriceMinter1155Address(flags['minter-contract']);
+    const knownMinter = await preferredFixedPriceMinter1155(token, flags['minter-contract']);
     if (dryRun && !knownMinter) {
       console.log(yellow(`  ⚠ no shared edition minter deployed on ${CHAIN} yet — a real run deploys it once (a separate tx) before configuring.`));
     }
-    const minter = dryRun ? (knownMinter ?? zeroAddress) : await ensureFixedPriceMinter1155(flags['minter-contract']);
+    const minter = dryRun ? (knownMinter ?? zeroAddress) : await ensureFixedPriceMinter1155(knownMinter ?? undefined);
 
     // Sanity-check the allocation against what THIS id can still mint. `maxSupply(id) === 0` reads
     // as "open" (the un-overridden --copies default, or an id nobody has ever capped) — the same
@@ -3212,11 +3228,11 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
   if (flags['token-id'] !== undefined) {
     throw new Error(`--token-id is edition-only (per-(token,id) sales) — ${token} is a ${kind.label} (721), sold as a single project-wide sale. Drop --token-id.`);
   }
-  const knownMinter = fixedPriceMinterAddress(flags['minter-contract']);
+  const knownMinter = await preferredFixedPriceMinter(token, flags['minter-contract']);
   if (dryRun && !knownMinter) {
     console.log(yellow(`  ⚠ no shared minter deployed on ${CHAIN} yet — a real run deploys it once (a separate tx) before configuring.`));
   }
-  const minter = dryRun ? (knownMinter ?? zeroAddress) : await ensureFixedPriceMinter(flags['minter-contract']);
+  const minter = dryRun ? (knownMinter ?? zeroAddress) : await ensureFixedPriceMinter(knownMinter ?? undefined);
 
   // Sanity-check the allocation against what the contract can actually mint. A creator who sets
   // --allocation 100 on a 16-supply Series would only ever sell the remainder (maxInvocations binds
@@ -3276,7 +3292,7 @@ export async function cmdMinterShow(address: string | undefined, flags: Flags): 
 
   if (kind.isEdition) {
     const tokenId = parseEditionCountFlag(requireFlag(flags, 'token-id', usage), 'token-id');
-    const minter = fixedPriceMinter1155Address(flags['minter-contract']);
+    const minter = await preferredFixedPriceMinter1155(token, flags['minter-contract']);
     if (!minter) {
       console.log(yellow(`  no shared edition minter known for ${CHAIN} — configure a sale (deploys it) or set ABX_FIXED_PRICE_MINTER_1155`));
       return;
@@ -3318,7 +3334,7 @@ export async function cmdMinterShow(address: string | undefined, flags: Flags): 
   if (flags['token-id'] !== undefined) {
     throw new Error(`--token-id is edition-only — ${token} is a ${kind.label} (721). Drop --token-id.`);
   }
-  const minter = fixedPriceMinterAddress(flags['minter-contract']);
+  const minter = await preferredFixedPriceMinter(token, flags['minter-contract']);
   if (!minter) {
     console.log(yellow(`  no shared minter known for ${CHAIN} — configure a sale (deploys it) or set ABX_FIXED_PRICE_MINTER`));
     return;
@@ -3370,7 +3386,7 @@ export async function cmdMinterBuy(address: string | undefined, flags: Flags): P
     const tokenId = parseEditionCountFlag(requireFlag(flags, 'token-id', usage), 'token-id');
     const quantity = flags.quantity !== undefined ? parseEditionCountFlag(flags.quantity as string, 'quantity') : 1n;
     if (quantity === 0n) throw new Error('--quantity must be at least 1 (0 copies is not a purchase).');
-    const minter = fixedPriceMinter1155Address(flags['minter-contract']);
+    const minter = await preferredFixedPriceMinter1155(token, flags['minter-contract']);
     if (!minter) throw new Error(`no shared edition minter known for ${CHAIN} — configure a sale first, or set ABX_FIXED_PRICE_MINTER_1155`);
     const sale = await readSaleConfig1155(publicClient, minter, token, tokenId);
     if (!sale.configured) throw new Error(`no sale configured for ${token} #${tokenId} — run: abx minter configure ${token} --token-id ${tokenId} …`);
@@ -3398,7 +3414,7 @@ export async function cmdMinterBuy(address: string | undefined, flags: Flags): P
   if (flags['token-id'] !== undefined || flags.quantity !== undefined) {
     throw new Error(`--token-id/--quantity are edition-only — ${token} is a ${kind.label} (721), where a sale buys exactly one token. Drop them.`);
   }
-  const minter = fixedPriceMinterAddress(flags['minter-contract']);
+  const minter = await preferredFixedPriceMinter(token, flags['minter-contract']);
   if (!minter) throw new Error(`no shared minter known for ${CHAIN} — configure a sale first, or set ABX_FIXED_PRICE_MINTER`);
   const sale = await readSaleConfig(publicClient, minter, token);
   if (!sale.configured) throw new Error(`no sale configured for ${token} — run: abx minter configure ${token} …`);

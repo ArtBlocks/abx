@@ -17,10 +17,8 @@ import {AbxEditionLib} from "../../libraries/AbxEditionLib.sol";
 ///         (`TransferValidatorUpdated`) and the SAME ERC-165 ids (Limit Break's
 ///         creator-token-standards uses identical `ICreatorToken`/`ICreatorTokenLegacy` ids
 ///         across both standards), and the SAME `abx.extension.creator-token` beacon id — one
-///         extension id, shared unchanged, between the 721 and 1155 families (per
-///         `specs/protocol/event-spine.md`'s Edition Supply note: "every other extension id ...
-///         is shared, unchanged, between 721 and 1155 tokens"). Only the per-transfer validator
-///         CALL differs: ERC-1155C's `validateTransfer` takes an `amount` and is NOT a view (vs.
+///         extension id, shared unchanged, between the 721 and 1155 families. Only the per-transfer
+///         validator CALL differs: ERC-1155C's `validateTransfer` takes an `amount` and is NOT a view (vs.
 ///         721C's view, no-amount signature) — see `getTransferValidationFunction`.
 /// @dev The *composing token* wires `_validateTransfer1155` into its `_beforeTokenTransfer`
 ///      override (Solady's ERC1155 hook is always batch-shaped — a single transfer arrives as a

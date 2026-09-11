@@ -14,7 +14,7 @@ import {AbxSalts} from "./AbxSalts.sol";
 ///         the generator itself lands at a deterministic-salt CREATE2 address (via the
 ///         canonical CREATE2 deployer forge broadcasts through).
 ///
-///         Registry wiring per chain (specs/protocol/dependency-registry.md):
+///         Registry wiring per chain:
 ///         mainnet + Sepolia = Art Blocks' DependencyRegistryV0; anywhere else, set
 ///         `ABX_DEPENDENCY_REGISTRY` (or accept zero = no default registry — collections can
 ///         still point at their own).

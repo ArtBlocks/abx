@@ -26,8 +26,8 @@ import {IAbxPrimaryPayee} from "../extensions/primary-payee/IAbxPrimaryPayee.sol
 ///         factories/renderer): per-project sale terms are keyed by the ABX token address, and
 ///         **all authority defers to that token's owner** — the minter has no admin of its own.
 ///         It sells any token exposing {IAbxSequentialMint}, mints **one token per call**, and
-///         routes proceeds to the token's declared `primaryPayee()`. It implements the Minter
-///         spine (`specs/protocol/minter-spine.md`): `SaleConfigured` / `Purchase`.
+///         routes proceeds to the token's declared `primaryPayee()`. Its shared event vocabulary is
+///         `SaleConfigured` / `Purchase`.
 ///
 /// @dev Two independent grants, both the project owner's — and diagnosable in isolation:
 ///      1. **Mint rights** — the owner assigns this minter on the token

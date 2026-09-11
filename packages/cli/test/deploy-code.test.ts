@@ -522,7 +522,7 @@ test('Surfaces: an undeclared param alone never claims a surface resolves to NOT
   // Any address WITH code on the test chain (sepolia): the dry run verifies code presence at the
   // renderer address, not that render() behaves. The canonical metadata renderer is a convenient
   // stand-in — an address with no code is correctly reported as an unusable renderer instead.
-  const R = '0x85C1aE1F076d808fF7c1729F21B85038Fa16105E';
+  const R = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
   const {code, out} = await runCli(
     ['deploy-code', '--script', tmpSketchWithParam(), '--name', 'X', '--symbol', 'XX',
      '--image-renderer', R, '--attributes-renderer', R, '--onchain-uri', '--max', '1', '--dry-run'],
@@ -541,7 +541,7 @@ test('Surfaces: an on-chain image renderer is never told to stand up a render ru
   // Any address WITH code on the test chain (sepolia): the dry run verifies code presence at the
   // renderer address, not that render() behaves. The canonical metadata renderer is a convenient
   // stand-in — an address with no code is correctly reported as an unusable renderer instead.
-  const R = '0x85C1aE1F076d808fF7c1729F21B85038Fa16105E';
+  const R = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
   const {code, out} = await runCli(
     ['deploy-code', '--script', tmpSketch(), '--name', 'X', '--symbol', 'XX',
      '--image-renderer', R, '--attributes-renderer', R, '--onchain-uri', '--max', '1', '--dry-run'],

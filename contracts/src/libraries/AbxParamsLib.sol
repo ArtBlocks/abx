@@ -120,7 +120,7 @@ library AbxParamsLib {
         }
     }
 
-    /// @dev The extracted `onlyOwner`. B22 step 3 moved the Params/ConfigurableParams WRITE shells
+    /// @dev The extracted `onlyOwner`. The Params/ConfigurableParams WRITE shells moved
     ///      into this library as raw-calldata passthroughs (the reads were already passthroughs), so
     ///      the gate that lived on each `external onlyOwner` mixin function is enforced here instead.
     function _requireOwner() private view {
@@ -135,7 +135,7 @@ library AbxParamsLib {
         if (ConfigurableParamsStorage.layout().schemas[key].exists) revert SchemaGoverned();
     }
 
-    // ── owner-gated write front doors (the extracted mixin shells, B22 step 3) ─────────────────
+    // ── owner-gated write front doors (the extracted mixin shells) ─────────────────────────────
     //
     // Each MATCHES a token's external ABI selector exactly, so the mixin forwards raw calldata here
     // (identical mechanism to the read passthroughs). They gate — owner, plus schema-governance
@@ -229,7 +229,7 @@ library AbxParamsLib {
     ///      `seed` key once `anySeedAssigned` is set — but that bit was only set when the seed
     ///      PERSISTED, which is after the external seed-source call returns.
     ///
-    ///      An independent audit showed what that window buys: a custom seed source that is also
+    ///      Adversarial review showed what that window buys: a custom seed source that is also
     ///      the project owner reenters `setParamSchema("seed", ..., Creator, ...)` from inside
     ///      `seed()`, and the outer frame then persists the drawn seed under a schema that did not
     ///      exist when a buyer checked. The collection reads as ungoverned right up to its first
@@ -629,8 +629,8 @@ library AbxParamsLib {
 
     // ── reads: key enumeration + schema ─────────────────────────────────────--
     // The `IAbxParams` key-enumeration views and the `IAbxConfigurableParams` schema views,
-    // externalized from the mixins for the same reason as the writes (EIP-170 — B22 step 1 in
-    // docs/10-backlog.md). Pure reads over the token's namespaces; the extra delegatecall hop
+    // externalized from the mixins for the same EIP-170 reason as the writes. Pure reads over the
+    // token's namespaces; the extra delegatecall hop
     // rides the eth_call lane, never the gas-metered hot path.
     //
     // **Signatures and return types here are the mixins' external ABI, verbatim.** The mixin
@@ -866,8 +866,7 @@ library AbxParamsLib {
     ///
     ///      **1155 path** (new, editions): the `ownerOf` probe fails — no such function on an
     ///      ERC-1155 base — so fall back to "any holder qualifies":
-    ///      `balanceOf(msg.sender, tokenId) > 0` (per `specs/protocol/interfaces.md`'s
-    ///      "TokenOwner generalizes on editions" rule — params are per-id shared state of the
+    ///      `balanceOf(msg.sender, tokenId) > 0` — params are per-id shared state of the
     ///      work, not a single owner's; last-writer-wins among holders is the intended
     ///      semantic). **Documented gap, not silently resolved**: delegate.xyz's
     ///      `checkDelegateForERC1155(to, from, contract_, tokenId, rights)` needs an explicit

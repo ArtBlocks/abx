@@ -21,8 +21,10 @@ import {isAddress} from 'viem';
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
-const GENERATOR = '0xb7104ADfa6fb5615E46e2a681A2Ff043B08fADB5';
-const RENDERER = '0x85C1aE1F076d808fF7c1729F21B85038Fa16105E';
+const ARBITRUM_SEPOLIA = 421614;
+const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
+const ARBITRUM_GENERATOR = '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84';
+const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 
 // Every recorded address must be a VALID EIP-55 checksum, not merely 40 hex characters.
 //
@@ -30,7 +32,7 @@ const RENDERER = '0x85C1aE1F076d808fF7c1729F21B85038Fa16105E';
 // one wrong nibble of casing in the manifest turns into `Address "0x…" is invalid` at the point of
 // use — and the manifest is the one place nobody re-derives it. Both AbxGenerator entries shipped
 // that way once (the address was right, the casing was mangled in transcription), which broke every
-// on-chain-URI read on both testnets while the per-entry equality tests below stayed green, because
+// on-chain-URI read on both original testnets while the per-entry equality tests below stayed green, because
 // they compared against the same mangled string. A property over the whole manifest is what catches
 // the next one.
 test('manifest: every address is a valid EIP-55 checksum', () => {
@@ -43,7 +45,7 @@ test('manifest: every address is a valid EIP-55 checksum', () => {
 });
 
 // The manifest is the zero-state trust root: the canonical generator + the CURRENT renderer
-// rev (spec v9 — CREATE2, route-only field provenance, no abx_params, no duplicated image artifact) must
+// rev (spec v11) must
 // resolve with no env and no flags.
 test('manifest: sepolia ships the canonical generator + the current renderer rev', () => {
   assert.equal(DEPLOYMENTS[SEPOLIA].generator, GENERATOR);
@@ -58,7 +60,7 @@ test('manifest: sepolia ships the canonical generator + the current renderer rev
 // The CREATE2 invariant: the deterministic address the CLI's lazy deployers land at (and self-heal
 // to) MUST equal the manifest address — otherwise `ensureRenderer`/`ensureChunkStore` would deploy a
 // duplicate at a different address. Guards against salt-string or bytecode drift vs. AbxSalts.sol.
-test('lazy-deploy CREATE2 predictions equal the manifest addresses (both chains)', () => {
+test('lazy-deploy CREATE2 predictions equal the manifest addresses (all shipped chains)', () => {
   assert.equal(predictRenderer(), DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(predictChunkStore(), DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(predictFixedPriceMinter(), DEPLOYMENTS[SEPOLIA].fixedPriceMinter);
@@ -66,6 +68,9 @@ test('lazy-deploy CREATE2 predictions equal the manifest addresses (both chains)
   // canonical infra is cross-chain-identical, so the same prediction serves every chain
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].generator, ARBITRUM_GENERATOR);
 });
 
 // Precedence is override → env → manifest — identical to every other resolver (resolveRenderer
@@ -114,7 +119,7 @@ test('isCurrentGenerator: null (not false) when the chain has no canonical gener
   assert.equal(isCurrentGenerator(8453, GENERATOR), null);
 });
 
-// ── anchor generations: the identity that makes "canonically ABX v2" sayable ──────────────────
+// ── anchor generations: stable identity for current and prior canonical deployments ───────────
 //
 // The manifest records which generation of the trust anchors deployed a clone, keyed by the CORE
 // VERSION those anchors stamp — so a collection can prove what it is by reading its own
@@ -171,7 +176,7 @@ test('generations: exactly one is current, and it is first', () => {
 
 test('generations: stable identity and factory lookups resolve the current generation', () => {
   const current = currentAnchorGeneration();
-  assert.equal(current.id, 'abx-core-v2');
+  assert.equal(current.id, 'abx-core-v3');
   assert.equal(findAnchorGenerationById(current.id), current);
   assert.equal(findAnchorGenerationByCoreVersion(current.coreVersion), current);
   assert.equal(findAnchorGenerationByFactory(current.factories.editionCodeFactory), current);

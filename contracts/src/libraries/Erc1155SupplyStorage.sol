@@ -23,7 +23,7 @@ library Erc1155SupplyStorage {
     struct Layout {
         mapping(uint256 => uint256) totalSupply; // per-id live count (minted − burned)
         uint256 idWatermark; // highest id + 1 ever minted; monotonic non-decreasing
-        // Opt-in burn (B44): false unless the creator enabled it at deploy. Appended, so the
+        // Opt-in burn: false unless the creator enabled it at deploy. Appended, so the
         // existing layout is unchanged. When true, the core `burn` path is open (holder-or-approved);
         // when false there is no way to destroy a copy. Set once at init, immutable after.
         bool burnable;

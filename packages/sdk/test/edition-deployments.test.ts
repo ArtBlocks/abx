@@ -1,6 +1,6 @@
 // ERC-1155 editions: CREATE2 predictions are stable + independent of call order, and the four new
 // ChainDeployment fields resolve override → env → manifest exactly like every existing resolver
-// (deployments.test.ts is the model). CANONICAL carries identical edition anchors on both chains,
+// (deployments.test.ts is the model). CANONICAL carries identical edition anchors on every shipped chain,
 // so the manifest leg resolves to the recorded addresses and
 // env/override must still WIN over it (the harder precedence case than an empty manifest).
 import {test} from 'node:test';
@@ -16,12 +16,13 @@ import {predictOneOfOneEditionFactory, predictEditionFactory, predictFixedPriceM
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
+const ARBITRUM_SEPOLIA = 421614;
 
 // The canonical edition anchors (see deployments.ts CANONICAL + reference/deployments.mdx).
-const ONE_OF_ONE_EDITION_FACTORY = '0x6ecc7fAd2186965BaECD0Aa215b00239a3459ddF';
-const EDITION_FACTORY = '0xB6a8f051B08A8d6Fb0B6DA53BD23006CE2da31b7';
-const EDITION_CODE_FACTORY = '0x9441Cc75318E20Ae6237EDb213b4C3019d756Bf0';
-const FIXED_PRICE_MINTER_1155 = '0x8FcC37dCb00A02367838Fa5B37347dCEec060981';
+const ONE_OF_ONE_EDITION_FACTORY = '0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E';
+const EDITION_FACTORY = '0xCC29eD68f26693dc9Aa5f090B21F37985206cc19';
+const EDITION_CODE_FACTORY = '0x86f9CFe597ab145452f4A66ac102291d54e8EB46';
+const FIXED_PRICE_MINTER_1155 = '0x2af9f0c477c34a23cBeC646a3b6BC0cA4Df5d37f';
 
 test('edition CREATE2 predictions are stable (pure functions of fixed bytecode + salt)', () => {
   assert.equal(predictOneOfOneEditionFactory(), predictOneOfOneEditionFactory());
@@ -32,8 +33,8 @@ test('edition CREATE2 predictions are stable (pure functions of fixed bytecode +
   assert.notEqual(predictOneOfOneEditionFactory(), predictFixedPriceMinter1155());
 });
 
-test('manifest: the canonical edition anchors are recorded, identical on both chains', () => {
-  for (const chainId of [SEPOLIA, BASE_SEPOLIA]) {
+test('manifest: the canonical edition anchors are recorded, identical on all shipped chains', () => {
+  for (const chainId of [SEPOLIA, BASE_SEPOLIA, ARBITRUM_SEPOLIA]) {
     const deployment = getDeployment(chainId);
     assert.equal(deployment.oneOfOneEditionFactory, ONE_OF_ONE_EDITION_FACTORY);
     assert.equal(deployment.editionFactory, EDITION_FACTORY);
@@ -44,15 +45,8 @@ test('manifest: the canonical edition anchors are recorded, identical on both ch
 
 test('CREATE2 predictions agree with the recorded manifest for the two predictable factories + the minter', () => {
   // The strongest cross-check available offline: the TS salt/bytecode twins must land exactly where
-  // forge deployed. (EditionCodeFactory is absent for a mundane reason, not a determinism one — it IS
-  // predictable now, via `predictEditionCodeFactory()`, but the recorded address below predates the
-  // canonical library salts; it comes back under this check at the next redeploy. See link.test.ts.)
-  //
-  // KNOWN RED until the round-2 redeploy: all three edition token types now delegate into
-  // AbxEditionLib, so both factories below are library-linked and their (correct, linked)
-  // predictions no longer match the pre-remediation addresses recorded in deployments.ts. That is
-  // this detector doing its job — the fix is the redeploy + repointing the manifest, NOT relaxing
-  // the assertion. `predictFixedPriceMinter1155` links nothing and still matches.
+  // forge deployed. EditionCodeFactory has its own prediction assertion in link.test.ts because it
+  // uses the 200-run compilation restriction.
   assert.equal(predictOneOfOneEditionFactory(), ONE_OF_ONE_EDITION_FACTORY);
   assert.equal(predictEditionFactory(), EDITION_FACTORY);
   assert.equal(predictFixedPriceMinter1155(), FIXED_PRICE_MINTER_1155);

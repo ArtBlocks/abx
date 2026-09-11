@@ -22,9 +22,8 @@ import {AbxEditionLib} from "../../libraries/AbxEditionLib.sol";
 ///      UNCONDITIONALLY in its `_afterTokenTransfer` (mirroring `SupplyStorage`'s core,
 ///      always-on role for ERC-721). This extension owns only the CAP (`editionSize` default +
 ///      per-id overrides, in `EditionSupplyStorage`) and exposes the PUBLIC reads
-///      (`totalSupply`/`exists`/`maxSupply`) — matching `specs/protocol/interfaces.md`, which
-///      attributes those three reads to "the Edition Supply extension's read surface" (unlike
-///      721, where `totalSupply()` is unconditional/core, not gated behind an extension).
+///      (`totalSupply`/`exists`/`maxSupply`). Unlike ERC-721's unconditional `totalSupply()`, those
+///      reads belong to the Edition Supply extension.
 ///      Reading the base's counter needs no inheritance coupling: both files just import the same
 ///      freestanding ERC-7201 library — no virtual-hook indirection needed for a plain library.
 ///
