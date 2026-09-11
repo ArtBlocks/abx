@@ -12,9 +12,11 @@
     "@artblocks/abx-storage-arweave": "0.1.0-alpha.0"
   },
   "changesets": [
+    "brave-cacti-production-candidate",
     "calm-desert-turbo",
     "plain-sky-generations",
     "public-source-release",
-    "quiet-stars-generation-services"
+    "quiet-stars-generation-services",
+    "sandy-road-networks"
   ]
 }

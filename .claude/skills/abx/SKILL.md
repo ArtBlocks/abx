@@ -9,7 +9,7 @@ description: >-
   change an ABX collection, or to determine whether ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
-  version: "0.1.0-alpha.44"
+  version: "0.1.0-alpha.45"
 ---
 
 # ABX

@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-cli",
-  "version": "0.1.0-alpha.44",
+  "version": "0.1.0-alpha.45",
   "license": "MIT",
   "description": "Command-line interface for deploying, operating, indexing, and serving ABX projects.",
   "type": "module",
