@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {hexToBytes, recoverMessageAddress, toHex, type Hex} from 'viem';
+import {privateKeyToAccount} from 'viem/accounts';
 import {TurboUploader, turboUploadId} from '../src/index.js';
+import {localEthereumDataItemSigner, remoteEthereumDataItemSigner} from '../src/turbo.js';
+
+const ETH_KEY = '0xac0976bfec70ba57a56a97f5b3b26f4b7cb17df3edc816e14e77dc22a8ed3a48' as const;
+
+const asSignature = (bytes: Uint8Array): Hex => toHex(bytes);
 
 test('turboUploadId: reads the normal {id}, AND Turbo\'s idempotent "already uploaded" dedup reply', () => {
   const TXID = 'cELQ6_Zxh9pODH0y24m7hqJBhKz1xFHtUjtvwTRpxiw'; // 43-char base64url arweave id
@@ -26,12 +33,12 @@ test('TurboUploader: accepts a well-formed identity of each kind without touchin
   // Construction only validates shape — it never imports turbo-sdk or reaches the network until
   // .upload()/.funding.* is actually called (see the class doc).
   assert.doesNotThrow(() => new TurboUploader({kind: 'arweave', jwk: {kty: 'RSA', n: 'bW9kdWx1cw', e: 'AQAB'}}));
-  assert.doesNotThrow(() => new TurboUploader({kind: 'ethereum', privateKey: '0xac0976bfec70ba57a56a97f5b3b26f4b7cb17df3edc816e14e77dc22a8ed3a48'}));
+  assert.doesNotThrow(() => new TurboUploader({kind: 'ethereum', privateKey: ETH_KEY}));
   assert.doesNotThrow(() => new TurboUploader({kind: 'ethereum-remote', address: '0xF00', signMessage: async () => new Uint8Array()}));
 });
 
 test('TurboUploader: funding.address() is a pure derivation — no SDK import, no network', async () => {
-  const eth = new TurboUploader({kind: 'ethereum', privateKey: '0xac0976bfec70ba57a56a97f5b3b26f4b7cb17df3edc816e14e77dc22a8ed3a48'});
+  const eth = new TurboUploader({kind: 'ethereum', privateKey: ETH_KEY});
   assert.match(await eth.funding.address(), /^0x[0-9a-fA-F]{40}$/);
 
   const remote = new TurboUploader({kind: 'ethereum-remote', address: '0xF00', signMessage: async () => new Uint8Array()});
@@ -39,4 +46,47 @@ test('TurboUploader: funding.address() is a pure derivation — no SDK import, n
 
   const arweave = new TurboUploader({kind: 'arweave', jwk: {kty: 'RSA', n: 'bW9kdWx1cw', e: 'AQAB'}});
   assert.match(await arweave.funding.address(), /^[A-Za-z0-9_-]+$/); // base64url(sha256(n))
+});
+
+test('local Ethereum Turbo signer uses viem and emits the 65-byte data-item signature shape', async () => {
+  const account = privateKeyToAccount(ETH_KEY);
+  const signer = localEthereumDataItemSigner(ETH_KEY);
+  const message = new TextEncoder().encode('ABX Turbo local signer');
+  const signature = await signer.sign(message);
+
+  assert.deepEqual(signer.publicKey, Buffer.from(hexToBytes(account.publicKey)));
+  assert.equal(signer.signatureType, 3);
+  assert.equal(signer.ownerLength, 65);
+  assert.equal(signer.signatureLength, 65);
+  assert.equal(signature.byteLength, 65);
+  assert.equal(await recoverMessageAddress({message: {raw: message}, signature: asSignature(signature)}), account.address);
+});
+
+test('remote Ethereum Turbo signer delegates signatures and recovers the wallet public key with viem', async () => {
+  const account = privateKeyToAccount(ETH_KEY);
+  const signed: Uint8Array[] = [];
+  const signer = await remoteEthereumDataItemSigner(async (message) => {
+    signed.push(message);
+    return account.signMessage({message: {raw: message}});
+  });
+  const message = new TextEncoder().encode('ABX Turbo remote signer');
+  const signature = await signer.sign(message);
+
+  assert.equal(signed.length, 2); // one public-key challenge, then the data item
+  assert.deepEqual(signer.publicKey, Buffer.from(hexToBytes(account.publicKey)));
+  assert.equal(signature.byteLength, 65);
+  assert.equal(await recoverMessageAddress({message: {raw: message}, signature: asSignature(signature)}), account.address);
+});
+
+test('remote Ethereum Turbo signer rejects malformed wallet signatures before constructing a client', async () => {
+  await assert.rejects(remoteEthereumDataItemSigner(async () => '0xdeadbeef'), /invalid 65-byte hex signature/);
+});
+
+test('Turbo SDK accepts the viem-backed structural signer without replacing it', async () => {
+  const uploader = new TurboUploader({kind: 'ethereum', privateKey: ETH_KEY});
+  const client = await (
+    uploader as unknown as {buildClient(): Promise<{uploadFile?: unknown}>}
+  ).buildClient();
+
+  assert.equal(typeof client.uploadFile, 'function');
 });

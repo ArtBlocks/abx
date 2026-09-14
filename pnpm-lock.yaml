@@ -122,9 +122,6 @@ importers:
       '@ardrive/turbo-sdk':
         specifier: ^1.43.0
         version: 1.43.0(@solana/sysvars@5.5.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@6.0.3))(@tanstack/query-core@5.101.2)(@tanstack/react-query@5.101.2(react@19.2.8))(@types/react@19.2.18)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(react@19.2.8)(typescript@6.0.3)(utf-8-validate@6.0.6)
-      '@dha-team/arbundles':
-        specifier: ^1.0.4
-        version: 1.0.4(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       viem:
         specifier: ^2.56.3
         version: 2.56.3(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@6.0.6)(zod@3.25.76)
