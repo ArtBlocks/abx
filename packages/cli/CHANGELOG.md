@@ -1,5 +1,12 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.47
+
+### Patch Changes
+
+- 5e93246: Correct the bundled agent guidance for Arbitrum Sepolia's canonical contract deployment.
+  - @artblocks/abx-storage@0.1.0-alpha.35
+
 ## 0.1.0-alpha.46
 
 ### Patch Changes
