@@ -71,6 +71,23 @@ test('deploy --dry-run WITHOUT --salt: no predicted address anywhere, salt is pr
   assert.doesNotMatch(out, /freshly-reserved/);
 });
 
+test('deploy exact-replay command preserves every authorship field', async () => {
+  const {code, out} = await runCli(
+    [
+      'deploy', '--onchain-uri', '--for', FOR, '--name', 'X', '--symbol', 'XX',
+      '--creator', 'Art Blocks', '--display-notes', 'A quiet test',
+      '--creator-links', 'https://example.com/artist', '--license', 'CC0-1.0', '--dry-run',
+    ],
+    NO_KEY,
+  );
+  assert.equal(code, 0, out);
+  const replay = out.split('\n').find((line) => line.includes('reproduce this exact preview')) ?? '';
+  assert.match(replay, /--creator 'Art Blocks'/);
+  assert.match(replay, /--display-notes 'A quiet test'/);
+  assert.match(replay, /--creator-links https:\/\/example\.com\/artist/);
+  assert.match(replay, /--license CC0-1\.0/);
+});
+
 test('deploy --dry-run WITH --salt: prints the address exactly as before, PLUS approvals', async () => {
   const preview = await runCli(['deploy', '--onchain-uri', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--dry-run'], NO_KEY);
   const salt = extractSalt(preview.out);

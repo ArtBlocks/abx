@@ -355,6 +355,7 @@ export function deployCommandLine(flags: Flags, salt: string): string {
   const bool = (k: string) => { if (flags[k] === '' || flags[k] === 'true') parts.push(`--${k}`); };
   str('image', flags.image); str('name', flags.name); str('symbol', flags.symbol);
   str('description', flags.description); str('external-url', flags['external-url']);
+  for (const [flag] of AUTHORSHIP_DEPLOY_FIELDS) str(flag, flags[flag]);
   str('traits', flags.traits); str('attributes', flags.attributes);
   bool('traits-onchain'); bool('description-onchain'); bool('onchain-uri'); bool('onchain-image');
   str('compress', flags.compress); str('royalty-bps', flags['royalty-bps']); str('royalty-cap', flags['royalty-cap']); bool('burnable'); bool('no-mint');
@@ -1271,7 +1272,11 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     blockNumber = r.blockNumber;
     ok(`deployed ${clone}`);
     info(`tx ${explorerBase()}/tx/${r.txHash}  (block ${blockNumber})`);
-    info(`on-chain content commitment: keccak256 of the served image`);
+    info(
+      onchainImage
+        ? 'on-chain image: reader-backed bytes, self-resolving from chain — no separate hash commitment'
+        : 'on-chain content commitment: keccak256 of the served image',
+    );
   } else if (lane === 'sign' && onchainImage) {
     // wallet lane + on-chain staging: ONE sign session signs every chunk write AND the deploy.
     // The connecting wallet pays for (and is the deployer of) all of it — staging can't precede

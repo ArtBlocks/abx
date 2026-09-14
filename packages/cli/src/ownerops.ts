@@ -2165,7 +2165,7 @@ export async function previewImageStaging(imagePath: string, compress: Compress)
   return (
     `would stage ${basename(resolvePath(imagePath))} on-chain (chunk store): ` +
     `${planSizeLine(bytes.length, p, compress)} as ${p.representation}; ` +
-    `${planTxLine(p, '1 deploy (bakes the reader field + mints)')}`
+    `${planTxLine(p, '1 deploy (bakes the reader field)')}`
   );
 }
 
@@ -2183,7 +2183,7 @@ export async function stageImageField(
 ): Promise<{field: OnChainFieldInput; note: string}> {
   const bytes = readFileSync(resolvePath(imagePath));
   refusePrewrappedImage(bytes, basename(resolvePath(imagePath)));
-  const {value, representation} = await putContentOnChain(bytes, compress, 'image', send, '1 deploy (bakes the reader field + mints)');
+  const {value, representation} = await putContentOnChain(bytes, compress, 'image', send, '1 deploy (bakes the reader field)');
   return {
     field: {field: encodeTag(F.image), representation: encodeTag(representation), value},
     note: `image: ${bytes.length}B staged ON-CHAIN via reader (${representation}) — baked into the deploy`,
@@ -2212,7 +2212,7 @@ export async function stageImageFieldsBatch(
       compress,
       'image',
       send,
-      '1 deploy (bakes the reader fields + mints)',
+      '1 deploy (bakes the reader fields)',
       store,
     );
     fields.push({field: encodeTag(F.image), representation: encodeTag(representation), value});
