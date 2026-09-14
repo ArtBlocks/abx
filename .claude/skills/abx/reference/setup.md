@@ -59,10 +59,10 @@ output bug without repeating the secret.
 ## Select the chain explicitly through the environment
 
 Read the full `chains` array from `abx capabilities --json`. Base Sepolia is the default; Sepolia is
-also supported. Arbitrum Sepolia is experimental and has no canonical ABX contracts yet, so use it
-only for explicit qualification with the required address overrides. Production entries are present
-but disabled, and the CLI refuses them. There is deliberately no `--chain` flag because silently
-ignoring a wrong-chain request could spend on the wrong network.
+also supported. Arbitrum Sepolia is experimental and has canonical ABX contracts for explicit
+qualification. Production entries are present but disabled, and the CLI refuses them. There is
+deliberately no `--chain` flag because silently ignoring a wrong-chain request could spend on the
+wrong network.
 
 Before any transaction on an `experimental` or future `beta` network, name the network and support
 level, explain what the transaction or transaction group will do, and state the relevant contract,
