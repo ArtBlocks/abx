@@ -21,7 +21,7 @@ const accepted = new Map([
       path:
         'packages__storage-arweave>@ardrive/turbo-sdk>@cosmjs/proto-signing>@cosmjs/crypto>elliptic',
       reason:
-        'no upstream fix; ABX does not use Turbo\'s Cosmos/Kyve signing path',
+        'no upstream fix; ABX supplies a viem-backed Ethereum signer and does not use Turbo\'s Cosmos/Kyve signing path',
     },
   ],
 ]);

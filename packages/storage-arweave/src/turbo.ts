@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {hashMessage, hexToBytes, recoverPublicKey, type Hex} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 
 /**
@@ -73,8 +74,63 @@ export interface ArweaveUploader {
   readonly funding?: ArweaveFunding;
 }
 
-const withHexPrefix = (k: string): `0x${string}` => (k.startsWith('0x') ? (k as `0x${string}`) : (`0x${k}` as `0x${string}`));
-const stripHexPrefix = (k: string): string => (k.startsWith('0x') ? k.slice(2) : k);
+const withHexPrefix = (k: string): Hex => (k.startsWith('0x') ? (k as Hex) : (`0x${k}` as Hex));
+
+const ETHEREUM_SIGNATURE_TYPE = 3 as const;
+const ETHEREUM_PUBLIC_KEY_LENGTH = 65 as const;
+const ETHEREUM_SIGNATURE_LENGTH = 65 as const;
+const PUBLIC_KEY_CHALLENGE = new TextEncoder().encode('sign this message to connect to Bundlr.Network');
+
+interface EthereumDataItemSigner {
+  publicKey: Buffer;
+  readonly signatureType: typeof ETHEREUM_SIGNATURE_TYPE;
+  readonly ownerLength: typeof ETHEREUM_PUBLIC_KEY_LENGTH;
+  readonly signatureLength: typeof ETHEREUM_SIGNATURE_LENGTH;
+  sign(message: Uint8Array): Promise<Uint8Array>;
+}
+
+function ethereumSignature(value: string): Hex {
+  if (!/^0x[0-9a-fA-F]{130}$/.test(value)) {
+    throw new Error('Turbo Ethereum signer returned an invalid 65-byte hex signature.');
+  }
+  return value as Hex;
+}
+
+class ViemEthereumDataItemSigner implements EthereumDataItemSigner {
+  readonly signatureType = ETHEREUM_SIGNATURE_TYPE;
+  readonly ownerLength = ETHEREUM_PUBLIC_KEY_LENGTH;
+  readonly signatureLength = ETHEREUM_SIGNATURE_LENGTH;
+
+  constructor(
+    readonly publicKey: Buffer,
+    private readonly signMessage: (message: Uint8Array) => Promise<string>,
+  ) {}
+
+  async sign(message: Uint8Array): Promise<Uint8Array> {
+    return Buffer.from(hexToBytes(ethereumSignature(await this.signMessage(message))));
+  }
+}
+
+/** Build Turbo's structural Ethereum data-item signer with viem's maintained noble-curves
+ * implementation instead of arbundles' ethers-v5/elliptic signer. */
+export function localEthereumDataItemSigner(privateKey: string): EthereumDataItemSigner {
+  const account = privateKeyToAccount(withHexPrefix(privateKey));
+  return new ViemEthereumDataItemSigner(Buffer.from(hexToBytes(account.publicKey)), (message) =>
+    account.signMessage({message: {raw: message}}),
+  );
+}
+
+/** Adapt a browser-wallet callback to Turbo's structural signer without importing arbundles. */
+export async function remoteEthereumDataItemSigner(
+  signMessage: (message: Uint8Array) => Promise<string>,
+): Promise<EthereumDataItemSigner> {
+  const challengeSignature = ethereumSignature(await signMessage(PUBLIC_KEY_CHALLENGE));
+  const publicKey = await recoverPublicKey({
+    hash: hashMessage({raw: PUBLIC_KEY_CHALLENGE}),
+    signature: challengeSignature,
+  });
+  return new ViemEthereumDataItemSigner(Buffer.from(hexToBytes(publicKey)), signMessage);
+}
 
 /** The Arweave address for a JWK: `base64url(sha256(modulus))`. Pure derivation, no network —
  *  duplicated from `@artblocks/abx-storage`'s `arweave-identity.ts` (see the module doc). */
@@ -138,11 +194,10 @@ export function turboUploadId(res: unknown): string | null {
 }
 
 /**
- * ArDrive Turbo uploader — the recommended Arweave path. Lazy-loads `@ardrive/turbo-sdk` /
- * `@dha-team/arbundles` only when an upload / balance / top-up actually runs, so merely
- * constructing (or importing) this class stays light. The signing {@link TurboIdentity} is
- * multi-chain: a JWK, an EVM private key, or a remote browser wallet — each both signs uploads and
- * holds the prepaid credits at its own address.
+ * ArDrive Turbo uploader — the recommended Arweave path. Lazy-loads `@ardrive/turbo-sdk` only when
+ * an upload / balance / top-up actually runs, so merely constructing (or importing) this class
+ * stays light. The signing {@link TurboIdentity} is multi-chain: a JWK, an EVM private key, or a
+ * remote browser wallet — each both signs uploads and holds the prepaid credits at its own address.
  */
 export class TurboUploader implements ArweaveUploader {
   constructor(private readonly identity: TurboIdentity) {
@@ -180,20 +235,18 @@ export class TurboUploader implements ArweaveUploader {
     }
   }
 
-  /** arbundles (the signing lib Turbo uses) — for `InjectedEthereumSigner`, which turbo-sdk does NOT
-   *  re-export. Only reached on the remote-wallet upload path. */
-  private async arbundles() {
-    return import('@dha-team/arbundles');
-  }
-
   private clientPromise?: Promise<unknown>;
   private client(): Promise<any> {
     return (this.clientPromise ??= this.buildClient());
   }
 
-  /** Authenticate a Turbo client for the selected identity. Arweave uses the JWK directly; an EVM
-   *  identity uses an arbundles `EthereumSigner` (local key) or `InjectedEthereumSigner` (remote
-   *  wallet) — the SDK re-exports both, so no direct arbundles dependency. */
+  /** Authenticate a Turbo client for the selected identity. Arweave uses the JWK directly. EVM
+   *  identities use the structural Turbo signer above, backed by viem for local signatures or the
+   *  supplied wallet callback for remote signatures.
+   *
+   *  Security boundary: always pass the EVM signer. Passing a private key would make Turbo build
+   *  its ethers-v5/elliptic signer (GHSA-848j-6mx2-7j84). Likewise, do not add a Solana identity
+   *  without first resolving Turbo's bigint-buffer path (GHSA-3gc7-fjrx-p6mg). */
   private async buildClient(): Promise<any> {
     const m = await this.sdk();
     const id = this.identity;
@@ -201,27 +254,11 @@ export class TurboUploader implements ArweaveUploader {
       return m.TurboFactory.authenticated({privateKey: id.jwk as any, token: 'arweave'});
     }
     if (id.kind === 'ethereum') {
-      const signer = new m.EthereumSigner(stripHexPrefix(id.privateKey));
-      return m.TurboFactory.authenticated({signer, token: 'ethereum'});
+      const signer = localEthereumDataItemSigner(id.privateKey);
+      return m.TurboFactory.authenticated({signer: signer as never, token: 'ethereum'});
     }
-    // ethereum-remote: drive arbundles' own InjectedEthereumSigner via a provider shim that
-    // round-trips each signMessage to the browser wallet. arbundles calls `signer.signMessage(msg)`
-    // with a STRING challenge (setPublicKey → pubkey recovery, one prompt) and a Uint8Array per data
-    // item, and expects back a `0x…` hex signature (it does `sig.slice(2)`). ethers'
-    // signMessage(string) ≡ signMessage(utf8Bytes(string)), so normalizing to bytes is faithful.
-    // NOTE: turbo-sdk re-exports EthereumSigner but NOT InjectedEthereumSigner — import it from
-    // arbundles (the same package turbo signs with) directly.
-    const {InjectedEthereumSigner} = await this.arbundles();
-    const signMessage = id.signMessage;
-    const provider = {
-      getSigner: () => ({
-        signMessage: (message: string | Uint8Array): Promise<string> =>
-          signMessage(typeof message === 'string' ? new TextEncoder().encode(message) : Uint8Array.from(message)),
-      }),
-    };
-    const signer = new InjectedEthereumSigner(provider as never);
-    await signer.setPublicKey();
-    return m.TurboFactory.authenticated({signer, token: 'ethereum'});
+    const signer = await remoteEthereumDataItemSigner(id.signMessage);
+    return m.TurboFactory.authenticated({signer: signer as never, token: 'ethereum'});
   }
 
   async upload(bytes: Uint8Array, contentType: string): Promise<{id: string}> {
