@@ -1,5 +1,13 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.48
+
+### Patch Changes
+
+- 70d2761: Make release-candidate automation fail closed: accept the documented hot-signing flag for code
+  editions, simulate purchase dry-runs as the configured hot signer, and return a failed exit status
+  when any requested render fails.
+
 ## 0.1.0-alpha.47
 
 ### Patch Changes
