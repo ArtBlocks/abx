@@ -4,9 +4,7 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX is in alpha. Canonical contracts are deployed on Base Sepolia and Sepolia. Arbitrum Sepolia has
-canonical contracts for explicit qualification work. Production networks are recognized but disabled
-in this release.
+ABX is alpha software. Testnet support is available now. Production networks are coming soon.
 
 ## Quickstart
 
@@ -24,36 +22,18 @@ abx doctor
 The complete user guide, protocol reference, deployment addresses, and API documentation are at
 [docs.abx.io](https://docs.abx.io).
 
-## Deployed contracts
+## Networks
 
-Production networks are disabled. The canonical infrastructure below is deployed on Base Sepolia,
-Sepolia, and Arbitrum Sepolia via the keyless CREATE2 proxy, so every address **except the generator**
-is identical on all three chains. Network lifecycle is defined by
-[`packages/sdk/src/chain-support.json`](packages/sdk/src/chain-support.json), addresses by
-[`packages/sdk/src/deployments.ts`](packages/sdk/src/deployments.ts), and the current public reference is at
-[docs.abx.io/docs/reference/deployments](https://docs.abx.io/docs/reference/deployments).
+| Network type | Supported | Experimental | Coming soon |
+| --- | --- | --- | --- |
+| Testnets | Base Sepolia (default), Sepolia | Arbitrum Sepolia | — |
+| Production | — | — | Base, Arbitrum One, Ethereum |
 
-| Contract | Env override | Address (all three testnets) |
-| --- | --- | --- |
-| `OneOfOneImageFactory` (1/1 anchor) | `ABX_FACTORY` | `0x2ff8828a9150401225bB217CAA8b9b5e666a1c97` |
-| `SeriesImageFactory` (series anchor) | `ABX_SERIES_FACTORY` | `0x83222f791cA243FEb0c1Fef93a8732eCe3001b4b` |
-| `SeriesCodeFactory` (code anchor) | `ABX_SERIES_CODE_FACTORY` | `0xEAB8a19fEada0DDba2FDE324715eBbB6234B5616` |
-| `OneOfOneEditionFactory` (1/1-edition anchor) | `ABX_ONE_OF_ONE_EDITION_FACTORY` | `0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E` |
-| `EditionImageFactory` (edition anchor) | `ABX_EDITION_FACTORY` | `0xCC29eD68f26693dc9Aa5f090B21F37985206cc19` |
-| `EditionCodeFactory` (code-edition anchor) | `ABX_EDITION_CODE_FACTORY` | `0x86f9CFe597ab145452f4A66ac102291d54e8EB46` |
-| `AbxMetadataRenderer` (spec v11) | `ABX_RENDERER` | `0x5772249A8fA0bAFfD4B2e3378189465B4dB67417` |
-| `AbxChunkStore` | `ABX_CHUNK_STORE` | `0x1Ca63a4ADEeF5e722ADA25b892BA40E3b2bcB905` |
-| `AbxSeedSource` | `ABX_SEED_SOURCE` | `0xD01d4eDc17F8b4493A43A5e70DCD9813FB1b9A0A` |
-| `AbxFixedPriceMinter` (721 sale) | `ABX_FIXED_PRICE_MINTER` | `0xfb5C61274a3A7dA83CcDD88DdEC914438244E2c9` |
-| `AbxFixedPriceMinter1155` (1155 sale) | `ABX_FIXED_PRICE_MINTER_1155` | `0x2af9f0c477c34a23cBeC646a3b6BC0cA4Df5d37f` |
-
-The `AbxGenerator` bakes chain-specific immutables, so its address differs per chain:
-
-| Chain | `AbxGenerator` (`ABX_GENERATOR`) |
-| --- | --- |
-| Base Sepolia (`84532`) | `0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2` |
-| Sepolia (`11155111`) | `0x7fcf8118D400FF004fF0772a37c24196D9aA7b17` |
-| Arbitrum Sepolia (`421614`) | `0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84` |
+Coming-soon networks remain disabled in the current CLI. For live support status and canonical
+contract addresses, see [Networks and deployments](https://docs.abx.io/docs/reference/deployments).
+The machine-readable sources of truth are
+[`chain-support.json`](packages/sdk/src/chain-support.json) and
+[`deployments.ts`](packages/sdk/src/deployments.ts).
 
 ## Repository
 
@@ -99,9 +79,9 @@ documentation, or published packages.
 
 ## Packages and releases
 
-All six `@artblocks/abx-*` packages are published independently to npm. Changesets describe
-user-visible package changes, and GitHub Actions creates version PRs and publishes through npm trusted
-publishing. Package changelogs begin with the public source release.
+The `@artblocks/abx-*` packages are published independently to npm. Changesets describe user-visible
+package changes, and GitHub Actions creates version PRs and publishes through npm trusted publishing.
+Package changelogs begin with the public source release.
 
 ## Security
 
