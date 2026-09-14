@@ -11,7 +11,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {MetadataField} from '@artblocks/abx-sdk';
-import {computeAvailability, pointerOnlyImageCheck} from '../src/commands/project.js';
+import {computeAvailability, onChainImageSource, pointerOnlyImageCheck} from '../src/commands/project.js';
 
 const field = (representation: string): MetadataField => ({field: 'image', representation, value: '0x00' as MetadataField['value']});
 
@@ -38,6 +38,15 @@ test('pointerOnlyImageCheck: inline/renderer/reader representations are not loca
 test('pointerOnlyImageCheck: no image field at all is "no commitment", not "unrecomputable"', () => {
   assert.equal(pointerOnlyImageCheck([]), null);
   assert.equal(pointerOnlyImageCheck([{field: 'description', representation: 'inline', value: '0x00' as MetadataField['value']}]), null);
+});
+
+test('onChainImageSource: inline and reader images are chain-resident, not hash checks or pointers', () => {
+  for (const representation of ['inline', 'inline-gzip', 'reader', 'reader-gzip']) {
+    assert.equal(onChainImageSource([field(representation)]), representation);
+  }
+  for (const representation of ['keccak256', 'sha256', 'ipfs', 'url']) {
+    assert.equal(onChainImageSource([field(representation)]), null);
+  }
 });
 
 // ── computeAvailability: the verdict, from facts a caller already gathered ──────────────────────
@@ -85,4 +94,18 @@ test('computeAvailability: no commitments at all — nothing to serve, so "avail
   const v = computeAvailability({isCode: false, minted: 0, present: 0, anyCheck: false, unrecomputablePointers: 0});
   assert.equal(v.status, 'available');
   assert.match(v.note, /no content commitments/);
+});
+
+test('computeAvailability: chain-resident image bytes are available without claiming a hash check', () => {
+  const v = computeAvailability({
+    isCode: false,
+    minted: 1,
+    present: 0,
+    anyCheck: false,
+    unrecomputablePointers: 0,
+    onChainContent: 1,
+  });
+  assert.equal(v.status, 'available');
+  assert.match(v.note, /stored on chain/);
+  assert.doesNotMatch(v.note, /nothing to serve/);
 });

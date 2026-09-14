@@ -17,7 +17,10 @@ const ADDR = '0xb5D472600107a56c0A36838FFf7030A864439a30';
 
 /** A resolver that serves one minted token and answers the credentialed verify route however the
  *  test wants (`verified`), plus the effects report for a project with no renders. */
-function mockResolver(opts: {verified: boolean | 'unauthorized' | 'missing'}): Promise<{server: Server; port: number; seen: string[]}> {
+function mockResolver(opts: {
+  verified: boolean | 'unauthorized' | 'missing' | 'none';
+  imageRepresentation?: string;
+}): Promise<{server: Server; port: number; seen: string[]}> {
   const seen: string[] = [];
   const server = createServer((req, res) => {
     seen.push(`${req.method} ${req.url}`);
@@ -25,7 +28,18 @@ function mockResolver(opts: {verified: boolean | 'unauthorized' | 'missing'}): P
       res.writeHead(status, {'content-type': 'application/json'});
       res.end(JSON.stringify(body));
     };
-    if (req.url === `/api/project/${ADDR}`) return json(200, {name: 'Amber', tokens: [{tokenId: '0', lifecycle: 'live'}]});
+    if (req.url === `/api/project/${ADDR}`) {
+      return json(200, {
+        name: 'Amber',
+        tokens: [{
+          tokenId: '0',
+          lifecycle: 'live',
+          fields: opts.imageRepresentation
+            ? [{field: 'image', representation: opts.imageRepresentation, value: '0x00'}]
+            : [],
+        }],
+      });
+    }
     if (req.url === '/api/watch') return json(200, {watching: false, intervalMs: 0, pollAt: null, lastDeltaAt: null, chains: {}});
     if (req.url === `/api/project/${ADDR}/effects`) {
       // a static-image project: nothing to render, so the render lane has nothing to report
@@ -34,6 +48,7 @@ function mockResolver(opts: {verified: boolean | 'unauthorized' | 'missing'}): P
     if (req.url === `/api/project/${ADDR}/verify`) {
       if (opts.verified === 'unauthorized') return json(401, {error: 'unauthorized', code: 'unauthorized'});
       if (opts.verified === 'missing') return json(404, {error: 'not found'});
+      if (opts.verified === 'none') return json(200, {tokens: [{tokenId: '0', checks: []}]});
       if (!req.headers.authorization) return json(401, {error: 'unauthorized', code: 'unauthorized'});
       return json(200, {tokens: [{tokenId: '0', checks: [{kind: 'keccak256', committed: '0xabc', verified: opts.verified}]}]});
     }
@@ -85,6 +100,31 @@ test('bytes that hash-match report ✓ and exit 0 — no false alarm on a health
     const {code, out} = await runCli(['verify', ADDR, '--remote', `http://127.0.0.1:${port}`, '--remote-token', 'k']);
     assert.equal(code, 0, `a healthy project must not fail\n${out}`);
     assert.match(out, /hash-match their on-chain commitment/);
+  } finally {
+    server.close();
+  }
+});
+
+test('reader-backed remote content is reported as chain-resident without claiming a hash comparison', async () => {
+  const {server, port} = await mockResolver({verified: 'none', imageRepresentation: 'reader'});
+  try {
+    const {code, out, stdout} = await runCli([
+      'verify', ADDR, '--remote', `http://127.0.0.1:${port}`, '--remote-token', 'k', '--json',
+    ]);
+    assert.equal(code, 0, out);
+    const payload = JSON.parse(stdout) as {
+      contentIntegrity: string;
+      onChainContent: Array<{field: string; representation: string}>;
+      availability: {status: string; note: string};
+    };
+    assert.equal(payload.contentIntegrity, 'no-commitments');
+    assert.deepEqual(payload.onChainContent.map(({field, representation}) => ({field, representation})), [
+      {field: 'image', representation: 'reader'},
+    ]);
+    assert.equal(payload.availability.status, 'available');
+    assert.match(payload.availability.note, /stored on chain/);
+    assert.match(out, /stored on chain \(reader\).*no separate hash commitment/);
+    assert.doesNotMatch(out, /nothing to serve/);
   } finally {
     server.close();
   }

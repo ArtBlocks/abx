@@ -156,7 +156,7 @@ test('deploy --onchain-image --dry-run --json: renderer address, image file meta
   const svgPath = tmpSketch().replace(/sketch\.js$/, 'image.svg');
   writeFileSync(svgPath, '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="red"/></svg>');
   const {code, stdout, stderr} = await runCliSplit(
-    ['deploy', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-image', '--image', svgPath, '--compress', 'fastlz', '--dry-run', '--json'],
+    ['deploy', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-image', '--image', svgPath, '--compress', 'fastlz', '--no-mint', '--dry-run', '--json'],
     NO_KEY,
   );
   assert.equal(code, 0, stderr);
@@ -180,6 +180,12 @@ test('deploy --onchain-image --dry-run --json: renderer address, image file meta
   // comment) — sanity-checked, not drift-tested, so a missing prose line can never mask a real bug.
   assert.equal(plan.custody.image.mimeType, 'image/svg+xml');
   assert.match(plan.custody.image.contentHash, /^0x[0-9a-f]{64}$/);
+
+  // The staging helper used to hard-code "+ mints" even when this plan explicitly deferred minting.
+  assert.match(stderr, /1 deploy \(bakes the reader field\)/);
+  assert.doesNotMatch(stderr, /bakes the reader field \+ mints/);
+  assert.equal(plan.mint.deferred, true, DRIFT_MSG);
+  assert.equal(plan.mint.count, 0, DRIFT_MSG);
 
   // legs/approvals consistency
   const approvalsLine = stderr.match(/approvals\s+(\d+) wallet approval\(s\)/);

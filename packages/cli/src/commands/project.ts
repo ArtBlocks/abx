@@ -396,6 +396,7 @@ export function computeAvailability(opts: {
   present: number;
   anyCheck: boolean;
   unrecomputablePointers: number;
+  onChainContent?: number;
 }): AvailabilityVerdict {
   if (opts.isCode) {
     if (opts.minted === 0) return {status: 'unknown', note: 'no tokens minted yet — nothing to render'};
@@ -412,7 +413,29 @@ export function computeAvailability(opts: {
       note: `${opts.unrecomputablePointers} locator commitment(s) (ipfs/arweave/url) exist but were not independently re-fetched by this command`,
     };
   }
+  if ((opts.onChainContent ?? 0) > 0) {
+    return {
+      status: 'available',
+      note: `${opts.onChainContent} image source(s) are stored on chain; no external custody to probe`,
+    };
+  }
   return {status: 'available', note: 'no content commitments on this project — nothing to serve'};
+}
+
+/** Chain-resident image representations carry the bytes themselves rather than a hash or locator.
+ *  They are available without external custody, but they are deliberately NOT counted as a hash
+ *  verification: the chain is the source, so there is no second copy to compare against it. */
+const ON_CHAIN_CONTENT_REPRESENTATIONS = new Set<string>([
+  METADATA_REPRESENTATION.inline,
+  METADATA_REPRESENTATION.inlineGzip,
+  METADATA_REPRESENTATION.reader,
+  METADATA_REPRESENTATION.readerGzip,
+]);
+
+export function onChainImageSource(fields: MetadataField[]): string | null {
+  const image = fieldOf(fields, METADATA_FIELD.image);
+  if (image && ON_CHAIN_CONTENT_REPRESENTATIONS.has(image.representation)) return image.representation;
+  return null;
 }
 
 /** Locator representations `verifyProject` never emits a check for (only `keccak256`/`sha256`
@@ -476,6 +499,7 @@ export async function cmdVerifyBody(
     canonical: state.isCanonical, // TRUE tri-state: true | false | null (couldn't check)
     owner: state.owner ?? null,
     contentChecks: [] as unknown[],
+    onChainContent: [] as unknown[],
     contentIntegrity: 'no-commitments' as 'ok' | 'mismatch' | 'no-commitments',
     renders: null as unknown,
     onChainUri: null as unknown,
@@ -507,6 +531,7 @@ export async function cmdVerifyBody(
   // verdict either way, so it must never move `contentIntegrity`/`ok` — it feeds `availability`
   // instead, below.
   let unrecomputablePointers = 0;
+  const onChainContent: Array<{tokenId: string; lifecycle: TokenState['lifecycle']; field: 'image'; representation: string}> = [];
   for (const t of tokens) {
     const tok = state.tokens.find((s) => s.tokenId === t.tokenId);
     const life =
@@ -550,10 +575,17 @@ export async function cmdVerifyBody(
           verified: null,
         });
         info(`${pointerKind} — pointer-only, not locally recomputable (no outbound fetch from this command)`);
+      } else {
+        const representation = onChainImageSource(tok.fields);
+        if (representation) {
+          onChainContent.push({tokenId: t.tokenId, lifecycle: tok.lifecycle, field: 'image', representation});
+          info(`${representation} image — bytes are stored on chain; no separate hash commitment to compare`);
+        }
       }
     }
   }
-  if (!anyCheck && unrecomputablePointers === 0 && !isCodeProject(state)) info('no content commitments on this project');
+  verifyReport.onChainContent = onChainContent;
+  if (!anyCheck && unrecomputablePointers === 0 && onChainContent.length === 0 && !isCodeProject(state)) info('no content commitments on this project');
   verifyReport.contentIntegrity = !anyCheck ? 'no-commitments' : allGood ? 'ok' : 'mismatch';
   verifyReport.ok = !anyCheck || allGood;
   emit(verifyReport);
@@ -666,6 +698,7 @@ export async function cmdVerifyBody(
       present: codeRenders?.present ?? 0,
       anyCheck,
       unrecomputablePointers,
+      onChainContent: onChainContent.length,
     }),
   );
   emit(verifyReport);
@@ -819,6 +852,7 @@ export async function cmdVerifyRemote(
     name: null as string | null,
     watching: null as boolean | null,
     contentChecks: [] as unknown[],
+    onChainContent: [] as unknown[],
     contentIntegrity: 'not-checked' as 'ok' | 'mismatch' | 'no-commitments' | 'not-checked',
     renders: null as unknown,
     availability: null as unknown,
@@ -848,8 +882,18 @@ export async function cmdVerifyRemote(
   if (!stateRes.ok) {
     throw new Error(`resolver ${base} doesn't serve ${address} (HTTP ${stateRes.status}) — register it first: abx add ${address} --remote ${remote.name?.toLowerCase() ?? base}`);
   }
-  const state = (await stateRes.json()) as {name?: string; tokens?: Array<{tokenId: string; lifecycle: TokenState['lifecycle']}>};
+  const state = (await stateRes.json()) as {
+    name?: string;
+    tokens?: Array<{tokenId: string; lifecycle: TokenState['lifecycle']; fields?: MetadataField[]}>;
+  };
   verifyReport.name = state.name ?? null;
+  const onChainContent = (state.tokens ?? []).flatMap((token) => {
+    const representation = onChainImageSource(token.fields ?? []);
+    return representation
+      ? [{tokenId: token.tokenId, lifecycle: token.lifecycle, field: 'image' as const, representation}]
+      : [];
+  });
+  verifyReport.onChainContent = onChainContent;
   info(`serving as "${state.name ?? address}"`);
   // Is the resolver actively WATCHING the chain? Prove it from /api/watch (the meta the watcher
   // stamps each tick) so a hosted operator who can't tail the log still sees liveness — and catches
@@ -916,10 +960,17 @@ export async function cmdVerifyRemote(
     }
     verifyReport.renders = jsonSafe({minted: minted.length, upToDate, stale, rendering, failed, tokens: report.tokens});
     verifyReport.availability = jsonSafe(
-      computeAvailability({isCode: report.tokens.length > 0, minted: minted.length, present: upToDate, anyCheck: false, unrecomputablePointers: 0}),
+      computeAvailability({
+        isCode: report.tokens.length > 0,
+        minted: minted.length,
+        present: upToDate,
+        anyCheck: false,
+        unrecomputablePointers: 0,
+        onChainContent: onChainContent.length,
+      }),
     );
     emit(verifyReport);
-    const integrity = await reportRemoteByteIntegrity(address, remote, base);
+    const integrity = await reportRemoteByteIntegrity(address, remote, base, onChainContent.map((item) => item.representation));
     verifyReport.contentIntegrity = integrity.status;
     verifyReport.contentChecks = integrity.checks;
     verifyReport.ok = integrity.status !== 'mismatch';
@@ -947,9 +998,11 @@ export async function cmdVerifyRemote(
       : `  ${g('✓ thumbnails are real renders')} ${dim('— served straight from the resolver.')}`,
   );
   verifyReport.renders = jsonSafe({minted: minted.length, present, missing, scope: 'the resolver (raw image probe — no /effects route)'});
-  verifyReport.availability = jsonSafe(computeAvailability({isCode: true, minted: minted.length, present, anyCheck: false, unrecomputablePointers: 0}));
+  verifyReport.availability = jsonSafe(
+    computeAvailability({isCode: true, minted: minted.length, present, anyCheck: false, unrecomputablePointers: 0, onChainContent: onChainContent.length}),
+  );
   emit(verifyReport);
-  const integrity = await reportRemoteByteIntegrity(address, remote, base);
+  const integrity = await reportRemoteByteIntegrity(address, remote, base, onChainContent.map((item) => item.representation));
   verifyReport.contentIntegrity = integrity.status;
   verifyReport.contentChecks = integrity.checks;
   verifyReport.ok = integrity.status !== 'mismatch';
@@ -978,7 +1031,12 @@ export interface RemoteByteIntegrity {
  * outbound fetches). When we can't reach that — no credential, or an older node — say plainly that
  * byte integrity was NOT checked rather than leaving the ✓ above to imply it was.
  */
-export async function reportRemoteByteIntegrity(address: Address, remote: RemoteTarget, base: string): Promise<RemoteByteIntegrity> {
+export async function reportRemoteByteIntegrity(
+  address: Address,
+  remote: RemoteTarget,
+  base: string,
+  onChainRepresentations: string[] = [],
+): Promise<RemoteByteIntegrity> {
   if (!remote.token) {
     warn(`byte integrity NOT checked — that check is credentialed on the service. Set ${remote.tokenVar} (or pass --remote-token) and re-run, or run ${bold(`abx verify ${address}`)} against a node that holds the bytes.`);
     return {status: 'not-checked', checks: []};
@@ -1007,7 +1065,14 @@ export async function reportRemoteByteIntegrity(address: Address, remote: Remote
   }
   const checked = (report.tokens ?? []).filter((t) => t.checks.length > 0);
   if (checked.length === 0) {
-    info(`bytes      ${dim('no on-chain byte commitment to check (this project commits no image hash)')}`);
+    const representations = [...new Set(onChainRepresentations)];
+    info(
+      `bytes      ${dim(
+        representations.length
+          ? `stored on chain (${representations.join(', ')}) — no separate hash commitment to check`
+          : 'no on-chain byte commitment to check (this project commits no image hash)',
+      )}`,
+    );
     return {status: 'no-commitments', checks: []};
   }
   const flatChecks = checked.flatMap((t) => t.checks.map((k) => ({tokenId: t.tokenId, kind: k.kind, verified: k.verified})));

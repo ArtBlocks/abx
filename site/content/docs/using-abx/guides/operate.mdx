@@ -132,7 +132,9 @@ separate fields:
   check matched or there was nothing to check (`contentIntegrity: "no-commitments"`), and `false`
   only on a real mismatch (`contentIntegrity: "mismatch"`). **This is the only field the command's
   exit status reflects** — `abx verify` exits non-zero if and only if a hash mismatch was found, so
-  a CI job gates on the exit code (or `ok`) and nothing else.
+  a CI job gates on the exit code (or `ok`) and nothing else. Chain-resident `inline`/`reader`
+  images have no separate hash copy to compare, so they keep `contentIntegrity: "no-commitments"`;
+  the additive `onChainContent` list identifies those sources explicitly.
 - **`availability`** — a **sibling** verdict, never a rename of `ok`: is the project's content fully
   *servable* right now. `status` is one of `available` / `partial` / `unavailable` / `unknown`. A
   code project's status comes from render presence (a minted token with no real render anywhere
@@ -142,6 +144,7 @@ separate fields:
   `unknown` rather than silently reading as "nothing to check" — `contentChecks` carries it as a
   `verified: null` entry, the same tri-state slot a hash check uses. **A missing render or an
   unconfirmed locator never fails the command** — only an integrity mismatch does.
+  Chain-resident image bytes report `available` because they require no external custody.
 
 `abx verify <address> --remote <name|url>` checks what a HOSTED resolver actually serves instead of
 this machine's own store, and emits the same JSON shape under `--json` (`ok`, `contentIntegrity`,
