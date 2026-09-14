@@ -40,7 +40,7 @@ src/
   extensions/   one folder per opt-in ABX extension; each is a self-contained mixin
     royalty/ · creator-token/ · onchain-metadata/ · max-invocations/ · external-minter/ · primary-payee/
     paused/ · params/ · configurable-params/ · onchain-script/ · dependencies/ · seed-source/
-  libraries/    ERC-7201-namespaced storage libraries, one per stateful concern (19 today), plus a
+  libraries/    ERC-7201-namespaced storage libraries, one per stateful concern (20 today), plus a
                 handful of stateless logic libraries — most inlined; FOUR (`AbxMetadataLib`,
                 `AbxParamsLib`, `AbxCodeLib`, `AbxEditionLib`) externalized and `delegatecall`ed so
                 write paths and read views don't count against a token's own EIP-170 ceiling.
@@ -107,11 +107,11 @@ mixin's `supportsInterface` together (Solady's leaf implementations don't super-
 Every concern with genuinely new state is a library owning its own
 [ERC-7201](https://eips.ethereum.org/EIPS/eip-7201) namespace — a `Layout` struct at a slot computed
 once, off any inheritance position — so storage can never collide across libraries, the Solady base, or
-mixins, no matter how mixins get added, removed, or reordered on a concrete token. Nineteen storage
+mixins, no matter how mixins get added, removed, or reordered on a concrete token. Twenty storage
 libraries follow this today (`BeaconStorage`, `SupplyStorage`, `CollectionMetadataLib`,
 `TokenURIStorage`, `ContractURIStorage`, `ParamsStorage`, `ConfigurableParamsStorage`,
 `OnChainMetadataStorage`, `OnChainScriptStorage`, `DependenciesStorage`, `MaxInvocationsStorage`,
-`ExternalMinterStorage`, `PrimaryPayeeStorage`, `PausedStorage`, `SeedSourceStorage`,
+`ExternalMinterStorage`, `PrimaryPayeeStorage`, `PausedStorage`, `RoyaltyStorage`, `SeedSourceStorage`,
 `SeriesMintStorage`, `TransferValidatorStorage`, `EditionSupplyStorage`, `Erc1155SupplyStorage`)
 — nothing but a `Layout` struct and a `layout()`
 accessor.
@@ -120,10 +120,9 @@ accessor.
 
 - **Interfaces** (`IAbx*`, `IERC4906`, `IERC7572`) are the *external ABI*: the spine's events + the
   ERC-165 ids. No storage, no logic.
-- **Storage libraries** exist *only where there is new storage to namespace*, as above. We deliberately
-  don't add one for royalty: Solady's `ERC2981` already owns royalty *storage* and the `royaltyInfo`
-  view, so `RoyaltyExtension` holds only logic (a capped, owner-settable default + the event) — no
-  parallel storage, no second source of truth. *Rule of thumb: a library is for new storage; an
+- **Storage libraries** exist *only where there is new storage to namespace*, as above. Solady's
+  `ERC2981` owns the active royalty receiver/rate and the `royaltyInfo` view; `RoyaltyStorage` owns
+  only ABX's separate, reduce-only royalty ceiling. *Rule of thumb: a library is for new storage; an
   interface names the ABI; a mixin carries behavior.*
 - **Logic libraries** are stateless helpers, and split by how they run. Most (`TokenDataLib`,
   `DynamicBuffer`) are `internal` — compiled straight into the caller, no separate deployment.

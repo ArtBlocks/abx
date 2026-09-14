@@ -10,7 +10,7 @@ import {readdirSync, readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {parseEther, zeroAddress, type Address, type Hex, type PublicClient} from 'viem';
 import type {PreparedTx} from '@artblocks/abx-sdk';
-import {confirmSend, gatedSend, laneFromFlags} from '../src/riskgate.js';
+import {confirmSend, gatedSend, laneFromFlags, previewSigner} from '../src/riskgate.js';
 import type {Flags} from '../src/flags.js';
 
 const SRC_DIR = resolve(import.meta.dirname, '../src');
@@ -36,6 +36,17 @@ test('laneFromFlags: default send; --sign → wallet; --unsigned → cold', () =
   // `--sign --unsigned` used to resolve by precedence (unsigned won). It is refused now — see the
   // lane-flag tests at the bottom of this file for why a silent pick is the wrong answer.
   assert.throws(() => laneFromFlags({sign: 'true', unsigned: 'true'}), /pick ONE signing lane/);
+});
+
+test('previewSigner: hot lane derives the env-key account; explicit and non-hot lanes stay pinned', () => {
+  const key = '0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' as const;
+  const derived = previewSigner({} as Flags, undefined, key);
+  assert.match(derived ?? '', /^0x[0-9a-fA-F]{40}$/);
+  const explicit = '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C' as Address;
+  assert.equal(previewSigner({} as Flags, explicit, key), explicit);
+  assert.equal(previewSigner({sign: 'true'} as Flags, undefined, key), undefined);
+  assert.equal(previewSigner({unsigned: 'true'} as Flags, undefined, key), undefined);
+  assert.equal(previewSigner({} as Flags, undefined, '0x1234'), undefined);
 });
 
 // ── confirmSend: every path that must NEVER stall a script or hang a test ────
@@ -78,16 +89,23 @@ test('gatedSend: --dry-run returns null without ever resolving a chain/signer (n
 });
 
 test('gatedSend: --dry-run with a builder provider calls it with the expectedSigner (or the zero address), not a live signer', async () => {
+  const priorKey = process.env.ABX_DEPLOYER_PK;
+  delete process.env.ABX_DEPLOYER_PK;
   let seenSigner: Address | undefined;
   const provider = (signer: Address) => {
     seenSigner = signer;
     return preparedTx();
   };
-  await gatedSend(provider, {'dry-run': 'true'} as Flags, {chainKey: 'not-a-real-chain'});
-  assert.equal(seenSigner, zeroAddress); // no expectedSigner given → the preview falls back to zero
+  try {
+    await gatedSend(provider, {'dry-run': 'true'} as Flags, {chainKey: 'not-a-real-chain'});
+    assert.equal(seenSigner, zeroAddress); // no explicit signer or hot key → the preview falls back to zero
 
-  await gatedSend(provider, {'dry-run': 'true'} as Flags, {chainKey: 'not-a-real-chain', expectedSigner: '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C' as Address});
-  assert.equal(seenSigner, '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C');
+    await gatedSend(provider, {'dry-run': 'true'} as Flags, {chainKey: 'not-a-real-chain', expectedSigner: '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C' as Address});
+    assert.equal(seenSigner, '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C');
+  } finally {
+    if (priorKey === undefined) delete process.env.ABX_DEPLOYER_PK;
+    else process.env.ABX_DEPLOYER_PK = priorKey;
+  }
 });
 
 // ── regression: zero ad-hoc `flags['dry-run']` reads outside flags.ts ────────
@@ -197,11 +215,21 @@ test('laneFromFlags: two lane flags is refused, not silently resolved by precede
 });
 
 test('every deploy family allowlist accepts the three lane flags its help documents', async () => {
-  const {DEPLOY_FLAGS, DEPLOY_SERIES_FLAGS, DEPLOY_CODE_FLAGS} = await import('../src/commands/deploy.js');
+  const {
+    DEPLOY_FLAGS,
+    DEPLOY_EDITION_FLAGS,
+    DEPLOY_SERIES_FLAGS,
+    DEPLOY_SERIES_EDITION_FLAGS,
+    DEPLOY_CODE_FLAGS,
+    DEPLOY_CODE_EDITION_FLAGS,
+  } = await import('../src/commands/deploy.js');
   for (const [name, set] of [
     ['DEPLOY_FLAGS', DEPLOY_FLAGS],
+    ['DEPLOY_EDITION_FLAGS', DEPLOY_EDITION_FLAGS],
     ['DEPLOY_SERIES_FLAGS', DEPLOY_SERIES_FLAGS],
+    ['DEPLOY_SERIES_EDITION_FLAGS', DEPLOY_SERIES_EDITION_FLAGS],
     ['DEPLOY_CODE_FLAGS', DEPLOY_CODE_FLAGS],
+    ['DEPLOY_CODE_EDITION_FLAGS', DEPLOY_CODE_EDITION_FLAGS],
   ] as Array<[string, Set<string>]>) {
     for (const lane of ['send', 'sign', 'unsigned']) {
       assert.ok(set.has(lane), `${name} rejects --${lane}, which its own help advertises`);

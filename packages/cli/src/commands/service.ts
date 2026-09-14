@@ -37,6 +37,7 @@ import {assertPrivateEnvPath, saveEnvSecret, saveEnvSecrets} from './auth.js';
 import {repinNodeCustody, resolveBackend} from '@artblocks/abx-storage';
 import {DEFAULT_PORT, resolveBaseUrl, startChainWatcher, startTokenApiServer, watchIntervalMs} from '@artblocks/abx-token-api';
 import {formatAssertion, runConformance, verdictLine} from '../conformance.js';
+import {markBatchFailure} from '../errors.js';
 import {CHAIN, factoryAddress, localIndexer, loopbackBaseUrl, storageOptions, storageOverrides} from '../config.js';
 import {type Flags} from '../flags.js';
 import {
@@ -185,7 +186,7 @@ export async function cmdEffects(flags: Flags): Promise<void> {
   if (flags.once !== undefined) {
     const stats = await runner.sweepAll();
     const line = `effects once: ran=${stats.ran} skipped=${stats.skipped} failed=${stats.failed} ${dim(`(${resolverUrl})`)}`;
-    if (stats.failed) warn(`${line}\n  ${dim(stats.errors[0] ?? 'see error above')}`);
+    if (markBatchFailure(stats.failed)) warn(`${line}\n  ${dim(stats.errors[0] ?? 'see error above')}`);
     else ok(line);
     return;
   }

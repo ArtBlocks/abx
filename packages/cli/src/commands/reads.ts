@@ -32,6 +32,7 @@ import {
 import {CHAIN, localIndexer, storageOptions, storageOverrides} from '../config.js';
 import {type Flags, parseFlags, positionalArgs, warnStrayFlags} from '../flags.js';
 import {jsonSafe, withJson} from '../jsonout.js';
+import {markBatchFailure} from '../errors.js';
 import {assertPortFree, bold, c, dim, g, info, loadEffects, ok, requirePublishableBackend, step, warn} from '../output.js';
 import {detectTokenKind, describeKind, isEditionContract} from '../kind.js';
 import {
@@ -276,7 +277,7 @@ export async function cmdRender(address: Address | undefined, tokenIds: string[]
     if (!res.ok) throw new Error(`effect runner at ${runnerUrl} replied ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
     const stats = (await res.json()) as {ran: number; skipped: number; failed: number; errors?: string[]};
     const line = `runner: ran=${stats.ran} skipped=${stats.skipped} failed=${stats.failed} ${dim(`(${runnerUrl})`)}`;
-    if (stats.failed) warn(`${line}\n  ${dim(stats.errors?.[0] ?? 'see runner logs')}`);
+    if (markBatchFailure(stats.failed)) warn(`${line}\n  ${dim(stats.errors?.[0] ?? 'see runner logs')}`);
     else ok(line);
     return;
   }
@@ -308,7 +309,7 @@ export async function cmdRender(address: Address | undefined, tokenIds: string[]
   const where = remote ? `published → ${resolverUrl}` : `resolver ${resolverUrl}`;
   const forceNote = force ? ' (forced re-render)' : '';
   const summary = `inline: ran=${stats.ran} skipped=${stats.skipped} failed=${stats.failed}${forceNote} ${dim(`(${where})`)}`;
-  if (stats.failed) warn(`${summary}\n  ${dim(stats.errors[0] ?? 'see error above')}`);
+  if (markBatchFailure(stats.failed)) warn(`${summary}\n  ${dim(stats.errors[0] ?? 'see error above')}`);
   else ok(summary);
   if (stats.ran) noteArweavePropagation(flags);
 }
