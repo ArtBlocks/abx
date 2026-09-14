@@ -1,5 +1,12 @@
 # @artblocks/abx-storage-arweave
 
+## 0.1.0-alpha.5
+
+### Patch Changes
+
+- d78c369: Use viem for local and remote Ethereum Turbo data-item signing instead of the vulnerable
+  ethers-v5/elliptic signer bundled by the upstream dependency tree.
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes
