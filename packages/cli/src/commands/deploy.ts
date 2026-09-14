@@ -5067,7 +5067,7 @@ export const DEPLOY_CODE_EDITION_FLAGS = new Set<string>([
   'max', 'mint-count', 'mint-all', 'no-mint', 'mint-amount', 'unpaused', 'minter', 'primary-payee', 'royalty-bps', 'royalty-cap', 'burnable', '721c',
   'schema', 'no-seed', 'seed-source',
   'public-base-url', 'onchain-uri', 'generator', 'renderer', 'port',
-  'sign', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   'dry-run', 'confirm', 'yes', 'json', 'copies',
   // storage (directory mode + --image-base's off-chain still) — mirrors storageOverrides(), same
   // allowlist entries as the 721 twin's DEPLOY_CODE_FLAGS.

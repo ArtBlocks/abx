@@ -62,8 +62,8 @@ test('process.exit( appears only in the allowlisted entry-file + SIGINT-handler 
 // ── regression: no command body reaches for process.exit as a shortcut ────────
 // The allowlist above is a ceiling, not a floor — pin the entry-file exceptions specifically so
 // a refactor that moves main()'s dispatch elsewhere doesn't silently relax the check for everyone else.
-test('errors.ts exports CliError (the one-exit-discipline\'s throw-with-exit-code type)', async () => {
-  const {CliError} = await import('../src/errors.js');
+test('errors.ts exports CliError and marks failed batch commands', async () => {
+  const {CliError, markBatchFailure} = await import('../src/errors.js');
   const err = new CliError('boom');
   assert.equal(err.message, 'boom');
   assert.equal(err.exitCode, 1);
@@ -71,4 +71,12 @@ test('errors.ts exports CliError (the one-exit-discipline\'s throw-with-exit-cod
   const custom = new CliError('quiet', 3, true);
   assert.equal(custom.exitCode, 3);
   assert.equal(custom.alreadyPrinted, true);
+
+  const prior = process.exitCode;
+  process.exitCode = undefined;
+  assert.equal(markBatchFailure(0), false);
+  assert.equal(process.exitCode, undefined);
+  assert.equal(markBatchFailure(1), true);
+  assert.equal(process.exitCode, 1);
+  process.exitCode = prior;
 });

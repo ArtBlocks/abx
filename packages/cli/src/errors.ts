@@ -23,3 +23,10 @@ export class CliError extends Error {
     this.alreadyPrinted = alreadyPrinted;
   }
 }
+
+/** Mark a completed batch command as failed when any item failed, while preserving command cleanup. */
+export function markBatchFailure(failed: number): boolean {
+  if (failed <= 0) return false;
+  process.exitCode = 1;
+  return true;
+}

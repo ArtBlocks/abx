@@ -16,6 +16,7 @@
  * simply never wired.
  */
 import {decodeErrorResult, formatEther, zeroAddress, type PublicClient} from 'viem';
+import {privateKeyToAccount} from 'viem/accounts';
 import {createInterface} from 'node:readline';
 import {
   assertChainId,
@@ -111,7 +112,7 @@ function printDryRunPreview(prepared: PreparedTx, expectedSigner?: Address): voi
   console.log(`\n  ${bold('◆ ' + prepared.summary)}  ${dim('(dry run — nothing sent)')}`);
   for (const [k, v] of Object.entries(prepared.fields)) console.log(`    ${dim(k.padEnd(12))} ${v}`);
   console.log(`    ${dim('to'.padEnd(12))} ${prepared.to ?? dim('(contract deploy)')}`);
-  if (expectedSigner) console.log(`    ${dim('owner'.padEnd(12))} ${expectedSigner}`);
+  if (expectedSigner) console.log(`    ${dim('signer'.padEnd(12))} ${expectedSigner}`);
 }
 
 export interface DryRunSimulation {
@@ -309,6 +310,22 @@ export interface GatedSendOptions {
   client?: PublicClient;
 }
 
+/** Resolve the signer a preview should simulate from the same source the hot send will use.
+ * Explicit owner/buyer pinning always wins; wallet and cold lanes cannot be inferred locally. */
+export function previewSigner(
+  flags: Flags,
+  explicit?: Address,
+  signingKey: `0x${string}` | undefined = envSigningKey(),
+): Address | undefined {
+  if (explicit) return explicit;
+  if (laneFromFlags(flags) !== 'send' || !signingKey) return undefined;
+  try {
+    return privateKeyToAccount(signingKey).address;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The one send choke point for a SINGLE already-prepared write: `--dry-run` preview (nothing sent,
  * returns `null`) → optional `--confirm` prompt → lane selection → `signTx`. Every caller — an
@@ -319,15 +336,16 @@ export interface GatedSendOptions {
  * missed a branch.
  */
 export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedSendOptions): Promise<SignResult | null> {
+  const expectedSigner = previewSigner(flags, opts.expectedSigner);
   if (isDryRun(flags)) {
-    const prepared = await resolveProvider(provider, opts.expectedSigner ?? zeroAddress);
+    const prepared = await resolveProvider(provider, expectedSigner ?? zeroAddress);
     if (flags.json !== undefined) {
-      const simulation = await simulateDryRun(prepared, opts.chainKey, opts.expectedSigner, false, opts.client);
+      const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, false, opts.client);
       console.log(JSON.stringify({
         dryRun: true,
         sent: false,
         lane: laneFromFlags(flags),
-        expectedSigner: opts.expectedSigner ?? null,
+        expectedSigner: expectedSigner ?? null,
         transaction: prepared,
         // `transaction.gasFloor` (when present) is a PROVEN MINIMUM used to detect an implausible
         // gas estimate — not a prediction of total cost. `simulation.estimatedGas`/`estimatedCostWei`
@@ -335,19 +353,19 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
         simulation,
       }, null, 2));
     } else {
-      printDryRunPreview(prepared, opts.expectedSigner);
-      await simulateDryRun(prepared, opts.chainKey, opts.expectedSigner, true, opts.client);
+      printDryRunPreview(prepared, expectedSigner);
+      await simulateDryRun(prepared, opts.chainKey, expectedSigner, true, opts.client);
       console.log(dim(`\n  Re-run without --dry-run to send (lane: ${laneFromFlags(flags)}).\n`));
     }
     return null;
   }
   await assertChainId(opts.chainKey); // verify the RPC really is the target chain before any irreversible write
-  const preview = await resolveProvider(provider, opts.expectedSigner ?? zeroAddress);
+  const preview = await resolveProvider(provider, expectedSigner ?? zeroAddress);
   await confirmSend(preview.summary, flags);
   return signTx(provider, {
     lane: laneFromFlags(flags),
     chainKey: opts.chainKey,
-    expectedSigner: opts.expectedSigner,
+    expectedSigner,
     yes: !!flags.yes,
     port: flags.port ? Number(flags.port) : undefined,
     signUrlFile: flags['sign-url-file'],
