@@ -1,5 +1,12 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.46
+
+### Patch Changes
+
+- b6f941d: Preserve authorship fields in exact deploy replay commands, keep deferred-mint staging narration
+  accurate, and distinguish chain-resident image bytes from independently hash-verified content.
+
 ## 0.1.0-alpha.45
 
 ### Minor Changes
