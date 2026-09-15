@@ -59,14 +59,16 @@ output bug without repeating the secret.
 ## Select the chain explicitly through the environment
 
 Read the full `chains` array from `abx capabilities --json`. Base Sepolia is the default; Sepolia is
-also supported. Arbitrum Sepolia is experimental and has canonical ABX contracts for explicit
-qualification. Production entries are present but disabled, and the CLI refuses them. There is
-deliberately no `--chain` flag because silently ignoring a wrong-chain request could spend on the
-wrong network.
+also supported. Arbitrum Sepolia is experimental. Base production is beta; Arbitrum One and Ethereum
+remain disabled. There is deliberately no `--chain` flag because silently ignoring a wrong-chain
+request could spend on the wrong network.
 
-Before any transaction on an `experimental` or future `beta` network, name the network and support
-level, explain what the transaction or transaction group will do, and state the relevant contract,
-configuration, and real-funds risks. Qualify the same flow on the paired testnet before production.
+Before any transaction on an `experimental` or `beta` network, name the network and support level,
+explain what the transaction or transaction group will do, and state the relevant contract,
+configuration, and real-funds risks. Base beta is prerelease software without an independent
+third-party audit; bugs, misconfiguration, and nondeterministic agent behavior may cause permanent
+loss. Link to the open source, use-at-your-own-risk implementation at
+https://github.com/ArtBlocks/abx. Qualify the same flow on the paired testnet before production.
 
 Use per-chain RPC variables when operating more than one chain. `abx doctor` checks chain identity,
 wide-range `eth_getLogs`, archival reach, and nonce coherence. Put a healthy archive endpoint first:
