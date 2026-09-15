@@ -1,5 +1,16 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.50
+
+### Patch Changes
+
+- 4512962: Enable Base production as beta, add a keyless read fallback, and surface production risk and paired-testnet guidance in the CLI, agent skill, and public docs.
+- Updated dependencies [4512962]
+  - @artblocks/abx-sdk@0.1.0-alpha.37
+  - @artblocks/abx-indexer@0.1.0-alpha.38
+  - @artblocks/abx-storage@0.1.0-alpha.37
+  - @artblocks/abx-token-api@0.1.0-alpha.40
+
 ## 0.1.0-alpha.49
 
 ### Patch Changes
