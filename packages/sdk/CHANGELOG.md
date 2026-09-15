@@ -1,5 +1,12 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.36
+
+### Patch Changes
+
+- 5522192: Record the source-verified Base production contract deployment while keeping Base disabled for CLI
+  use until the separate beta-enablement release.
+
 ## 0.1.0-alpha.35
 
 ### Minor Changes
