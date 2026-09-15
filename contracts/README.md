@@ -7,7 +7,8 @@ three ERC-721 — **`OneOfOneImage`** (a 1/1), **`SeriesImage`** (a multi-token 
 shared renderer, reader, minter, and seed-source singletons. See the maintained
 [event-spine reference](../site/content/docs/protocol/event-spine.mdx).
 
-> **Security status:** ABX is alpha and pre-mainnet. The repository does not publish a completed
+> **Security status:** ABX is alpha. Release-candidate contracts are deployed on Base, while the
+> current CLI keeps production networks disabled. The repository does not publish a completed
 > independent third-party audit. Review the source, tests, deployed bytecode, owner powers, and
 > [security policy](../SECURITY.md) before relying on it.
 

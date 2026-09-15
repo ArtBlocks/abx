@@ -35,7 +35,7 @@
       "name": "Base",
       "environment": "production",
       "pairedChain": "base-sepolia",
-      "contractStatus": "not-deployed",
+      "contractStatus": "deployed",
       "supportLevel": "disabled"
     },
     {

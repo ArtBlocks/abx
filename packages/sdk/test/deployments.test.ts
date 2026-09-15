@@ -22,8 +22,11 @@ import {isAddress} from 'viem';
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
 const ARBITRUM_SEPOLIA = 421614;
+const BASE = 8453;
+const UNDEPLOYED = 10;
 const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
 const ARBITRUM_GENERATOR = '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84';
+const BASE_GENERATOR = '0x4F74De4835B51414a4DA83527589aEDc41A26FaE';
 const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 
 // Every recorded address must be a VALID EIP-55 checksum, not merely 40 hex characters.
@@ -47,14 +50,16 @@ test('manifest: every address is a valid EIP-55 checksum', () => {
 // The manifest is the zero-state trust root: the canonical generator + the CURRENT renderer
 // rev (spec v11) must
 // resolve with no env and no flags.
-test('manifest: sepolia ships the canonical generator + the current renderer rev', () => {
+test('manifest: shipped chains include the canonical generator + current renderer rev', () => {
   assert.equal(DEPLOYMENTS[SEPOLIA].generator, GENERATOR);
   assert.equal(DEPLOYMENTS[SEPOLIA].renderer, RENDERER);
   assert.equal(resolveGenerator(SEPOLIA), GENERATOR);
   assert.equal(resolveRenderer(SEPOLIA), RENDERER);
+  assert.equal(resolveGenerator(BASE), BASE_GENERATOR);
+  assert.equal(resolveRenderer(BASE), RENDERER);
   // an unshipped chain resolves to nothing (the CLI degrades to guidance, never a silent deploy)
-  assert.equal(resolveGenerator(8453), undefined);
-  assert.deepEqual(getDeployment(8453), {});
+  assert.equal(resolveGenerator(UNDEPLOYED), undefined);
+  assert.deepEqual(getDeployment(UNDEPLOYED), {});
 });
 
 // The CREATE2 invariant: the deterministic address the CLI's lazy deployers land at (and self-heal
@@ -71,6 +76,9 @@ test('lazy-deploy CREATE2 predictions equal the manifest addresses (all shipped 
   assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].generator, ARBITRUM_GENERATOR);
+  assert.equal(DEPLOYMENTS[BASE].renderer, DEPLOYMENTS[SEPOLIA].renderer);
+  assert.equal(DEPLOYMENTS[BASE].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[BASE].generator, BASE_GENERATOR);
 });
 
 // Precedence is override → env → manifest — identical to every other resolver (resolveRenderer
@@ -84,7 +92,7 @@ test('resolveGenerator: explicit override → ABX_GENERATOR env → manifest', (
     assert.equal(resolveGenerator(SEPOLIA), GENERATOR); // manifest
     process.env.ABX_GENERATOR = ENV;
     assert.equal(resolveGenerator(SEPOLIA), ENV); // env beats manifest
-    assert.equal(resolveGenerator(8453), ENV); // env also covers an unshipped chain
+    assert.equal(resolveGenerator(UNDEPLOYED), ENV); // env also covers an unshipped chain
     assert.equal(resolveGenerator(SEPOLIA, OVERRIDE), OVERRIDE); // override beats env
   } finally {
     if (before === undefined) delete process.env.ABX_GENERATOR;
@@ -116,7 +124,7 @@ test('isCurrentGenerator: address comparison is case-insensitive (viem/EIP-55 ca
 test('isCurrentGenerator: null (not false) when the chain has no canonical generator recorded at all', () => {
   // An unshipped chain is a DIFFERENT fact from "doesn't match" — collapsing the two would report a
   // collection on a chain this manifest has never heard of as if it were pinned to something wrong.
-  assert.equal(isCurrentGenerator(8453, GENERATOR), null);
+  assert.equal(isCurrentGenerator(UNDEPLOYED, GENERATOR), null);
 });
 
 // ── anchor generations: stable identity for current and prior canonical deployments ───────────
