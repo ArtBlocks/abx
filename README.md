@@ -4,7 +4,7 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX is alpha software. Testnet support is available now. Production networks are coming soon.
+ABX is alpha software. Testnet support is available now. Production network support is coming soon.
 
 ## Quickstart
 

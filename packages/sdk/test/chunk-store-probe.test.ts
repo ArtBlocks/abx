@@ -13,7 +13,7 @@ import {probeChunkStore} from '../src/chunks.js';
 import {resolveChunkStore} from '../src/deployments.js';
 
 const BASE_SEPOLIA = 84532;
-const UNSHIPPED_CHAIN = 8453; // no manifest entry — matches deployments.test.ts's convention
+const UNSHIPPED_CHAIN = 10; // no manifest entry — matches deployments.test.ts's convention
 const MANIFEST_STORE = resolveChunkStore(BASE_SEPOLIA) as Address;
 const OVERRIDE = '0x1111111111111111111111111111111111111111' as Address;
 
