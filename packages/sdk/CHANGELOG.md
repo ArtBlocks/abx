@@ -1,5 +1,11 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.37
+
+### Patch Changes
+
+- 4512962: Enable Base production as beta, add a keyless read fallback, and surface production risk and paired-testnet guidance in the CLI, agent skill, and public docs.
+
 ## 0.1.0-alpha.36
 
 ### Patch Changes
