@@ -4,7 +4,8 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX is alpha software. Testnet support is available now. Production network support is coming soon.
+ABX tooling is prerelease software. Testnets are supported, and Base production is available as a
+beta. Arbitrum One and Ethereum are coming later.
 
 ## Quickstart
 
@@ -27,9 +28,10 @@ The complete user guide, protocol reference, deployment addresses, and API docum
 | Network type | Supported | Experimental | Coming soon |
 | --- | --- | --- | --- |
 | Testnets | Base Sepolia (default), Sepolia | Arbitrum Sepolia | — |
-| Production | — | — | Base, Arbitrum One, Ethereum |
+| Production | — | Base | Arbitrum One, Ethereum |
 
-Coming-soon networks remain disabled in the current CLI. For live support status and canonical
+Base beta transactions use real ETH and irreversible state; prove the same flow on Base Sepolia
+first. Coming-soon networks remain disabled. For live support status, risks, and canonical
 contract addresses, see [Networks and deployments](https://docs.abx.io/docs/reference/deployments).
 The machine-readable sources of truth are
 [`chain-support.json`](packages/sdk/src/chain-support.json) and

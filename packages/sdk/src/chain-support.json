@@ -36,7 +36,7 @@
       "environment": "production",
       "pairedChain": "base-sepolia",
       "contractStatus": "deployed",
-      "supportLevel": "disabled"
+      "supportLevel": "beta"
     },
     {
       "key": "arbitrum-one",

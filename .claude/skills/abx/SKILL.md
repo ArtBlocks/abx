@@ -2,7 +2,7 @@
 name: abx
 description: >-
   Use the ABX CLI (`abx`) to plan, launch, host, inspect, and operate ABX NFT projects on supported
-  testnets: static 1/1s, image series, editions, JavaScript/code drops, and Solidity-rendered projects.
+  networks: static 1/1s, image series, editions, JavaScript/code drops, and Solidity-rendered projects.
   Covers on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
   PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
   requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
@@ -27,6 +27,12 @@ typed errors outrank remembered prose.
 - Read the full `chains` array from `abx capabilities --json` before choosing a network. Never
   operate on a `disabled` chain. Call out `experimental` or `beta` status and its risks before a
   transaction. Select with `ABX_CHAIN=<chain>`; there is deliberately no `--chain` flag.
+- On a production `beta` network, say that real funds and irreversible state are at risk; ABX is
+  prerelease software without an independent third-party audit; bugs, misconfiguration, and
+  nondeterministic agent behavior may cause permanent loss. Link to https://github.com/ArtBlocks/abx,
+  prove the same flow on the paired testnet, and summarize the network, signer, transaction group,
+  value, and irreversible choices before asking to send. An environment key may still sign deliberate
+  automation; do not impose a browser-wallet requirement the creator did not choose.
 - Run `abx help <command>` immediately before composing a non-trivial command. Do not recover flag
   syntax from this skill.
 - Never infer that a capability is absent because a flag is absent. Run `abx capabilities --json`,

@@ -16,7 +16,7 @@
 // workspace packages resolvable, which they are not from `/tmp`.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
+import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
@@ -78,11 +78,11 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
     }
   });
   assert.match(out, /is not a recognized chain/);
-  assert.match(out, /Production networks are disabled/, 'a mainnet-ish alias gets the production explanation');
+  assert.match(out, /Base is available as beta/, 'a mainnet-ish alias gets the current production explanation');
 });
 
 test('a recognized but disabled production chain is REFUSED with its registry status', () => {
-  const out = withDotEnv('ABX_CHAIN=base\n', (dir) => {
+  const out = withDotEnv('ABX_CHAIN=arbitrum-one\n', (dir) => {
     try {
       execFileSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'doctor'], {
         cwd: dir,
@@ -96,7 +96,23 @@ test('a recognized but disabled production chain is REFUSED with its registry st
       return (err.stdout ?? '') + (err.stderr ?? '');
     }
   });
-  assert.match(out, /ABX_CHAIN="base" is recognized but disabled/);
-  assert.match(out, /chain 8453, production/);
-  assert.match(out, /paired base-sepolia network/);
+  assert.match(out, /ABX_CHAIN="arbitrum-one" is recognized but disabled/);
+  assert.match(out, /chain 42161, production/);
+  assert.match(out, /paired arbitrum-sepolia network/);
+});
+
+test('Base is selectable but every substantive invocation prints the production-beta warning', () => {
+  const result = withDotEnv('ABX_CHAIN=base\n', (dir) =>
+    spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
+      timeout: 60_000,
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Base production beta \(chain 8453\)/);
+  assert.match(result.stderr, /Real funds and irreversible state are at risk/);
+  const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'base')?.supportLevel, 'beta');
 });

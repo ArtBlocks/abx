@@ -22,11 +22,12 @@ test('chain registry separates recognized networks from selectable networks', ()
     'arbitrum-one',
     'ethereum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'arbitrum-sepolia']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 3);
+  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'arbitrum-sepolia', 'base']);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 4);
   assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
-  for (const key of ['base', 'arbitrum-one', 'ethereum']) {
+  assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
+  for (const key of ['arbitrum-one', 'ethereum']) {
     assert.equal(chainSupportByKey(key)?.supportLevel, 'disabled');
   }
 });
@@ -40,6 +41,10 @@ test('registry ids agree with viem chain metadata, including disabled production
 
 test('Arbitrum Sepolia has a keyless default RPC for qualification', () => {
   assert.deepEqual(resolveRpcUrls('arbitrum-sepolia'), ['https://sepolia-rollup.arbitrum.io/rpc']);
+});
+
+test('Base has a keyless default RPC for beta access', () => {
+  assert.deepEqual(resolveRpcUrls('base'), ['https://mainnet.base.org']);
 });
 
 test('redactRpcUrlsInText removes credential-bearing configured endpoints from upstream errors', () => {

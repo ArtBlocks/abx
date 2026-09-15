@@ -3,21 +3,27 @@ title: "Networks and deployments"
 description: "ABX network support and canonical contract addresses."
 ---
 
-Production networks are disabled in this release. Base contracts are deployed and verified ahead of
-beta enablement. Start on Base Sepolia; Sepolia is also supported, and Arbitrum Sepolia is available
-for explicit qualification work.
+Start on Base Sepolia. Base production is available as a beta after the same flow has passed on its
+testnet pair. Sepolia is also supported, and Arbitrum Sepolia is available for explicit
+qualification work.
+
+**Base beta:** transactions use real ETH and create irreversible state. ABX is prerelease software,
+has not had an independent third-party audit, and may fail through software bugs, configuration
+mistakes, or nondeterministic agent behavior. Review the network, signer, complete transaction group,
+value, and locks before sending. Use at your own risk.
 
 | Network | Chain ID | Support | Canonical contracts |
 | --- | ---: | --- | --- |
 | Base Sepolia | `84532` | supported · default | deployed |
 | Sepolia | `11155111` | supported | deployed |
 | Arbitrum Sepolia | `421614` | experimental | deployed |
-| Base | `8453` | disabled | deployed |
+| Base | `8453` | beta | deployed |
 | Arbitrum One | `42161` | disabled | not deployed |
 | Ethereum | `1` | disabled | not deployed |
 
-“Experimental” means the network is ready for deliberate qualification, but is not yet a recommended
-default. “Disabled” means the CLI refuses to operate on the network.
+“Experimental” means deliberate testnet qualification. “Beta” means production use is enabled with
+explicit warnings and paired-testnet proof, but is not yet general production support. “Disabled”
+means the CLI refuses to operate on the network.
 
 The machine-readable sources of truth are
 [`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)
@@ -64,6 +70,13 @@ Address resolution follows this order: explicit option, environment override, SD
 Sepolia also has the Art Blocks `DependencyRegistryV0` at
 <CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, and Arbitrum Sepolia
 have no canonical dependency registry.
+
+A dependency registry is an independent contract behind a soft pointer, not part of an ABX token or
+factory deployment. Each collection's pointer wins over the generator fallback and may be changed
+until that collection locks its dependencies. A future Base registry can therefore be used by new
+collections—and set on existing unlocked collections—without redeploying ABX. Only changing this
+generator's zero fallback would require a new generator singleton; it would not require a new token
+or factory generation.
 
 ## Contract generations
 

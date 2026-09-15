@@ -109,7 +109,7 @@ export const ABX_CAPABILITIES = {
     'ERC-721C/ERC-1155C enrollment (--721c)',
   ],
   unsupportedToday: [
-    'production networks (recognized in the chain registry, but disabled in this release)',
+    'chains whose support level is disabled (currently Arbitrum One and Ethereum)',
     'unsupported chains',
     'secondary-market listings or an order book',
     'compiling or deploying custom Solidity through abx',

@@ -24,7 +24,7 @@ for (const support of CHAIN_SUPPORT) {
   }
 }
 
-/** Every recognized chain, including production networks that are deliberately disabled. */
+/** Every recognized chain, including production and deliberately disabled entries. */
 export const ALL_CHAIN_KEYS = CHAIN_SUPPORT.map((chain) => chain.key);
 
 /** Chains this release permits callers to select with `ABX_CHAIN`. */
@@ -41,6 +41,7 @@ const DEFAULT_RPC_URLS: Record<string, string> = {
   'base-sepolia': 'https://sepolia.base.org',
   sepolia: 'https://ethereum-sepolia-rpc.publicnode.com',
   'arbitrum-sepolia': 'https://sepolia-rollup.arbitrum.io/rpc',
+  base: 'https://mainnet.base.org',
 };
 
 export function resolveChain(key: string = DEFAULT_CHAIN_KEY): Chain {

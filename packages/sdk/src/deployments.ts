@@ -177,8 +177,7 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
     ...CANONICAL,
     generator: '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84',
   },
-  // Base (production). Contracts are deployed and source-verified, but `chain-support.json` keeps
-  // the network disabled until the separate beta-enablement release. Base has no configured Art
+  // Base (production beta). Contracts are deployed and source-verified. Base has no configured Art
   // Blocks DependencyRegistry. SSTORE2 asset pointers:
   // abxJsPointer 0xbeD5a9dec0c94fF39F7874df979eBdC3Adab568D,
   // gunzipScriptPointer 0x686CE62bdE8FE4Fc3de70c8fC65b574A05a23D52.

@@ -183,18 +183,32 @@ function assertKnownChainEnv(): void {
         `  This release will not operate on it. Qualify the paired ${support.pairedChain} network and wait for an enabled release.\n\n`,
     );
   } else {
-    const mainnetish = /^(mainnet|homestead|eth|1|8453)$/i.test(key.trim());
+    const mainnetish = /^(mainnet|homestead|eth|1|8453|42161)$/i.test(key.trim());
     process.stderr.write(
       `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
         (mainnetish
-          ? `  Production networks are disabled in this release. Use base-sepolia (the default), sepolia, or arbitrum-sepolia;\n` +
-            `  a testnet launch exercises the real thing end to end, just without real money.\n\n`
+          ? `  Base is available as beta with ABX_CHAIN=base. Ethereum and Arbitrum One remain disabled.\n` +
+            `  Prove the same flow on the paired testnet before using real funds.\n\n`
           : `  Unset it to use the default (${DEFAULT_CHAIN_KEY}), or set one of the above.\n\n`),
     );
   }
   process.exit(1);
 }
 assertKnownChainEnv();
+
+/** A selected production beta must remain impossible to mistake for a testnet. This is advisory,
+ *  not a human-wallet requirement: unattended signing remains supported, but the network and risks
+ *  are stated on every substantive invocation before any command can prepare or send a write. */
+function warnActiveChainRisk(cmd: string | undefined): void {
+  if (!cmd || ['help', '--help', '-h', 'version', '--version', '-v'].includes(cmd)) return;
+  const support = chainSupportByKey(CHAIN);
+  if (support?.environment !== 'production' || support.supportLevel !== 'beta') return;
+  process.stderr.write(
+    `\n\u001b[38;5;215m⚠\u001b[0m ${support.name} production beta (chain ${support.chainId}).\n` +
+      `  Real funds and irreversible state are at risk. ABX is prerelease software and has not had an independent third-party audit.\n` +
+      `  Prove the flow on ${support.pairedChain}; verify the network, signer, actions, value, and locks before sending. Use at your own risk.\n\n`,
+  );
+}
 
 
 
@@ -292,6 +306,8 @@ async function main() {
   if (cmd && cmd !== 'help' && (flags.help !== undefined || rest.includes('-h'))) {
     return printCommandHelp(cmd, positionalArgs(rest)[0]);
   }
+
+  warnActiveChainRisk(cmd);
 
   // One unknown-flag notice for every listed command. Centralized here rather than added to ~45
   // command bodies: one call site can't drift out of sync with itself, and a command absent from
