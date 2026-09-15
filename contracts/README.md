@@ -288,8 +288,9 @@ dependency registry) → its address legitimately differs per chain.
 Three operational notes:
 
 - **Deploy the libraries yourself, first, and pin them.** `DeployLibraries.s.sol` CREATE2s
-  `AbxParamsLib`, `AbxCodeLib` and `AbxEditionLib` through the keyless proxy at salts named in
-  `AbxSalts.sol`, and `--sig 'predict()'` prints the addresses without sending anything.
+  `AbxMetadataLib`, `AbxParamsLib`, `AbxCodeLib`, and `AbxEditionLib` through the keyless proxy at
+  salts named in `AbxSalts.sol`, and `--sig 'predict()'` prints the addresses without sending
+  anything.
   `forge` would also auto-deploy them CREATE2-deterministically — that is how every existing
   deployment happened — but that determinism is the toolchain's, not ours, and it came from forge's
   salt rather than a salt we named. The gap cost something real: two token types were kept
@@ -401,9 +402,10 @@ forge verify-contract <addr> src/renderers/AbxChunkStore.sol:AbxChunkStore \
   --chain sepolia --compilation-profile default --watch
 ```
 
-Run it for each chain (`--chain sepolia`, `--chain base-sepolia`, `--chain arbitrum-sepolia`). `--compilation-profile default` is
-required whenever the build cache holds more than one profile (otherwise forge stops with *"Ambiguous
-compilation profiles found in cache"*).
+Run it for each deployed chain (`--chain sepolia`, `--chain base-sepolia`,
+`--chain arbitrum-sepolia`, `--chain base`, `--chain arbitrum`, or `--chain mainnet`).
+`--compilation-profile default` is required whenever the build cache holds more than one profile
+(otherwise forge stops with *"Ambiguous compilation profiles found in cache"*).
 
 **Three settings bite, each on a different set of paths.** Miss any and Etherscan returns the same
 unhelpful *"Compiled contract deployment bytecode does NOT match"*:
@@ -427,13 +429,12 @@ unhelpful *"Compiled contract deployment bytecode does NOT match"*:
   the metadata hash. The linked bytecode alone is not enough; the *compile input* has to match.
 
 Pass **every** library the unit links, not just the ones you remember. `SeriesCode` links three
-because the on-chain metadata field store lives in `AbxMetadataLib`; a
-missing pin fails with the same unhelpful "bytecode does NOT match". The authoritative list per token
-type is the table in
-[`deployments.mdx`](https://github.com/ArtBlocks/abx/blob/main/site/content/docs/reference/deployments.mdx),
-and the addresses are the `metadataLib` / `paramsLib` / `codeLib` / `editionLib` entries in
-`packages/sdk/src/deployments.ts` — read them from there rather than from this example, which is a
-snapshot and will age:
+because the on-chain metadata field store lives in `AbxMetadataLib`; a missing pin fails with the
+same unhelpful "bytecode does NOT match". The authoritative list is the artifact's
+`bytecode.linkReferences`; the deploy scripts construct the same sets in `script/AbxLink.sol` and
+tests reject unresolved placeholders. Read addresses from the `metadataLib` / `paramsLib` /
+`codeLib` / `editionLib` entries in `packages/sdk/src/deployments.ts` rather than this example, which
+is a snapshot and will age:
 
 ```bash
 forge verify-contract <addr> src/tokens/SeriesCode.sol:SeriesCode \

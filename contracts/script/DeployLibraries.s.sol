@@ -11,7 +11,7 @@ import {AbxSalts} from "./AbxSalts.sol";
 ///         they recompute them from the same salts. Idempotent: a library that already has code is
 ///         reported and skipped, so re-running is the normal way to verify a chain is set up.
 ///
-///         `--sig 'predict()'` prints all three addresses without sending anything.
+///         `--sig 'predict()'` prints all four addresses without sending anything.
 ///
 /// @dev **Why this script exists.** `forge` will auto-deploy an unlinked library when a script
 ///      references one, and it routes that through the keyless CREATE2 proxy, so the address is
