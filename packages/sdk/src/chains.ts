@@ -1,4 +1,4 @@
-import {arbitrum, arbitrumSepolia, base, baseSepolia, mainnet, robinhood, robinhoodTestnet, sepolia} from 'viem/chains';
+import {base, baseSepolia, mainnet, robinhood, robinhoodTestnet, sepolia} from 'viem/chains';
 import type {Chain} from 'viem';
 import {CHAIN_SUPPORT, CHAIN_SUPPORT_REGISTRY, isChainSelectable} from './chain-support.js';
 import {readEnv} from './util.js';
@@ -15,8 +15,6 @@ export const CHAINS: Record<string, Chain> = {
   base,
   robinhood,
   ethereum: mainnet,
-  'arbitrum-sepolia': arbitrumSepolia,
-  'arbitrum-one': arbitrum,
 };
 
 for (const support of CHAIN_SUPPORT) {
@@ -44,8 +42,6 @@ const DEFAULT_RPC_URLS: Record<string, string> = {
   sepolia: 'https://ethereum-sepolia-rpc.publicnode.com',
   'robinhood-testnet': 'https://rpc.testnet.chain.robinhood.com',
   robinhood: 'https://rpc.mainnet.chain.robinhood.com',
-  // Retained for reads against historical ABX deployments. The chain is no longer selectable.
-  'arbitrum-sepolia': 'https://sepolia-rollup.arbitrum.io/rpc',
   base: 'https://mainnet.base.org',
 };
 

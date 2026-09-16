@@ -2,7 +2,7 @@ import registryJson from './chain-support.json' with {type: 'json'};
 
 export type ChainEnvironment = 'testnet' | 'production';
 export type ContractDeploymentStatus = 'not-deployed' | 'deployed' | 'superseded';
-export type ChainSupportLevel = 'disabled' | 'experimental' | 'beta' | 'supported' | 'deprecated';
+export type ChainSupportLevel = 'disabled' | 'experimental' | 'beta' | 'supported';
 
 /** Stable network facts consumed by the SDK, CLI, services, and agent skill. */
 export interface ChainSupport {
@@ -26,7 +26,7 @@ export interface ChainSupportRegistry {
 
 const ENVIRONMENTS = new Set<ChainEnvironment>(['testnet', 'production']);
 const CONTRACT_STATUSES = new Set<ContractDeploymentStatus>(['not-deployed', 'deployed', 'superseded']);
-const SUPPORT_LEVELS = new Set<ChainSupportLevel>(['disabled', 'experimental', 'beta', 'supported', 'deprecated']);
+const SUPPORT_LEVELS = new Set<ChainSupportLevel>(['disabled', 'experimental', 'beta', 'supported']);
 const SELECTABLE_LEVELS = new Set<ChainSupportLevel>(['experimental', 'beta', 'supported']);
 
 function loadRegistry(input: unknown): ChainSupportRegistry {

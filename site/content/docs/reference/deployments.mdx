@@ -20,13 +20,10 @@ value, and locks before sending. Use at your own risk.
 | Base | `8453` | beta | deployed |
 | Robinhood Chain | `4663` | disabled | not deployed |
 | Ethereum | `1` | disabled | not deployed |
-| Arbitrum Sepolia | `421614` | deprecated | deployed |
-| Arbitrum One | `42161` | deprecated | not deployed |
 
 “Experimental” means deliberate testnet qualification. “Beta” means production use is enabled with
 explicit warnings and paired-testnet proof, but is not yet general production support. “Disabled”
-means the CLI refuses to operate on the network. “Deprecated” preserves network facts and historical
-deployment records without allowing new CLI operations.
+means the CLI refuses to operate on the network.
 
 The machine-readable sources of truth are
 [`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)
@@ -68,11 +65,10 @@ Address resolution follows this order: explicit option, environment override, SD
 | Base Sepolia | `84532` | <CopyAddress>0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2</CopyAddress> |
 | Sepolia | `11155111` | <CopyAddress>0x7fcf8118D400FF004fF0772a37c24196D9aA7b17</CopyAddress> |
 | Base | `8453` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
-| Arbitrum Sepolia (deprecated) | `421614` | <CopyAddress>0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84</CopyAddress> |
 
 Sepolia also has the Art Blocks `DependencyRegistryV0` at
-<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, and the deprecated
-Arbitrum Sepolia deployment have no canonical dependency registry.
+<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base and Base Sepolia have no canonical
+dependency registry.
 
 A dependency registry is an independent contract behind a soft pointer, not part of an ABX token or
 factory deployment. Each collection's pointer wins over the generator fallback and may be changed

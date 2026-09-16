@@ -21,9 +21,9 @@
  *   - manifest: the canonical address below
  *
  * DEPLOYMENT SCOPE: canonical infrastructure is live on Base Sepolia (the default, chainId 84532),
- * Sepolia (11155111), Base (8453), and the deprecated Arbitrum Sepolia deployment (421614).
- * `chain-support.json` separately records whether each deployment is selectable; an address here
- * does not by itself enable a network. Absence here always means no canonical deployment.
+ * Sepolia (11155111), and Base (8453). `chain-support.json` separately records whether each
+ * deployment is selectable; an address here does not by itself enable a network. Absence here
+ * always means no canonical deployment.
  *
  * Changing a contract → redeploy → repoint here: see contracts/README.md#changing-a-contract.
  */
@@ -168,15 +168,6 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
   84532: {
     ...CANONICAL,
     generator: '0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2',
-  },
-  // Arbitrum Sepolia (deprecated testnet deployment, retained for historical reads). No Art Blocks
-  // DependencyRegistry on this chain, so the generator is deployed with
-  // defaultDependencyRegistry = address(0) — collections point at their own. SSTORE2
-  // asset pointers: abxJsPointer 0x3417C691C34d5b0b23fB339a2da0DeDf99729402,
-  // gunzipScriptPointer 0x59FaD0D88cC121F0F8c58F6a1AaeC2B7276AeADB.
-  421614: {
-    ...CANONICAL,
-    generator: '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84',
   },
   // Base (production beta). Contracts are deployed and source-verified. Base has no configured Art
   // Blocks DependencyRegistry. SSTORE2 asset pointers:

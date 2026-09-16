@@ -55,24 +55,6 @@
       "pairedChain": "sepolia",
       "contractStatus": "not-deployed",
       "supportLevel": "disabled"
-    },
-    {
-      "key": "arbitrum-sepolia",
-      "chainId": 421614,
-      "name": "Arbitrum Sepolia",
-      "environment": "testnet",
-      "pairedChain": "arbitrum-one",
-      "contractStatus": "deployed",
-      "supportLevel": "deprecated"
-    },
-    {
-      "key": "arbitrum-one",
-      "chainId": 42161,
-      "name": "Arbitrum One",
-      "environment": "production",
-      "pairedChain": "arbitrum-sepolia",
-      "contractStatus": "not-deployed",
-      "supportLevel": "deprecated"
     }
   ]
 }
