@@ -3,9 +3,8 @@ title: "Networks and deployments"
 description: "ABX network support and canonical contract addresses."
 ---
 
-Start on Base Sepolia. Base production is available as a beta after the same flow has passed on its
-testnet pair. Sepolia is also supported. Robinhood Chain Testnet is next under qualification but is
-not selectable until its canonical contracts are deployed and verified.
+Start on Base Sepolia. Sepolia is supported, Robinhood Chain Testnet is experimental, and Base
+production is beta after the same flow has passed on its testnet pair.
 
 **Base beta:** transactions use real ETH and create irreversible state. ABX is prerelease software,
 has not had an independent third-party audit, and may fail through software bugs, configuration
@@ -16,7 +15,7 @@ value, and locks before sending. Use at your own risk.
 | --- | ---: | --- | --- |
 | Base Sepolia | `84532` | supported · default | deployed |
 | Sepolia | `11155111` | supported | deployed |
-| Robinhood Chain Testnet | `46630` | disabled | not deployed |
+| Robinhood Chain Testnet | `46630` | experimental | deployed |
 | Base | `8453` | beta | deployed |
 | Robinhood Chain | `4663` | disabled | not deployed |
 | Ethereum | `1` | disabled | not deployed |
@@ -64,11 +63,12 @@ Address resolution follows this order: explicit option, environment override, SD
 | --- | --- | --- |
 | Base Sepolia | `84532` | <CopyAddress>0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2</CopyAddress> |
 | Sepolia | `11155111` | <CopyAddress>0x7fcf8118D400FF004fF0772a37c24196D9aA7b17</CopyAddress> |
+| Robinhood Chain Testnet | `46630` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
 | Base | `8453` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
 
 Sepolia also has the Art Blocks `DependencyRegistryV0` at
-<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base and Base Sepolia have no canonical
-dependency registry.
+<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, and Robinhood Chain
+Testnet have no canonical dependency registry.
 
 A dependency registry is an independent contract behind a soft pointer, not part of an ABX token or
 factory deployment. Each collection's pointer wins over the generator fallback and may be changed

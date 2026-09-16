@@ -26,8 +26,8 @@
       "name": "Robinhood Chain Testnet",
       "environment": "testnet",
       "pairedChain": "robinhood",
-      "contractStatus": "not-deployed",
-      "supportLevel": "disabled"
+      "contractStatus": "deployed",
+      "supportLevel": "experimental"
     },
     {
       "key": "base",

@@ -4,8 +4,8 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX tooling is prerelease software. Testnets are supported, and Base production is available as a
-beta. Robinhood Chain is the next network under qualification; Ethereum comes later.
+ABX tooling is prerelease software. Base Sepolia and Sepolia are supported, Robinhood Chain Testnet
+is experimental, and Base production is beta. Robinhood Chain and Ethereum come later.
 
 ## Quickstart
 
@@ -25,13 +25,13 @@ The complete user guide, protocol reference, deployment addresses, and API docum
 
 ## Networks
 
-| Environment | Active | Next |
+| Environment | Available | Next |
 | --- | --- | --- |
-| Testnet | Base Sepolia (default), Sepolia | Robinhood Chain Testnet |
+| Testnet | Base Sepolia (default), Sepolia, Robinhood Chain Testnet (experimental) | — |
 | Production | Base (beta) | Robinhood Chain, Ethereum |
 
 Base beta transactions use real ETH and irreversible state; prove the same flow on Base Sepolia
-first. Networks under qualification remain disabled. For live support status, risks, and canonical
+first. Experimental networks are for deliberate qualification. For live support status, risks, and canonical
 contract addresses, see [Networks and deployments](https://docs.abx.io/docs/reference/deployments).
 The machine-readable sources of truth are
 [`chain-support.json`](packages/sdk/src/chain-support.json) and

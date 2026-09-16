@@ -196,13 +196,20 @@ function assertKnownChainEnv(): void {
 }
 assertKnownChainEnv();
 
-/** A selected production beta must remain impossible to mistake for a testnet. This is advisory,
- *  not a human-wallet requirement: unattended signing remains supported, but the network and risks
- *  are stated on every substantive invocation before any command can prepare or send a write. */
+/** An experimental or production-beta chain must remain impossible to mistake for fully supported.
+ *  This is advisory, not a human-wallet requirement: unattended signing remains supported, but the
+ *  network and risks are stated on every substantive invocation before a write can be prepared. */
 function warnActiveChainRisk(cmd: string | undefined): void {
   if (!cmd || ['help', '--help', '-h', 'version', '--version', '-v'].includes(cmd)) return;
   const support = chainSupportByKey(CHAIN);
-  if (support?.environment !== 'production' || support.supportLevel !== 'beta') return;
+  if (!support || !['experimental', 'beta'].includes(support.supportLevel)) return;
+  if (support.supportLevel === 'experimental') {
+    process.stderr.write(
+      `\n\u001b[38;5;215m⚠\u001b[0m ${support.name} experimental (chain ${support.chainId}).\n` +
+        `  This testnet integration is under qualification. Verify the network, signer, actions, test ETH value, and irreversible choices before sending.\n\n`,
+    );
+    return;
+  }
   process.stderr.write(
     `\n\u001b[38;5;215m⚠\u001b[0m ${support.name} production beta (chain ${support.chainId}).\n` +
       `  Real funds and irreversible state are at risk. ABX is prerelease software and has not had an independent third-party audit.\n` +

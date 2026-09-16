@@ -21,6 +21,7 @@ import {isAddress} from 'viem';
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
+const ROBINHOOD_TESTNET = 46630;
 const BASE = 8453;
 const UNDEPLOYED = 10;
 const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
@@ -55,6 +56,8 @@ test('manifest: shipped chains include the canonical generator + current rendere
   assert.equal(resolveRenderer(SEPOLIA), RENDERER);
   assert.equal(resolveGenerator(BASE), BASE_GENERATOR);
   assert.equal(resolveRenderer(BASE), RENDERER);
+  assert.equal(resolveGenerator(ROBINHOOD_TESTNET), BASE_GENERATOR);
+  assert.equal(resolveRenderer(ROBINHOOD_TESTNET), RENDERER);
   // an unshipped chain resolves to nothing (the CLI degrades to guidance, never a silent deploy)
   assert.equal(resolveGenerator(UNDEPLOYED), undefined);
   assert.deepEqual(getDeployment(UNDEPLOYED), {});
@@ -73,7 +76,10 @@ test('lazy-deploy CREATE2 predictions equal the manifest addresses (all shipped 
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(DEPLOYMENTS[BASE].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[BASE].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[ROBINHOOD_TESTNET].renderer, DEPLOYMENTS[SEPOLIA].renderer);
+  assert.equal(DEPLOYMENTS[ROBINHOOD_TESTNET].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(DEPLOYMENTS[BASE].generator, BASE_GENERATOR);
+  assert.equal(DEPLOYMENTS[ROBINHOOD_TESTNET].generator, BASE_GENERATOR);
 });
 
 // Precedence is override → env → manifest — identical to every other resolver (resolveRenderer
