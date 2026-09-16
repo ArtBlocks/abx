@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.39
+
+### Patch Changes
+
+- 3d7fe3c: Record the verified canonical Robinhood Chain Testnet deployment and enable the network for
+  experimental qualification with explicit CLI and agent guidance.
+- 7b462e2: Update the SDK's Viem dependency to the latest compatible patch release.
+
 ## 0.1.0-alpha.38
 
 ### Patch Changes
