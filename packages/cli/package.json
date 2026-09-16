@@ -53,7 +53,7 @@
     "@artblocks/abx-indexer": "workspace:*",
     "@artblocks/abx-storage": "workspace:*",
     "@artblocks/abx-token-api": "workspace:*",
-    "viem": "^2.56.3"
+    "viem": "^2.56.5"
   },
   "optionalDependencies": {
     "@artblocks/abx-effects": "workspace:*"
