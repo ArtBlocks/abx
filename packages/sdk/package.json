@@ -62,7 +62,7 @@
     "sync-abis": "tsx scripts/sync-abis.ts"
   },
   "dependencies": {
-    "viem": "^2.56.3"
+    "viem": "^2.56.5"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

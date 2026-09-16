@@ -54,6 +54,6 @@
     "@artblocks/abx-sdk": "workspace:*",
     "@artblocks/abx-storage": "workspace:*",
     "playwright": "1.63.0",
-    "viem": "^2.56.3"
+    "viem": "^2.56.5"
   }
 }
