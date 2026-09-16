@@ -22,10 +22,10 @@ test('chain registry separates recognized networks from selectable networks', ()
     'robinhood',
     'ethereum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'base']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 3);
-  assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'not-deployed');
-  assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'disabled');
+  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'base']);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 4);
+  assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
+  assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
   for (const key of ['robinhood', 'ethereum']) {

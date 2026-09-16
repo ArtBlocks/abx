@@ -59,8 +59,8 @@ output bug without repeating the secret.
 ## Select the chain explicitly through the environment
 
 Read the full `chains` array from `abx capabilities --json`. Base Sepolia is the default; Sepolia is
-also supported. Base production is beta. Robinhood Chain Testnet and Robinhood Chain are disabled
-while their canonical deployment is qualified; Ethereum is disabled. There is deliberately no
+also supported. Robinhood Chain Testnet is experimental, Base production is beta, and Robinhood
+Chain and Ethereum are disabled. There is deliberately no
 `--chain` flag because silently ignoring a wrong-chain request could spend on the wrong network.
 
 Before any transaction on an `experimental` or `beta` network, name the network and support level,

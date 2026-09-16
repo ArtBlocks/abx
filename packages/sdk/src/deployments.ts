@@ -169,6 +169,15 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
     ...CANONICAL,
     generator: '0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2',
   },
+  // Robinhood Chain Testnet (experimental). Contracts were deployed and source-verified from this
+  // release on 2026-09-16. No canonical dependency registry exists, so the generator fallback is
+  // address(0). SSTORE2 asset pointers:
+  // abxJsPointer 0xbeD5a9dec0c94fF39F7874df979eBdC3Adab568D,
+  // gunzipScriptPointer 0x686CE62bdE8FE4Fc3de70c8fC65b574A05a23D52.
+  46630: {
+    ...CANONICAL,
+    generator: '0x4F74De4835B51414a4DA83527589aEDc41A26FaE',
+  },
   // Base (production beta). Contracts are deployed and source-verified. Base has no configured Art
   // Blocks DependencyRegistry. SSTORE2 asset pointers:
   // abxJsPointer 0xbeD5a9dec0c94fF39F7874df979eBdC3Adab568D,
