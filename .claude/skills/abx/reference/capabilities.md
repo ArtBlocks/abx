@@ -160,7 +160,7 @@ salt/deployer and predicted address before deploying either side.
 
 The toolkit currently does not provide:
 
-- operation on a chain whose capability entry is `disabled` (currently Arbitrum One and Ethereum);
+- operation on a chain whose capability entry is `disabled`;
 - a secondary-market listing/order-book feature;
 - Solidity compilation/deployment through `abx`;
 - CLI replacement of a deployed code project's script;

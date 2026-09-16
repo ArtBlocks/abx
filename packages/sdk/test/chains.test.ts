@@ -17,17 +17,18 @@ test('chain registry separates recognized networks from selectable networks', ()
   assert.deepEqual(ALL_CHAIN_KEYS, [
     'base-sepolia',
     'sepolia',
-    'arbitrum-sepolia',
+    'robinhood-testnet',
     'base',
-    'arbitrum-one',
+    'robinhood',
     'ethereum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'arbitrum-sepolia', 'base']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 4);
-  assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
+  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'base']);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 3);
+  assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'not-deployed');
+  assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'disabled');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
-  for (const key of ['arbitrum-one', 'ethereum']) {
+  for (const key of ['robinhood', 'ethereum']) {
     assert.equal(chainSupportByKey(key)?.supportLevel, 'disabled');
   }
 });
@@ -39,8 +40,8 @@ test('registry ids agree with viem chain metadata, including disabled production
   }
 });
 
-test('Arbitrum Sepolia has a keyless default RPC for qualification', () => {
-  assert.deepEqual(resolveRpcUrls('arbitrum-sepolia'), ['https://sepolia-rollup.arbitrum.io/rpc']);
+test('Robinhood Chain Testnet has a keyless default RPC ready for qualification', () => {
+  assert.deepEqual(resolveRpcUrls('robinhood-testnet'), ['https://rpc.testnet.chain.robinhood.com']);
 });
 
 test('Base has a keyless default RPC for beta access', () => {

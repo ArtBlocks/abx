@@ -21,11 +21,9 @@ import {isAddress} from 'viem';
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
-const ARBITRUM_SEPOLIA = 421614;
 const BASE = 8453;
 const UNDEPLOYED = 10;
 const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
-const ARBITRUM_GENERATOR = '0x641BdcF508B44dfDbf760169F02cBaef3A8C8a84';
 const BASE_GENERATOR = '0x4F74De4835B51414a4DA83527589aEDc41A26FaE';
 const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 
@@ -73,9 +71,6 @@ test('lazy-deploy CREATE2 predictions equal the manifest addresses (all shipped 
   // canonical infra is cross-chain-identical, so the same prediction serves every chain
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[BASE_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
-  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
-  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
-  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].generator, ARBITRUM_GENERATOR);
   assert.equal(DEPLOYMENTS[BASE].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[BASE].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(DEPLOYMENTS[BASE].generator, BASE_GENERATOR);

@@ -1,4 +1,4 @@
-import {arbitrum, arbitrumSepolia, base, baseSepolia, mainnet, sepolia} from 'viem/chains';
+import {base, baseSepolia, mainnet, robinhood, robinhoodTestnet, sepolia} from 'viem/chains';
 import type {Chain} from 'viem';
 import {CHAIN_SUPPORT, CHAIN_SUPPORT_REGISTRY, isChainSelectable} from './chain-support.js';
 import {readEnv} from './util.js';
@@ -11,9 +11,9 @@ import {readEnv} from './util.js';
 export const CHAINS: Record<string, Chain> = {
   'base-sepolia': baseSepolia,
   sepolia,
-  'arbitrum-sepolia': arbitrumSepolia,
+  'robinhood-testnet': robinhoodTestnet,
   base,
-  'arbitrum-one': arbitrum,
+  robinhood,
   ethereum: mainnet,
 };
 
@@ -40,7 +40,8 @@ export const DEFAULT_CHAIN_KEY = CHAIN_SUPPORT_REGISTRY.defaultChain;
 const DEFAULT_RPC_URLS: Record<string, string> = {
   'base-sepolia': 'https://sepolia.base.org',
   sepolia: 'https://ethereum-sepolia-rpc.publicnode.com',
-  'arbitrum-sepolia': 'https://sepolia-rollup.arbitrum.io/rpc',
+  'robinhood-testnet': 'https://rpc.testnet.chain.robinhood.com',
+  robinhood: 'https://rpc.mainnet.chain.robinhood.com',
   base: 'https://mainnet.base.org',
 };
 

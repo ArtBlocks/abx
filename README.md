@@ -5,7 +5,7 @@ the Solidity contracts, TypeScript SDK, command-line interface, reference servic
 public documentation.
 
 ABX tooling is prerelease software. Testnets are supported, and Base production is available as a
-beta. Arbitrum One and Ethereum are coming later.
+beta. Robinhood Chain is the next network under qualification; Ethereum comes later.
 
 ## Quickstart
 
@@ -25,13 +25,13 @@ The complete user guide, protocol reference, deployment addresses, and API docum
 
 ## Networks
 
-| Network type | Supported | Experimental | Coming soon |
-| --- | --- | --- | --- |
-| Testnets | Base Sepolia (default), Sepolia | Arbitrum Sepolia | — |
-| Production | — | Base | Arbitrum One, Ethereum |
+| Environment | Active | Next |
+| --- | --- | --- |
+| Testnet | Base Sepolia (default), Sepolia | Robinhood Chain Testnet |
+| Production | Base (beta) | Robinhood Chain, Ethereum |
 
 Base beta transactions use real ETH and irreversible state; prove the same flow on Base Sepolia
-first. Coming-soon networks remain disabled. For live support status, risks, and canonical
+first. Networks under qualification remain disabled. For live support status, risks, and canonical
 contract addresses, see [Networks and deployments](https://docs.abx.io/docs/reference/deployments).
 The machine-readable sources of truth are
 [`chain-support.json`](packages/sdk/src/chain-support.json) and

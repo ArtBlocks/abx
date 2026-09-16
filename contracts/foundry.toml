@@ -76,9 +76,7 @@ int_types = "long"
 [etherscan]
 sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 11155111}
 base-sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 84532}
-arbitrum-sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 421614}
 base = {key = "${ETHERSCAN_API_KEY}", chain = 8453}
-arbitrum = {key = "${ETHERSCAN_API_KEY}", chain = 42161}
 mainnet = {key = "${ETHERSCAN_API_KEY}", chain = 1}
 
 [soldeer]

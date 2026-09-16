@@ -3113,14 +3113,17 @@ async function ensureFixedPriceMinter1155(override?: string): Promise<Address> {
  *  the current manifest singleton. */
 async function preferredFixedPriceMinter(token: Address, override?: string): Promise<Address | null> {
   if (override !== undefined) return fixedPriceMinterAddress(override);
-  const assigned = await readSeries<Address>(token, 'minter').catch(() => zeroAddress);
+  // A transport failure is not evidence that the token has no assigned minter. Propagate it rather
+  // than silently switching to the current manifest singleton and inspecting/configuring the wrong
+  // sale. This surfaced during the first Base production smoke test against a throttled endpoint.
+  const assigned = await readSeries<Address>(token, 'minter');
   return assigned !== zeroAddress ? assigned : fixedPriceMinterAddress();
 }
 
 /** Edition twin of {@link preferredFixedPriceMinter}. */
 async function preferredFixedPriceMinter1155(token: Address, override?: string): Promise<Address | null> {
   if (override !== undefined) return fixedPriceMinter1155Address(override);
-  const assigned = await readEdition<Address>(token, 'minter').catch(() => zeroAddress);
+  const assigned = await readEdition<Address>(token, 'minter');
   return assigned !== zeroAddress ? assigned : fixedPriceMinter1155Address();
 }
 
@@ -3183,8 +3186,8 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
     // convention `tokens.ts`'s TokenRow.maxSupply documents; see set-max-supply's own note on why a
     // bare 0 can't be told apart from "explicitly closed" without more than this one read.
     const [maxSupply, supplyNow] = await Promise.all([
-      readEdition<bigint>(token, 'maxSupply', [tokenId]).catch(() => 0n),
-      readEdition<bigint>(token, 'totalSupply', [tokenId]).catch(() => 0n),
+      readEdition<bigint>(token, 'maxSupply', [tokenId]),
+      readEdition<bigint>(token, 'totalSupply', [tokenId]),
     ]);
     const remaining = maxSupply > 0n ? (maxSupply > supplyNow ? maxSupply - supplyNow : 0n) : null;
     if (remaining !== null && allocation > remaining) {
@@ -3206,13 +3209,12 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
     );
 
     // Through the EDITION ABI, for the same reason `minter show` spells out: the generic `read()`
-    // is the 721 1/1 ABI, which has no minter()/primaryPayee() at all, so the call throws
-    // client-side and the `.catch` swallows it into zeroAddress. That printed "⚠ assign this
-    // minter" + "⚠ set a primary payee" on an edition that already had both.
+    // is the 721 1/1 ABI, which has no minter()/primaryPayee() at all. These are required readiness
+    // facts, so any failed read aborts instead of being presented as a zero address or open state.
     const [assignedMinter, payee, paused] = await Promise.all([
-      readEdition<Address>(token, 'minter').catch(() => zeroAddress),
-      readEdition<Address>(token, 'primaryPayee').catch(() => zeroAddress),
-      readEdition<boolean>(token, 'paused').catch(() => false),
+      readEdition<Address>(token, 'minter'),
+      readEdition<Address>(token, 'primaryPayee'),
+      readEdition<boolean>(token, 'paused'),
     ]);
     const assigned = assignedMinter.toLowerCase() === minter.toLowerCase();
     console.log('');
@@ -3239,8 +3241,8 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
   // tighter than the minter's allocation) and discover it when mint #16 reverts. Warn loudly — but
   // don't refuse: allocation is a cap, and holding reserves (allocating < remaining) is legitimate.
   const [maxInv, supplyNow] = await Promise.all([
-    readSeries<bigint>(token, 'maxInvocations').catch(() => 0n),
-    readSeries<bigint>(token, 'totalSupply').catch(() => 0n),
+    readSeries<bigint>(token, 'maxInvocations'),
+    readSeries<bigint>(token, 'totalSupply'),
   ]);
   const remaining = maxInv > supplyNow ? maxInv - supplyNow : 0n;
   if (maxInv > 0n && allocation > remaining) {
@@ -3263,9 +3265,9 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
 
   // The two grants + the pause switch — surface what's still needed to actually sell.
   const [assignedMinter, payee, paused] = await Promise.all([
-    readSeries<Address>(token, 'minter').catch(() => zeroAddress),
-    readSeries<Address>(token, 'primaryPayee').catch(() => zeroAddress),
-    readSeries<boolean>(token, 'paused').catch(() => false),
+    readSeries<Address>(token, 'minter'),
+    readSeries<Address>(token, 'primaryPayee'),
+    readSeries<boolean>(token, 'paused'),
   ]);
   const assigned = assignedMinter.toLowerCase() === minter.toLowerCase();
   console.log('');
@@ -3299,14 +3301,14 @@ export async function cmdMinterShow(address: string | undefined, flags: Flags): 
     }
     const sale = await readSaleConfig1155(publicClient, minter, token, tokenId);
     // Every read here goes through the EDITION ABI: the generic `read()` is the 721 1/1 ABI,
-    // which has no minter()/primaryPayee() at all; a swallowed client-side throw would print a false
-    // "not assigned / no payee" for a correctly configured edition.
+    // which has no minter()/primaryPayee() at all. None is best-effort: an RPC failure must not
+    // become a false "not assigned / no payee / open / zero supply" production verdict.
     const [assignedMinter, payee, paused, maxSupply, supply] = await Promise.all([
-      readEdition<Address>(token, 'minter').catch(() => zeroAddress),
-      readEdition<Address>(token, 'primaryPayee').catch(() => zeroAddress),
-      readEdition<boolean>(token, 'paused').catch(() => false),
-      readEdition<bigint>(token, 'maxSupply', [tokenId]).catch(() => 0n),
-      readEdition<bigint>(token, 'totalSupply', [tokenId]).catch(() => 0n),
+      readEdition<Address>(token, 'minter'),
+      readEdition<Address>(token, 'primaryPayee'),
+      readEdition<boolean>(token, 'paused'),
+      readEdition<bigint>(token, 'maxSupply', [tokenId]),
+      readEdition<bigint>(token, 'totalSupply', [tokenId]),
     ]);
     const isEth = sale.paymentToken === zeroAddress;
     const assigned = assignedMinter.toLowerCase() === minter.toLowerCase();
@@ -3341,11 +3343,11 @@ export async function cmdMinterShow(address: string | undefined, flags: Flags): 
   }
   const sale = await readSaleConfig(publicClient, minter, token);
   const [assignedMinter, payee, paused, max, supply] = await Promise.all([
-    readSeries<Address>(token, 'minter').catch(() => zeroAddress),
-    readSeries<Address>(token, 'primaryPayee').catch(() => zeroAddress),
-    readSeries<boolean>(token, 'paused').catch(() => false),
-    readSeries<bigint>(token, 'maxInvocations').catch(() => 0n),
-    readSeries<bigint>(token, 'totalSupply').catch(() => 0n),
+    readSeries<Address>(token, 'minter'),
+    readSeries<Address>(token, 'primaryPayee'),
+    readSeries<boolean>(token, 'paused'),
+    readSeries<bigint>(token, 'maxInvocations'),
+    readSeries<bigint>(token, 'totalSupply'),
   ]);
   const isEth = sale.paymentToken === zeroAddress;
   const assigned = assignedMinter.toLowerCase() === minter.toLowerCase();
