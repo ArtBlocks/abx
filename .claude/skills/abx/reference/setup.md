@@ -59,9 +59,10 @@ output bug without repeating the secret.
 ## Select the chain explicitly through the environment
 
 Read the full `chains` array from `abx capabilities --json`. Base Sepolia is the default; Sepolia is
-also supported. Arbitrum Sepolia is experimental. Base production is beta; Arbitrum One and Ethereum
-remain disabled. There is deliberately no `--chain` flag because silently ignoring a wrong-chain
-request could spend on the wrong network.
+also supported. Base production is beta. Robinhood Chain Testnet and Robinhood Chain are disabled
+while their canonical deployment is qualified; Ethereum is disabled. Arbitrum networks are
+deprecated and retained only for historical deployment records. There is deliberately no `--chain`
+flag because silently ignoring a wrong-chain request could spend on the wrong network.
 
 Before any transaction on an `experimental` or `beta` network, name the network and support level,
 explain what the transaction or transaction group will do, and state the relevant contract,

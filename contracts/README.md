@@ -404,7 +404,9 @@ forge verify-contract <addr> src/renderers/AbxChunkStore.sol:AbxChunkStore \
 ```
 
 Run it for each deployed chain (`--chain sepolia`, `--chain base-sepolia`,
-`--chain arbitrum-sepolia`, `--chain base`, `--chain arbitrum`, or `--chain mainnet`).
+`--chain arbitrum-sepolia`, `--chain base`, or `--chain mainnet`). Robinhood Chain explorers use
+Blockscout: pass chain ID `46630` (testnet) or `4663` (production), `--verifier blockscout`, and the
+matching explorer API URL from Robinhood's official deployment guide.
 `--compilation-profile default` is required whenever the build cache holds more than one profile
 (otherwise forge stops with *"Ambiguous compilation profiles found in cache"*).
 

@@ -21,13 +21,13 @@
       "supportLevel": "supported"
     },
     {
-      "key": "arbitrum-sepolia",
-      "chainId": 421614,
-      "name": "Arbitrum Sepolia",
+      "key": "robinhood-testnet",
+      "chainId": 46630,
+      "name": "Robinhood Chain Testnet",
       "environment": "testnet",
-      "pairedChain": "arbitrum-one",
-      "contractStatus": "deployed",
-      "supportLevel": "experimental"
+      "pairedChain": "robinhood",
+      "contractStatus": "not-deployed",
+      "supportLevel": "disabled"
     },
     {
       "key": "base",
@@ -39,11 +39,11 @@
       "supportLevel": "beta"
     },
     {
-      "key": "arbitrum-one",
-      "chainId": 42161,
-      "name": "Arbitrum One",
+      "key": "robinhood",
+      "chainId": 4663,
+      "name": "Robinhood Chain",
       "environment": "production",
-      "pairedChain": "arbitrum-sepolia",
+      "pairedChain": "robinhood-testnet",
       "contractStatus": "not-deployed",
       "supportLevel": "disabled"
     },
@@ -55,6 +55,24 @@
       "pairedChain": "sepolia",
       "contractStatus": "not-deployed",
       "supportLevel": "disabled"
+    },
+    {
+      "key": "arbitrum-sepolia",
+      "chainId": 421614,
+      "name": "Arbitrum Sepolia",
+      "environment": "testnet",
+      "pairedChain": "arbitrum-one",
+      "contractStatus": "deployed",
+      "supportLevel": "deprecated"
+    },
+    {
+      "key": "arbitrum-one",
+      "chainId": 42161,
+      "name": "Arbitrum One",
+      "environment": "production",
+      "pairedChain": "arbitrum-sepolia",
+      "contractStatus": "not-deployed",
+      "supportLevel": "deprecated"
     }
   ]
 }

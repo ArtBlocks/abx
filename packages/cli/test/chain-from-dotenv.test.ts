@@ -82,7 +82,7 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
 });
 
 test('a recognized but disabled production chain is REFUSED with its registry status', () => {
-  const out = withDotEnv('ABX_CHAIN=arbitrum-one\n', (dir) => {
+  const out = withDotEnv('ABX_CHAIN=robinhood\n', (dir) => {
     try {
       execFileSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'doctor'], {
         cwd: dir,
@@ -96,9 +96,30 @@ test('a recognized but disabled production chain is REFUSED with its registry st
       return (err.stdout ?? '') + (err.stderr ?? '');
     }
   });
-  assert.match(out, /ABX_CHAIN="arbitrum-one" is recognized but disabled/);
-  assert.match(out, /chain 42161, production/);
-  assert.match(out, /paired arbitrum-sepolia network/);
+  assert.match(out, /ABX_CHAIN="robinhood" is recognized but disabled/);
+  assert.match(out, /chain 4663, production/);
+  assert.match(out, /paired robinhood-testnet network/);
+});
+
+test('a deprecated chain remains recognized for history but is not selectable', () => {
+  const out = withDotEnv('ABX_CHAIN=arbitrum-sepolia\n', (dir) => {
+    try {
+      execFileSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'doctor'], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
+        timeout: 60_000,
+      });
+      return '';
+    } catch (e) {
+      const err = e as {stdout?: string; stderr?: string};
+      return (err.stdout ?? '') + (err.stderr ?? '');
+    }
+  });
+  assert.match(out, /ABX_CHAIN="arbitrum-sepolia" is recognized but deprecated/);
+  assert.match(out, /chain 421614, testnet/);
+  assert.match(out, /recognized only for historical deployment records/);
+  assert.doesNotMatch(out, /Qualify the paired arbitrum-one network/);
 });
 
 test('Base is selectable but every substantive invocation prints the production-beta warning', () => {
