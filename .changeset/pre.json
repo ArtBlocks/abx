@@ -13,14 +13,13 @@
   },
   "changesets": [
     "brave-cacti-production-candidate",
-    "calm-canyons-network-guidance",
     "calm-desert-readiness",
     "calm-desert-turbo",
     "plain-sky-generations",
     "public-source-release",
     "quiet-dunes-crypto-signing",
     "quiet-stars-generation-services",
-    "sandy-road-networks",
+    "quiet-trails-robinhood-staging",
     "soft-mesa-verification",
     "warm-cattle-base-beta",
     "warm-mesa-base-deployment"

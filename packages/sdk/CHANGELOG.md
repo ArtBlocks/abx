@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.38
+
+### Patch Changes
+
+- c2400a7: Stage Robinhood Chain and its testnet as disabled qualification targets, keep the network registry
+  focused on the current roadmap, and stop sale inspection from turning RPC read failures into false
+  zero-state results.
+
 ## 0.1.0-alpha.37
 
 ### Patch Changes
@@ -21,6 +29,7 @@
   Record the synchronized v3 factory generation and testnet deployments, retain full v2 service
   compatibility (including already-assigned v2 sale minters), and update the renderer scaffold to
   `abx-contracts` 3.0.0.
+
 ## 0.1.0-alpha.34
 
 ### Minor Changes
