@@ -1,5 +1,20 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.54
+
+### Patch Changes
+
+- f9d7a44: Clarify fully on-chain image deployment tradeoffs and make static-project verification report
+  `onChainUri.chainComplete` as not applicable instead of false.
+- ee24497: Add machine-readable `--json` output to `contracturi` and `add`. Collection metadata reads now emit
+  the resolved document alone, while registration reports identify the target surface, chain and
+  address, scan floor, lifecycle status, and whether remote catch-up is complete or still backfilling.
+- Updated dependencies [b9197bc]
+  - @artblocks/abx-sdk@0.1.0-alpha.40
+  - @artblocks/abx-indexer@0.1.0-alpha.41
+  - @artblocks/abx-storage@0.1.0-alpha.40
+  - @artblocks/abx-token-api@0.1.0-alpha.43
+
 ## 0.1.0-alpha.53
 
 ### Patch Changes
