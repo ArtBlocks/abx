@@ -1,5 +1,18 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.52
+
+### Patch Changes
+
+- 3d7fe3c: Record the verified canonical Robinhood Chain Testnet deployment and enable the network for
+  experimental qualification with explicit CLI and agent guidance.
+- Updated dependencies [3d7fe3c]
+- Updated dependencies [7b462e2]
+  - @artblocks/abx-sdk@0.1.0-alpha.39
+  - @artblocks/abx-indexer@0.1.0-alpha.40
+  - @artblocks/abx-storage@0.1.0-alpha.39
+  - @artblocks/abx-token-api@0.1.0-alpha.42
+
 ## 0.1.0-alpha.51
 
 ### Patch Changes
