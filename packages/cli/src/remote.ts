@@ -66,6 +66,15 @@ export interface RemoteTarget {
   tokenFrom?: 'flag' | 'env';
 }
 
+/** Machine-readable outcome of a remote register/reindex request. */
+export interface RemoteIndexingOutcome {
+  status: IndexStatus;
+  completed: boolean;
+  backfilling: boolean;
+  eventCount?: number;
+  tokenCount?: number;
+}
+
 /** How to refer to the credential this target is using, in an error the creator has to act on. */
 export function tokenSourceLabel(t: RemoteTarget): string {
   return t.tokenFrom === 'flag' ? 'the token you passed with --remote-token' : t.tokenVar;
@@ -427,7 +436,7 @@ export async function reportRemoteIndexing(
   r: RegisterProjectResult,
   flags: Flags,
   verb: string,
-): Promise<void> {
+): Promise<RemoteIndexingOutcome> {
   // A real ABX clone ALWAYS emits a spine (its extension registrations at minimum), so a caught-up
   // projection with zero events means the service scanned the wrong chain/floor or its RPC hasn't
   // served the logs — not that the project is empty. A ✓ there is the lie that produces an empty
@@ -438,7 +447,13 @@ export async function reportRemoteIndexing(
   };
   if (!isAccepted(r)) {
     settledLine(r.project.eventCount, `${r.project.eventCount} events ${dim(`(${r.mode}, ${r.elapsedMs}ms)`)}`);
-    return;
+    return {
+      status: r.project.status ?? 'live',
+      completed: true,
+      backfilling: false,
+      eventCount: r.project.eventCount,
+      tokenCount: r.project.tokenCount,
+    };
   }
   const spec = remote.name ? remote.name.toLowerCase() : remote.source === 'default' ? '' : remote.url;
   const check = `abx status ${address} --remote${spec ? ` ${spec}` : ''}`;
@@ -455,7 +470,11 @@ export async function reportRemoteIndexing(
   // one regardless of --no-wait (never a ✓ over a broken index).
   if (flags['no-wait'] !== undefined && r.project.status !== 'failed') {
     info(`not waiting (--no-wait). Check with ${bold(check)}`);
-    return;
+    return {
+      status: r.project.status,
+      completed: false,
+      backfilling: r.project.status === 'queued' || r.project.status === 'backfilling',
+    };
   }
   const label = `remote ${verb === 'indexed' ? 'add' : 'index'}`;
   if (r.project.status === 'failed') {
@@ -483,11 +502,25 @@ export async function reportRemoteIndexing(
       throw new Error(`${label}: ${failedCatchUpMessage(address, remote, final.error, check)}`);
     }
     settledLine(final.eventCount, `${final.eventCount} events, ${final.tokenCount} token(s) ${dim('(live)')}`);
+    return {
+      status: final.status,
+      completed: final.status === 'live',
+      backfilling: final.status === 'backfilling',
+      eventCount: final.eventCount,
+      tokenCount: final.tokenCount,
+    };
   } catch (err) {
     if (err instanceof AbxIndexTimeoutError) {
       warn(`${address} is still ${err.last?.status ?? 'catching up'} on ${remote.url} — nothing is lost, it just isn't done.`);
       info(`follow it with ${bold(check + ' --watch')}`);
-      return;
+      const status = err.last?.status ?? r.project.status;
+      return {
+        status,
+        completed: false,
+        backfilling: status === 'queued' || status === 'backfilling',
+        eventCount: err.last?.eventCount,
+        tokenCount: err.last?.tokenCount,
+      };
     }
     // The service went away mid-wait (or rejected the poll). The registration still landed — say
     // which failure this is, in the same words every other remote command uses.

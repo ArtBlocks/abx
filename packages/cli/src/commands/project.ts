@@ -177,6 +177,39 @@ export async function cmdPredict(flags: Flags) {
 // Register + index a project this node didn't deploy. LOCAL by default (this
 // machine's store); `--remote [url]` instead tells a HOSTED resolver to index it —
 // the bridge a local deploy can't make on its own (separate projection stores).
+export interface AddJsonResult extends Record<string, unknown> {
+  target: {surface: 'local' | 'remote'; name: string | null; url: string | null};
+  chainId: number;
+  address: Address;
+  status: string;
+  scanFloor: string;
+  completed: boolean;
+  backfilling: boolean;
+  eventCount?: number;
+  tokenCount?: number;
+}
+
+/** Keep the local lane's machine contract independent of the indexer's larger state object. */
+export function localAddJsonResult(input: {
+  chainId: number;
+  address: Address;
+  scanFloor: string;
+  eventCount: number;
+  tokenCount: number;
+}): AddJsonResult {
+  return {
+    target: {surface: 'local', name: null, url: null},
+    chainId: input.chainId,
+    address: input.address,
+    status: input.eventCount > 0 ? 'live' : 'empty',
+    scanFloor: input.scanFloor,
+    completed: true,
+    backfilling: false,
+    eventCount: input.eventCount,
+    tokenCount: input.tokenCount,
+  };
+}
+
 export async function cmdAdd(address: Address | undefined, flags: Flags) {
   if (!address || address.startsWith('--')) {
     console.error('usage: abx add <address> [--from-block N] [--factory 0x..] [--label "..."] [--remote [name|url]]\n');
@@ -194,97 +227,117 @@ export async function cmdAdd(address: Address | undefined, flags: Flags) {
         'or `abx status <address> [--remote <name>]` (what a node already has). Re-run without --dry-run when you mean it.',
     );
   }
-  // `--attributes` is lane-aware here exactly as at deploy: a PER-TOKEN payload edits a Series'
-  // per-token off-chain traits; a flat payload (+ `--traits`) edits the collection/1-of-1 `attributes`.
-  // Ambiguity defaults to flat (see looksPerTokenAttributes), so a 1/1 add is never mis-read.
-  const attrRaw = flags.attributes ? readFileSync(resolvePath(process.cwd(), String(flags.attributes)), 'utf8') : undefined;
-  const perTokenEdit = attrRaw != null && looksPerTokenAttributes(attrRaw);
-  const flagTraits: OpenSeaAttribute[] = [];
-  if (attrRaw != null && !perTokenEdit) flagTraits.push(...normalizeAttributes(JSON.parse(attrRaw)));
-  if (flags.traits) flagTraits.push(...parseTraitPairs(flags.traits));
-  const editedTokenAttributes = perTokenEdit ? parseSeriesTraitsById(attrRaw) : undefined;
-  const remote = remoteFlag(flags);
-  if (remote) {
-    requireRemoteToken(remote);
-    // Bridge what a remote resolver can't derive itself: the off-chain traits and the durable
-    // content locators (ipfs://…). Prefer flags; otherwise forward what the LOCAL deploy stored
-    // (the local registration), and compute locators from this machine's content index if needed.
-    const localReg = localIndexer().store.getRegistration(address);
-    const attributes = flagTraits.length
-      ? flagTraits
-      : localReg?.attributes
-        ? (normalizeAttributes(JSON.parse(localReg.attributes)) as RegisterProjectBody['attributes'])
-        : undefined;
-    // Bridge a Series' per-token off-chain traits to the remote resolver (the resolver has no other
-    // way to derive them — they're operator metadata, not chain state). A fresh per-token `--attributes`
-    // EDITS them; otherwise forward what the LOCAL deploy stored. Best-effort parse.
-    let tokenAttributes: RegisterProjectBody['tokenAttributes'];
-    if (editedTokenAttributes && Object.keys(editedTokenAttributes).length) {
-      tokenAttributes = editedTokenAttributes as RegisterProjectBody['tokenAttributes'];
-    } else if (localReg?.tokenAttributes) {
+  return withJson<AddJsonResult>(flags, async (emit) => {
+    // `--attributes` is lane-aware here exactly as at deploy: a PER-TOKEN payload edits a Series'
+    // per-token off-chain traits; a flat payload (+ `--traits`) edits the collection/1-of-1 `attributes`.
+    // Ambiguity defaults to flat (see looksPerTokenAttributes), so a 1/1 add is never mis-read.
+    const attrRaw = flags.attributes ? readFileSync(resolvePath(process.cwd(), String(flags.attributes)), 'utf8') : undefined;
+    const perTokenEdit = attrRaw != null && looksPerTokenAttributes(attrRaw);
+    const flagTraits: OpenSeaAttribute[] = [];
+    if (attrRaw != null && !perTokenEdit) flagTraits.push(...normalizeAttributes(JSON.parse(attrRaw)));
+    if (flags.traits) flagTraits.push(...parseTraitPairs(flags.traits));
+    const editedTokenAttributes = perTokenEdit ? parseSeriesTraitsById(attrRaw) : undefined;
+    const remote = remoteFlag(flags);
+    if (remote) {
+      requireRemoteToken(remote);
+      // Bridge what a remote resolver can't derive itself: the off-chain traits and the durable
+      // content locators (ipfs://…). Prefer flags; otherwise forward what the LOCAL deploy stored
+      // (the local registration), and compute locators from this machine's content index if needed.
+      const localReg = localIndexer().store.getRegistration(address);
+      const attributes = flagTraits.length
+        ? flagTraits
+        : localReg?.attributes
+          ? (normalizeAttributes(JSON.parse(localReg.attributes)) as RegisterProjectBody['attributes'])
+          : undefined;
+      // Bridge a Series' per-token off-chain traits to the remote resolver (the resolver has no other
+      // way to derive them — they're operator metadata, not chain state). A fresh per-token `--attributes`
+      // EDITS them; otherwise forward what the LOCAL deploy stored. Best-effort parse.
+      let tokenAttributes: RegisterProjectBody['tokenAttributes'];
+      if (editedTokenAttributes && Object.keys(editedTokenAttributes).length) {
+        tokenAttributes = editedTokenAttributes as RegisterProjectBody['tokenAttributes'];
+      } else if (localReg?.tokenAttributes) {
+        try {
+          const obj = JSON.parse(localReg.tokenAttributes) as Record<string, unknown>;
+          const norm: NonNullable<RegisterProjectBody['tokenAttributes']> = {};
+          for (const [id, v] of Object.entries(obj)) {
+            const a = normalizeAttributes(v) as NonNullable<RegisterProjectBody['tokenAttributes']>[string];
+            if (a.length) norm[id] = a;
+          }
+          if (Object.keys(norm).length) tokenAttributes = norm;
+        } catch { /* skip a malformed local column */ }
+      }
+      const contentLocators = await remoteLocators(address, localReg?.contentLocators, flags);
+      // Forward the deploy block, like every other field falls back to the local registration.
+      // (Its ABSENCE here was the bug: a hosted resolver defaulted to genesis and scanned the whole
+      // chain.) Re-sending the same floor stays incremental server-side, so a nudge ≠ a re-scan.
+      const body: RegisterProjectBody = {
+        chainId: resolveChain(CHAIN).id,
+        address,
+        fromBlock: await resolveScanFloor(address, localReg?.fromBlock, flags),
+        factory: await detectCanonicalFactory(address, flags.factory as string | undefined, localReg?.factory),
+        label: flags.label,
+        description: flags.description ?? localReg?.description,
+        externalUrl: flags['external-url'] ?? localReg?.externalUrl,
+        attributes,
+        tokenAttributes,
+        contentLocators: Object.keys(contentLocators).length ? contentLocators : undefined,
+        full: flags.full ? true : undefined,
+      };
+      info(`${bold('REMOTE')} → ${remote.url}  ${dim('(registering with the remote resolver — NOT this machine)')}`);
+      if (body.contentLocators) info(`bridging image locator → ${Object.values(body.contentLocators)[0]} ${dim('(so the resolver points at IPFS, not its own localhost)')}`);
+      let r;
       try {
-        const obj = JSON.parse(localReg.tokenAttributes) as Record<string, unknown>;
-        const norm: NonNullable<RegisterProjectBody['tokenAttributes']> = {};
-        for (const [id, v] of Object.entries(obj)) {
-          const a = normalizeAttributes(v) as NonNullable<RegisterProjectBody['tokenAttributes']>[string];
-          if (a.length) norm[id] = a;
-        }
-        if (Object.keys(norm).length) tokenAttributes = norm;
-      } catch { /* skip a malformed local column */ }
+        r = await serviceClient(remote).registerProject(body);
+      } catch (err) {
+        throw describeRemoteError(err, remote, 'remote add');
+      }
+      const outcome = await reportRemoteIndexing(remote, body.chainId, address, r, flags, 'indexed');
+      info(`it now serves ${remote.url}/t/${body.chainId}/${address.toLowerCase()}/0`);
+      // "Indexed" is not "correct". This line proves the service replayed the chain and will answer at
+      // that URL; it says nothing about whether the bytes it serves match the on-chain commitment.
+      // Name the step that checks.
+      info(`confirm what it actually serves (bytes vs. the on-chain hash): ${bold(`abx verify ${address} --remote ${remote.name?.toLowerCase() ?? remote.url}`)}`);
+      // Say what this registration did NOT buy. A project whose `tokenURIRenderer` is set answers
+      // `tokenURI` from the chain, so marketplaces and wallets read THAT document and never touch this
+      // service — the register is still useful (indexing, the live view, managed rendering for a code
+      // drop) but it changes nothing a collector sees. Without this line the readout is a list of
+      // successes that reads like a win, and a creator who was told "put it on a hosted service so it
+      // shows up properly" concludes their problem is solved when nothing about it moved.
+      const onChainRenderer = await tryReadContract<Address>(makePublicClient({chainKey: CHAIN}), {
+        address,
+        abi: STATE_ABI,
+        functionName: 'tokenURIRenderer',
+      });
+      if (onChainRenderer && onChainRenderer !== zeroAddress) {
+        info(
+          `${dim('note:')} this project resolves ${bold('tokenURI from the chain')} (renderer ${onChainRenderer}) — marketplaces read that, not this service. ` +
+            `Registering still gives you indexing, the live view and managed rendering, but it does not change the metadata a collector sees.`,
+        );
+      }
+      emit({
+        target: {surface: 'remote', name: remote.name ?? null, url: remote.url},
+        chainId: body.chainId,
+        address,
+        status: outcome.status,
+        scanFloor: body.fromBlock ?? '0',
+        completed: outcome.completed,
+        backfilling: outcome.backfilling,
+        ...(outcome.eventCount === undefined ? {} : {eventCount: outcome.eventCount}),
+        ...(outcome.tokenCount === undefined ? {} : {tokenCount: outcome.tokenCount}),
+      });
+      return;
     }
-    const contentLocators = await remoteLocators(address, localReg?.contentLocators, flags);
-    // Forward the deploy block, like every other field falls back to the local registration.
-    // (Its ABSENCE here was the bug: a hosted resolver defaulted to genesis and scanned the whole
-    // chain.) Re-sending the same floor stays incremental server-side, so a nudge ≠ a re-scan.
-    const body: RegisterProjectBody = {
-      chainId: resolveChain(CHAIN).id,
+    // The local (non-`--remote`) path is shared with the deploy family's post-setup registration —
+    // see registerAndIndexLocally's doc comment (output.ts).
+    const outcome = await registerAndIndexLocally(address, flags);
+    emit(localAddJsonResult({
+      chainId: outcome.state.chainId,
       address,
-      fromBlock: await resolveScanFloor(address, localReg?.fromBlock, flags),
-      factory: await detectCanonicalFactory(address, flags.factory as string | undefined, localReg?.factory),
-      label: flags.label,
-      description: flags.description ?? localReg?.description,
-      externalUrl: flags['external-url'] ?? localReg?.externalUrl,
-      attributes,
-      tokenAttributes,
-      contentLocators: Object.keys(contentLocators).length ? contentLocators : undefined,
-      full: flags.full ? true : undefined,
-    };
-    info(`${bold('REMOTE')} → ${remote.url}  ${dim('(registering with the remote resolver — NOT this machine)')}`);
-    if (body.contentLocators) info(`bridging image locator → ${Object.values(body.contentLocators)[0]} ${dim('(so the resolver points at IPFS, not its own localhost)')}`);
-    let r;
-    try {
-      r = await serviceClient(remote).registerProject(body);
-    } catch (err) {
-      throw describeRemoteError(err, remote, 'remote add');
-    }
-    await reportRemoteIndexing(remote, body.chainId, address, r, flags, 'indexed');
-    info(`it now serves ${remote.url}/t/${body.chainId}/${address.toLowerCase()}/0`);
-    // "Indexed" is not "correct". This line proves the service replayed the chain and will answer at
-    // that URL; it says nothing about whether the bytes it serves match the on-chain commitment.
-    // Name the step that checks.
-    info(`confirm what it actually serves (bytes vs. the on-chain hash): ${bold(`abx verify ${address} --remote ${remote.name?.toLowerCase() ?? remote.url}`)}`);
-    // Say what this registration did NOT buy. A project whose `tokenURIRenderer` is set answers
-    // `tokenURI` from the chain, so marketplaces and wallets read THAT document and never touch this
-    // service — the register is still useful (indexing, the live view, managed rendering for a code
-    // drop) but it changes nothing a collector sees. Without this line the readout is a list of
-    // successes that reads like a win, and a creator who was told "put it on a hosted service so it
-    // shows up properly" concludes their problem is solved when nothing about it moved.
-    const onChainRenderer = await tryReadContract<Address>(makePublicClient({chainKey: CHAIN}), {
-      address,
-      abi: STATE_ABI,
-      functionName: 'tokenURIRenderer',
-    });
-    if (onChainRenderer && onChainRenderer !== zeroAddress) {
-      info(
-        `${dim('note:')} this project resolves ${bold('tokenURI from the chain')} (renderer ${onChainRenderer}) — marketplaces read that, not this service. ` +
-          `Registering still gives you indexing, the live view and managed rendering, but it does not change the metadata a collector sees.`,
-      );
-    }
-    return;
-  }
-  // The local (non-`--remote`) path is shared with the deploy family's post-setup registration —
-  // see registerAndIndexLocally's doc comment (output.ts).
-  return registerAndIndexLocally(address, flags);
+      scanFloor: outcome.scanFloor,
+      eventCount: outcome.state.eventCount,
+      tokenCount: outcome.state.tokens.length,
+    }));
+  });
 }
 
 export async function cmdIndex(address: Address | undefined, flags: Flags) {

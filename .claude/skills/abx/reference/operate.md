@@ -19,7 +19,7 @@ Never infer contract type or current authority from the original launch notes. R
 ```bash
 abx state <address>
 abx tokens <address> --json
-abx contracturi <address>
+abx contracturi <address> --json
 abx tokenuri <address> --token <id>
 abx verify <address> --json
 abx artifacts <address> --token <id> --json

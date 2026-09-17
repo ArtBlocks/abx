@@ -664,7 +664,7 @@ export function reportServedTokenUri(served: ServedTokenUri, address: Address): 
  * this command the only way to look was to hand-build the URL from memory of the grammar, and a
  * guessed path that 404s reads exactly like a broken service. Ask the chain instead.
  */
-export async function cmdContractUri(address: Address | undefined, _flags: Flags) {
+export async function cmdContractUri(address: Address | undefined, flags: Flags) {
   if (!address || address.startsWith('--')) {
     console.error('usage: abx contracturi <address>\n');
     process.exitCode = 1;
@@ -703,7 +703,6 @@ export async function cmdContractUri(address: Address | undefined, _flags: Flags
     process.exitCode = 1;
     return;
   }
-  console.log(`\n  ${bold('contractURI()')} ${dim(`— read directly from ${address} on ${CHAIN}`)}`);
   if (!uri) {
     console.error(
       `\n  ${bold('empty')} — this contract has no contractURI set: no collection-level metadata to resolve. ` +
@@ -712,55 +711,70 @@ export async function cmdContractUri(address: Address | undefined, _flags: Flags
     process.exitCode = 1;
     return;
   }
-  const onChain = decodeOnChainJson(uri);
-  if (onChain) {
-    info('resolution: ON-CHAIN (data: URI from the renderer — no server in the path)');
-    console.log(onChain.split('\n').map((l) => '    ' + l).join('\n') + '\n');
-    return;
-  }
-  console.log(`  ${dim('resolves to')} ${uri}`);
-  if (!/^https?:\/\//i.test(uri)) {
-    // ipfs:// / ar:// — a locator, not something we can fetch without choosing a gateway. Print it
-    // rather than silently picking one; the creator's gateway choice is theirs.
-    info(`not an http(s) URL — a ${uri.split(':')[0]}: locator needs a gateway to fetch. Nothing more to read from here.`);
-    console.log('');
-    return;
-  }
-  let body: string;
-  try {
-    const res = await fetch(uri, {headers: {accept: 'application/json'}});
-    body = await res.text();
-    if (!res.ok) {
-      // The URL came FROM THE CHAIN, so a bad status here is genuinely about the service (or the
-      // contract pointing somewhere stale) — never a mistyped path. Say which, so nobody re-guesses.
+  return withJson<Record<string, unknown>>(flags, async (emit) => {
+    console.log(`\n  ${bold('contractURI()')} ${dim(`— read directly from ${address} on ${CHAIN}`)}`);
+    const onChain = decodeOnChainJson(uri);
+    if (onChain) {
+      const document = JSON.parse(onChain) as Record<string, unknown>;
+      emit(document);
+      info('resolution: ON-CHAIN (data: URI from the renderer — no server in the path)');
+      console.log(onChain.split('\n').map((l) => '    ' + l).join('\n') + '\n');
+      return;
+    }
+    console.log(`  ${dim('resolves to')} ${uri}`);
+    if (!/^https?:\/\//i.test(uri)) {
+      // ipfs:// / ar:// — a locator, not something we can fetch without choosing a gateway. Print it
+      // rather than silently picking one; the creator's gateway choice is theirs.
+      if (flags.json !== undefined) {
+        throw new Error(
+          `contracturi: cannot resolve ${uri.split(':')[0]}: without choosing a gateway; --json requires a collection document.`,
+        );
+      }
+      info(`not an http(s) URL — a ${uri.split(':')[0]}: locator needs a gateway to fetch. Nothing more to read from here.`);
+      console.log('');
+      return;
+    }
+    let body: string;
+    try {
+      const res = await fetch(uri, {headers: {accept: 'application/json'}});
+      body = await res.text();
+      if (!res.ok) {
+        // The URL came FROM THE CHAIN, so a bad status here is genuinely about the service (or the
+        // contract pointing somewhere stale) — never a mistyped path. Say which, so nobody re-guesses.
+        console.error(
+          `\n  ${bold(`HTTP ${res.status}`)} from the contract's own contractURI — the URL is correct by construction (it came from ` +
+            `${address} on-chain), so this is the SERVICE, not the path. Likely: the project isn't registered on that resolver ` +
+            `(${bold('abx add ' + address + ' --remote')}), the node serves a different chain, or it's down. ` +
+            `Response: ${body.slice(0, 200)}\n`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+    } catch (e) {
       console.error(
-        `\n  ${bold(`HTTP ${res.status}`)} from the contract's own contractURI — the URL is correct by construction (it came from ` +
-          `${address} on-chain), so this is the SERVICE, not the path. Likely: the project isn't registered on that resolver ` +
-          `(${bold('abx add ' + address + ' --remote')}), the node serves a different chain, or it's down. ` +
-          `Response: ${body.slice(0, 200)}\n`,
+        `\n  couldn't reach ${uri} — ${(e as Error).message}. The URL is what the contract commits to, so check that the ` +
+          `host is up and publicly reachable (a localhost base URL resolves for no one but this machine).\n`,
       );
       process.exitCode = 1;
       return;
     }
-  } catch (e) {
-    console.error(
-      `\n  couldn't reach ${uri} — ${(e as Error).message}. The URL is what the contract commits to, so check that the ` +
-        `host is up and publicly reachable (a localhost base URL resolves for no one but this machine).\n`,
-    );
-    process.exitCode = 1;
-    return;
-  }
-  info('resolution: OFF-CHAIN (fetched from the URL the contract commits to)');
-  try {
-    console.log(
-      JSON.stringify(JSON.parse(body), null, 2)
-        .split('\n')
-        .map((l) => '    ' + l)
-        .join('\n') + '\n',
-    );
-  } catch {
-    console.log(`    ${dim('(not JSON)')} ${body.slice(0, 400)}\n`);
-  }
+    info('resolution: OFF-CHAIN (fetched from the URL the contract commits to)');
+    try {
+      const document = JSON.parse(body) as Record<string, unknown>;
+      emit(document);
+      console.log(
+        JSON.stringify(document, null, 2)
+          .split('\n')
+          .map((l) => '    ' + l)
+          .join('\n') + '\n',
+      );
+    } catch {
+      if (flags.json !== undefined) {
+        throw new Error(`contracturi: ${uri} returned a non-JSON document; --json requires valid collection metadata.`);
+      }
+      console.log(`    ${dim('(not JSON)')} ${body.slice(0, 400)}\n`);
+    }
+  });
 }
 
 // ── status ────────────────────────────────────────────────────────────────--
