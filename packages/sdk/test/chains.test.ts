@@ -22,17 +22,15 @@ test('chain registry separates recognized networks from selectable networks', ()
     'robinhood',
     'ethereum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'base']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 4);
+  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'base', 'robinhood']);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 5);
   assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('robinhood')?.contractStatus, 'deployed');
-  assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'disabled');
-  for (const key of ['robinhood', 'ethereum']) {
-    assert.equal(chainSupportByKey(key)?.supportLevel, 'disabled');
-  }
+  assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'beta');
+  assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'disabled');
 });
 
 test('registry ids agree with viem chain metadata, including disabled production networks', () => {
@@ -48,6 +46,10 @@ test('Robinhood Chain Testnet has a keyless default RPC ready for qualification'
 
 test('Base has a keyless default RPC for beta access', () => {
   assert.deepEqual(resolveRpcUrls('base'), ['https://mainnet.base.org']);
+});
+
+test('Robinhood Chain has a keyless default RPC for beta access', () => {
+  assert.deepEqual(resolveRpcUrls('robinhood'), ['https://rpc.mainnet.chain.robinhood.com']);
 });
 
 test('redactRpcUrlsInText removes credential-bearing configured endpoints from upstream errors', () => {

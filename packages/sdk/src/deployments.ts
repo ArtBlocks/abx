@@ -186,10 +186,11 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
     ...CANONICAL,
     generator: '0x4F74De4835B51414a4DA83527589aEDc41A26FaE',
   },
-  // Robinhood Chain (production candidate). Contracts were deployed from this release on
-  // 2026-09-17 and have exact-match source records on Sourcify. The network remains disabled until
-  // the separate services and low-value acceptance gates pass. No canonical dependency registry
-  // exists, so the generator fallback is address(0). SSTORE2 asset pointers:
+  // Robinhood Chain (production beta). Contracts were deployed from this release on
+  // 2026-09-17 and have exact-match source records on Sourcify. Beta enablement followed paired-testnet
+  // qualification and managed-service validation; low-value production acceptance follows under the
+  // beta warning. No canonical dependency registry exists, so the generator fallback is address(0).
+  // SSTORE2 asset pointers:
   // abxJsPointer 0xbeD5a9dec0c94fF39F7874df979eBdC3Adab568D,
   // gunzipScriptPointer 0x686CE62bdE8FE4Fc3de70c8fC65b574A05a23D52.
   4663: {

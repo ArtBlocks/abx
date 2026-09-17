@@ -59,15 +59,21 @@ output bug without repeating the secret.
 ## Select the chain explicitly through the environment
 
 Read the full `chains` array from `abx capabilities --json`. Base Sepolia is the default; Sepolia is
-also supported. Robinhood Chain Testnet is experimental, Base production is beta, and Robinhood
-Chain and Ethereum are disabled. There is deliberately no
+also supported. Robinhood Chain Testnet is experimental, production deployments on Base and
+Robinhood Chain are beta, and Ethereum is disabled. There is deliberately no
 `--chain` flag because silently ignoring a wrong-chain request could spend on the wrong network.
+
+Choose a production chain by intended collector base, then measured cost. Base fits projects aimed at
+Base users; Robinhood Chain fits projects intentionally aimed at that network. Run the exact flow on
+the paired testnet and compare the CLI dry-run gas report before deciding. Large onchain payloads
+amplify transaction cost on either network, so weigh onchain permanence against Arweave, IPFS, or
+cloud custody rather than assuming one chain makes storage cheap.
 
 Before any transaction on an `experimental` or `beta` network, name the network and support level,
 explain what the transaction or transaction group will do, and state the relevant contract,
-configuration, and real-funds risks. Base beta is prerelease software without an independent
-third-party audit; bugs, misconfiguration, and nondeterministic agent behavior may cause permanent
-loss. Link to the open source, use-at-your-own-risk implementation at
+configuration, and real-funds risks. Production beta support is prerelease software without an
+independent third-party audit; bugs, misconfiguration, and nondeterministic agent behavior may cause
+permanent loss. Link to the open source, use-at-your-own-risk implementation at
 https://github.com/ArtBlocks/abx. Qualify the same flow on the paired testnet before production.
 
 Use per-chain RPC variables when operating more than one chain. `abx doctor` checks chain identity,
