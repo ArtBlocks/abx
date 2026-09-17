@@ -11,7 +11,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {MetadataField} from '@artblocks/abx-sdk';
-import {computeAvailability, onChainImageSource, pointerOnlyImageCheck} from '../src/commands/project.js';
+import {computeAvailability, onChainImageSource, pointerOnlyImageCheck, verifyChainComplete} from '../src/commands/project.js';
 
 const field = (representation: string): MetadataField => ({field: 'image', representation, value: '0x00' as MetadataField['value']});
 
@@ -47,6 +47,13 @@ test('onChainImageSource: inline and reader images are chain-resident, not hash 
   for (const representation of ['keccak256', 'sha256', 'ipfs', 'url']) {
     assert.equal(onChainImageSource([field(representation)]), null);
   }
+});
+
+test('verifyChainComplete: static projects report not-applicable instead of a false failure signal', () => {
+  assert.equal(verifyChainComplete(false, false), null);
+  assert.equal(verifyChainComplete(false, true), null);
+  assert.equal(verifyChainComplete(true, false), false);
+  assert.equal(verifyChainComplete(true, true), true);
 });
 
 // ── computeAvailability: the verdict, from facts a caller already gathered ──────────────────────

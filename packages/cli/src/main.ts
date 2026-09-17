@@ -484,6 +484,8 @@ const COMMAND_HELP: Record<string, string> = {
                             a small SVG is inlined in the single deploy tx, description on-chain) — self-resolving, no server
     ${g('--onchain-image')}       stage ${g('--image')} bytes on-chain (chunk store) and bake a reader field INTO the deploy —
                             one or more staging txs BEFORE the deploy, so at least 2 tx total; no post-deploy write (implies --onchain-uri)
+                            For a small SVG, bare ${g('--onchain-uri')} can inline the bytes in the single deploy tx. ${g('--onchain-image')}
+                            keeps a separately staged, hash-committed reader instead. Dry-run both lanes before choosing.
                             ${dim('WRITE is chunked (~200 gas/byte, no block-limit issue at any size). READ is one eth_call, and its')}
                             ${dim('cost is what varies: tokenURI reassembles the whole document per call at ~360-405k gas/KB, climbing')}
                             ${dim('with size. NO SIZE IS REFUSED. Under ~50M gas (~117KB) every endpoint measured serves it; above that')}

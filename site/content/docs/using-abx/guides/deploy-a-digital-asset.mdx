@@ -32,6 +32,9 @@ Useful choices:
 
 - `--onchain-uri` makes the contract assemble its metadata JSON.
 - `--onchain-image` also writes the media bytes to the chunk store. It implies `--onchain-uri`.
+- For a small SVG, bare `--onchain-uri` can inline the bytes in the single deploy transaction.
+  `--onchain-image` uses separate staging transaction(s) and a hash-committed reader. Compare both
+  dry runs before choosing.
 - `--backend arweave|ipfs|cloud` keeps media offchain. `arweave` needs one extra package — see
   [Storage](/docs/using-abx/guides/storage#arweave-identity).
 - `--public-base-url <url>` points metadata at a resolver.

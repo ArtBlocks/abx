@@ -519,6 +519,13 @@ export function pointerOnlyImageCheck(fields: MetadataField[]): string | null {
   return null;
 }
 
+/** `chainComplete` describes a code template's dependency graph. Static projects have no code
+ * graph to classify, so their structured verification result must say "not applicable" instead
+ * of reporting a confident `false` that reads like a failed durability check. */
+export function verifyChainComplete(isCodeProject: boolean, chainComplete: boolean): boolean | null {
+  return isCodeProject ? chainComplete : null;
+}
+
 export async function cmdVerifyBody(
   address: Address,
   flags: Flags,
@@ -789,7 +796,7 @@ export async function cmdVerifyBody(
         // renderer — the underlying probe cannot tell those apart, so neither can this field.
         tokenURIRendererCurrent: rendererCurrent,
         branch: status.branchName,
-        chainComplete: !!status.chainComplete,
+        chainComplete: verifyChainComplete(isCodeProject, !!status.chainComplete),
         unresolvedRefs: [...status.unresolvedRefs],
         urlOverBudget: !!status.urlOverBudget,
         probe: probe

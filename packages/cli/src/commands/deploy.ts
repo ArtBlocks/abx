@@ -1078,7 +1078,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
       })()
     : 1;
   if (dryRun && onchainImage && imageEndsUpOnChain(flags, false)) {
-    info(
+    warn(
       `${bold('one-transaction alternative:')} this SVG can be inlined with bare ${bold('--onchain-uri')} instead of staged with ` +
         `${bold('--onchain-image')} (${approvals} transactions here). Dry-run that form before changing lanes.`,
     );
