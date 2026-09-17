@@ -17,6 +17,8 @@ import {predictOneOfOneEditionFactory, predictEditionFactory, predictFixedPriceM
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
 const ROBINHOOD_TESTNET = 46630;
+const BASE = 8453;
+const ROBINHOOD = 4663;
 
 // The canonical edition anchors (see deployments.ts CANONICAL + reference/deployments.mdx).
 const ONE_OF_ONE_EDITION_FACTORY = '0x4e9dFcC70dCC02FA5bad113Bc2CF0A2218358B1E';
@@ -34,7 +36,7 @@ test('edition CREATE2 predictions are stable (pure functions of fixed bytecode +
 });
 
 test('manifest: the canonical edition anchors are recorded, identical on all shipped chains', () => {
-  for (const chainId of [SEPOLIA, BASE_SEPOLIA, ROBINHOOD_TESTNET]) {
+  for (const chainId of [SEPOLIA, BASE_SEPOLIA, ROBINHOOD_TESTNET, BASE, ROBINHOOD]) {
     const deployment = getDeployment(chainId);
     assert.equal(deployment.oneOfOneEditionFactory, ONE_OF_ONE_EDITION_FACTORY);
     assert.equal(deployment.editionFactory, EDITION_FACTORY);

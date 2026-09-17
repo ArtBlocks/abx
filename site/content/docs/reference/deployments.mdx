@@ -17,7 +17,7 @@ value, and locks before sending. Use at your own risk.
 | Sepolia | `11155111` | supported | deployed |
 | Robinhood Chain Testnet | `46630` | experimental | deployed |
 | Base | `8453` | beta | deployed |
-| Robinhood Chain | `4663` | disabled | not deployed |
+| Robinhood Chain | `4663` | disabled | deployed |
 | Ethereum | `1` | disabled | not deployed |
 
 “Experimental” means deliberate testnet qualification. “Beta” means production use is enabled with
@@ -65,10 +65,11 @@ Address resolution follows this order: explicit option, environment override, SD
 | Sepolia | `11155111` | <CopyAddress>0x7fcf8118D400FF004fF0772a37c24196D9aA7b17</CopyAddress> |
 | Robinhood Chain Testnet | `46630` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
 | Base | `8453` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
+| Robinhood Chain | `4663` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
 
 Sepolia also has the Art Blocks `DependencyRegistryV0` at
-<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, and Robinhood Chain
-Testnet have no canonical dependency registry.
+<CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, Robinhood Chain
+Testnet, and Robinhood Chain have no canonical dependency registry.
 
 A dependency registry is an independent contract behind a soft pointer, not part of an ABX token or
 factory deployment. Each collection's pointer wins over the generator fallback and may be changed
@@ -111,5 +112,5 @@ address in this file must be called out explicitly in that package's release not
 changeset that bumps `@artblocks/abx-sdk` silently is not enough for an address every deployed
 project's `abx verify` compares itself against.
 
-All listed Solidity contracts are source-verified in the appropriate block explorer. An unverified
-canonical address is a release bug.
+All listed Solidity contracts have public exact-match source verification. A canonical address
+without an exact source match is a release bug.

@@ -28,6 +28,8 @@ test('chain registry separates recognized networks from selectable networks', ()
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
+  assert.equal(chainSupportByKey('robinhood')?.contractStatus, 'deployed');
+  assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'disabled');
   for (const key of ['robinhood', 'ethereum']) {
     assert.equal(chainSupportByKey(key)?.supportLevel, 'disabled');
   }
