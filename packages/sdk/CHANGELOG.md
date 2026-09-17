@@ -1,5 +1,12 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.40
+
+### Patch Changes
+
+- b9197bc: Record the exact-match canonical Robinhood Chain production deployment while keeping the network
+  disabled until its services and low-value acceptance gates pass.
+
 ## 0.1.0-alpha.39
 
 ### Patch Changes

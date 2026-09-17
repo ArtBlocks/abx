@@ -13,9 +13,12 @@
   },
   "changesets": [
     "brave-cacti-production-candidate",
+    "bright-trails-qualification",
     "calm-coyotes-smoke",
     "calm-desert-readiness",
     "calm-desert-turbo",
+    "clean-json-trails",
+    "dry-mesas-robinhood-mainnet",
     "plain-sky-generations",
     "public-source-release",
     "quiet-dunes-crypto-signing",
