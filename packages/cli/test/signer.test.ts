@@ -3,9 +3,19 @@ import assert from 'node:assert/strict';
 import {readFileSync, mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {openWalletSession} from '../src/signer.js';
+import {envKeyRequiresYes, openWalletSession} from '../src/signer.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+test('env-key consent follows the shared chain environment registry', () => {
+  assert.equal(envKeyRequiresYes('base-sepolia'), false);
+  assert.equal(envKeyRequiresYes('sepolia'), false);
+  assert.equal(envKeyRequiresYes('robinhood-testnet'), false);
+  assert.equal(envKeyRequiresYes('base'), true);
+  assert.equal(envKeyRequiresYes('robinhood'), true);
+  assert.equal(envKeyRequiresYes('ethereum'), true);
+  assert.equal(envKeyRequiresYes('unknown-chain'), true);
+});
 
 /** Read the actual bound URL a session announced (via signUrlFile) — the port may differ from
  *  the requested one after a collision fallback, so tests must read it, never assume it. */

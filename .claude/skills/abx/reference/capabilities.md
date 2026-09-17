@@ -123,7 +123,8 @@ token-data object.
 | Art reacts to oracle/block/other contract | augment hook or renderer direct read | disclose live/non-deterministic behavior |
 | Timed reveal | augment hook or renderer logic | live view versus still refresh distinction |
 | On-chain SVG and coherent traits | image + attributes renderers | never-revert Solidity implementations |
-| Large raster stored on-chain | `--onchain-image` | measured write cost and endpoint-dependent read reach |
+| Small inline SVG/text, one deployment transaction | bare `--onchain-uri` | only when the dry run confirms inline custody and one transaction |
+| Large media stored on-chain | `--onchain-image` | staged before deployment: at least two transactions; measured write cost and endpoint-dependent read reach |
 | One program, each token carries its own data | `deploy-code --script` + `<key>:Bytes:Creator` | mint, then set the creator payload with `configure-param --file`; no on-chain size budget on the param itself |
 | Royalty-aware transfer validation | ERC-721C/ERC-1155C validator | opt-in at deploy; marketplace compatibility varies |
 

@@ -394,7 +394,7 @@ async function main() {
     case 'set-admin': return cmdSetAdmin(rest[0], flags);
     case 'forget': return cmdForget(rest[0] as Address | undefined, flags);
     case 'migrate': return cmdMigrate(rest[0] as Address | undefined, flags);
-    case 'remote': return rest[0] === 'set' ? cmdRemoteSet(rest[1], flags) : cmdRemote(rest[0], flags);
+    case 'remote': return rest[0] === 'set' ? cmdRemoteSet(rest[1], flags) : cmdRemote(rest[0] === 'list' || rest[0] === 'ls' ? undefined : rest[0], flags);
     case 'feedback': return cmdFeedback(flags);
     case 'auth': return cmdAuth(rest, flags);
     case 'storage': return cmdStorage(rest);
@@ -481,9 +481,9 @@ const COMMAND_HELP: Record<string, string> = {
     --traits "K=V; K2=V2"   real OpenSea traits (the marketplace trait array)   --attributes <file.json>   (array or {name: value} map)
     --traits-onchain        store traits ON-CHAIN (inline JSON, lockable); else off-chain operator metadata (editable via ${g('abx add --traits')})
     ${g('--onchain-uri')}         resolve tokenURI/contractURI FULLY ON-CHAIN (renderer assembles JSON from fields;
-                            image inlined as SVG, description on-chain) — the token self-resolves, no server needed
+                            a small SVG is inlined in the single deploy tx, description on-chain) — self-resolving, no server
     ${g('--onchain-image')}       stage ${g('--image')} bytes on-chain (chunk store) and bake a reader field INTO the deploy —
-                            content with NO post-deploy tx (implies --onchain-uri)
+                            one or more staging txs BEFORE the deploy, so at least 2 tx total; no post-deploy write (implies --onchain-uri)
                             ${dim('WRITE is chunked (~200 gas/byte, no block-limit issue at any size). READ is one eth_call, and its')}
                             ${dim('cost is what varies: tokenURI reassembles the whole document per call at ~360-405k gas/KB, climbing')}
                             ${dim('with size. NO SIZE IS REFUSED. Under ~50M gas (~117KB) every endpoint measured serves it; above that')}
@@ -1181,7 +1181,7 @@ const COMMAND_HELP: Record<string, string> = {
     ${g('--remote [name|url]')}  deregister on a REMOTE resolver instead (it stops serving the project; re-add any time)`,
   remote: `
   ${bold('abx remote')} [<name|url>] ${dim('— inspect a remote service (read-only; registers nothing).')}
-    Bare: list the named remotes in .env (${g('ABX_REMOTE_<NAME>_URL')} / ${g('_TOKEN')} — token shown as set/unset, never printed)
+    Bare (or ${g('abx remote list')}): list the named remotes in .env (${g('ABX_REMOTE_<NAME>_URL')} / ${g('_TOKEN')} — token shown as set/unset, never printed)
     plus the self-host default (bare --remote = ${g('ABX_PUBLIC_BASE_URL')} + ${g('ABX_REMOTE_SELF_TOKEN')}).
     With a target: fetch its PUBLIC ${g('/.well-known/abx-service')} descriptor — what it serves (interfaces), which chains
     (flags a mismatch with your ${g('ABX_CHAIN')}), whether ${bold('rendering is managed')} behind it (code drops then need no effects

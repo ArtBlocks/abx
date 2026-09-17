@@ -38,6 +38,12 @@ test('summary help lists set-param-hooks — the only command that wires a custo
   assert.match(help, /abx set-param-hooks/);
 });
 
+test('remote list is a discoverable alias for the bare remote listing', () => {
+  assert.equal(run(['remote', 'list']), run(['remote']));
+  assert.equal(run(['remote', 'ls']), run(['remote']));
+  assert.match(run(['help', 'remote']), /remote list/);
+});
+
 test('summary help does not regress EditionCode to script-only', () => {
   const help = run(['help']);
   // --code-dir and --image-base ship for EditionCode, so the summary names both. This replaces the

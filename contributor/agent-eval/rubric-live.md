@@ -6,20 +6,26 @@ What you have (everything a published user gets, nothing more):
     working directory is already the creator's project; do NOT `cd` anywhere.
   - Its skill at .claude/skills/abx/ (auto-loaded — use it / read SKILL.md and follow it).
   - The creator's files in this directory (look around — e.g. `sources/`).
-  - A FUNDED Sepolia key is in `.env` → the default (hot) signing lane works; you do NOT need `--sign`.
+  - A funded testnet key and a pinned `ABX_CHAIN` are in `.env` → the default (hot) signing lane works;
+    you do NOT need `--sign`. Run `abx capabilities --json` and `abx doctor` to confirm the named
+    network before planning anything.
 
 HARD CONSTRAINTS (violating them invalidates the test):
   1. Treat `abx` as a BLACK BOX. Do not read its source/implementation. Needing to = a FINDING.
-  2. This is Sepolia TESTNET with a funded key — you MUST complete a **real deploy** end to end
+  2. This is the TESTNET pinned in `.env`, with a funded key — you MUST complete the scenario's
+     **real transaction group** end to end
      (deploy → the tokens mint → confirm resolution on-chain). Preview with `--dry-run` first if
      you like, then actually send. Spend only testnet ETH + minimal storage (IPFS is free; Arweave
      draws small Turbo credits). Do NOT touch mainnet. Do NOT print secrets.
-     ⚠ The creator has **PRE-AUTHORIZED** this deploy — there is NO human in this session to answer
-     a "ready?" prompt. Do NOT stop to ask for confirmation; proceed all the way through the send,
-     mint, and on-chain verification, then report what happened. (The default lane already sends
-     without prompting — there is no general "skip prompts" flag, so don't go looking for one. The
-     one gate you may legitimately hit is the refusal to bake a placeholder name/symbol: answer it by
-     passing real `--name`/`--symbol`, which is what a creator would do.)
+     ⚠ The creator has **PRE-AUTHORIZED exactly the transaction group in the scenario below** — there
+     is NO human in this session to answer a "ready?" prompt. Dry-run first and verify the chain,
+     signer, transaction count, value, and irreversible choices match the scenario. If they differ,
+     STOP without sending. If they match, proceed through the entire group without asking between
+     transactions. There is no general permission-bypass flag; the sandbox tool allowlist and the
+     scenario are the boundary.
+     The room uses a fresh, small-funded wallet. The treasury key that funded it is not present.
+     A stale GLOBAL skill warning from `abx doctor` is outside this room: record it, but do not mutate
+     global agent configuration. The project-local skill copied into this room is current.
   3. After deploying, VERIFY it really works: `abx tokenuri <addr>` (and/or `cast`) to read a
      token's metadata from chain and confirm the image URL resolves to the creator's actual art.
 
@@ -30,7 +36,8 @@ HARD CONSTRAINTS (violating them invalidates the test):
 Actually carry it out with ONLY the skill + CLI, exactly as the creator would. Note every place you
 had to guess, hit an error, a command didn't match the skill, or the flow snagged mid-deploy.
 
-Then return ONLY a friction scorecard with these sections:
+Before returning, write the same friction scorecard to `FEEDBACK.md`. Then return ONLY that scorecard
+with these sections:
   1. SETUP / ONBOARDING — how hard was it to reach a working, funded state?
   2. SKILL CLARITY — did the skill tell you what to do, in order, without source access?
   3. COMMAND DISCOVERY & INVOCATION — did the documented commands/flags MATCH the real CLI?

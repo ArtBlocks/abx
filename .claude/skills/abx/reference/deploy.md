@@ -38,12 +38,15 @@ Treat custody, resolution, and mutability as separate decisions.
 
 Use `--onchain-image [--compress fastlz]` for static media bytes behind the on-chain metadata
 renderer. It implies on-chain resolution and requires no host or storage provider. It works for 721
-static projects and their editions in hot or wallet lanes. Cold `--unsigned` staging is refused.
+static projects and their editions in hot or wallet lanes. It stages bytes before deployment, so the
+plan has at least two transactions (more when content needs multiple chunks). Cold `--unsigned`
+staging is refused.
 
 Use `fastlz` for on-chain-readable compression. Gzip is an off-chain decode format and cannot be
 substituted for an on-chain-rendered field. Bare `--onchain-uri` may inline very small SVG/text
-content, but the reader/chunk path is normally more economical for real files; trust the dry-run's
-measured plan rather than a memorized byte threshold.
+content directly in the deployment transaction. This can keep a tiny static project to one
+transaction, while the reader/chunk path is normally more economical for real files. Trust the dry
+run's measured transaction count and plan rather than a memorized byte threshold.
 
 ### Media external, metadata JSON on-chain, no resolver
 

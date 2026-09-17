@@ -2,6 +2,7 @@ import {createServer, type IncomingMessage, type ServerResponse, type Server} fr
 import type {AddressInfo} from 'node:net';
 import {writeFileSync} from 'node:fs';
 import {
+  chainSupportByKey,
   makeHotSender,
   makePublicClient,
   makeWalletClient,
@@ -72,7 +73,11 @@ export interface SignResult {
 }
 
 const DEFAULT_SIGN_PORT = 8799;
-const TESTNETS = new Set(['sepolia', 'base-sepolia']);
+/** Unknown chains stay on the conservative side. Known testnets come from the shared registry so
+ * adding a network cannot silently leave autonomous test workflows behind. */
+export function envKeyRequiresYes(chainKey: string): boolean {
+  return chainSupportByKey(chainKey)?.environment !== 'testnet';
+}
 
 // ── tiny ANSI (kept local so this module stands alone) ───────────────────────
 const C = {reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[38;5;115m', purple: '\x1b[38;5;141m', orange: '\x1b[38;5;215m'};
@@ -154,7 +159,7 @@ export async function signTx(provider: TxProvider, opts: SignOptions): Promise<S
 
 // ── hot lane: env key signs + broadcasts ─────────────────────────────────────
 async function signHot(provider: TxProvider, opts: SignOptions): Promise<SignResult> {
-  if (!TESTNETS.has(opts.chainKey) && !opts.yes) {
+  if (envKeyRequiresYes(opts.chainKey) && !opts.yes) {
     throw new Error(
       `Refusing to sign on '${opts.chainKey}' with the env key without --yes. ` +
         `For real value, prefer the wallet lane (--sign) so the key never touches this process.`,
@@ -191,7 +196,7 @@ async function signHot(provider: TxProvider, opts: SignOptions): Promise<SignRes
  * a hand-rolled nonce/gas loop at the one call site that needed it.
  */
 export async function signHotSequence(txs: PreparedTx[], opts: {chainKey: string; yes?: boolean}): Promise<SignResult[]> {
-  if (!TESTNETS.has(opts.chainKey) && !opts.yes) {
+  if (envKeyRequiresYes(opts.chainKey) && !opts.yes) {
     throw new Error(
       `Refusing to sign on '${opts.chainKey}' with the env key without --yes. ` +
         `For real value, prefer the wallet lane (--sign) so the key never touches this process.`,

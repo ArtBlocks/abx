@@ -22,8 +22,13 @@ Maintained live fixtures belong in automated tests, not scenario prose.
 
 ## Isolation rules
 
-- State the chain when it is not the default. The harness explicitly allows
-  `ABX_CHAIN=sepolia abx …` and `ABX_CHAIN=base-sepolia abx …`.
+- State the chain when it is not the default. Pass `--chain <registry-key>` to the harness; it pins
+  the room's `.env` and scopes the agent permission allowlist to that same chain.
+- Use `pnpm sandbox:smoke --chain <testnet> --name <run> --model <tier> <scenario>` for one
+  bounded, pre-authorized live group. It creates a fresh wallet and funds it with 0.001 test ETH by
+  default; use `--ephemeral <amount>` to change that allowance. Add `--with-remote <name>` only when
+  the scenario needs that hosted provider credential, and `--with-storage` only when it needs a
+  durable-storage credential.
 - Do not let a parallel room run `abx skill install --global`; it writes outside the room and can
   change what sibling runs observe.
 - Do not copy the repository `.env` into a room. Seed only the variables its lane requires.
