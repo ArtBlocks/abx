@@ -1077,6 +1077,12 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
         return (contentPlan.plan.mode === 'single' ? 1 : contentPlan.plan.txCount) + 1; // staging tx(s) + the deploy tx
       })()
     : 1;
+  if (dryRun && onchainImage && imageEndsUpOnChain(flags, false)) {
+    info(
+      `${bold('one-transaction alternative:')} this SVG can be inlined with bare ${bold('--onchain-uri')} instead of staged with ` +
+        `${bold('--onchain-image')} (${approvals} transactions here). Dry-run that form before changing lanes.`,
+    );
+  }
 
   // Mint-on-deploy is the default; --no-mint defers it so you can stand up + warm
   // the resolver at the (known) address first, then `abx mint`. The demo always mints.

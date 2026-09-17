@@ -321,7 +321,7 @@ fi
 if [ -n "$WITH_REMOTE" ]; then
   cat >> "$SANDBOX/CLAUDE.md" <<MD
 
-The smoke harness provisioned the named hosted provider `$WITH_REMOTE`. Use that exact remote for
+The smoke harness provisioned the named hosted provider \`$WITH_REMOTE\`. Use that exact remote for
 the scenario; do not try another account or start an interactive login.
 MD
 fi
