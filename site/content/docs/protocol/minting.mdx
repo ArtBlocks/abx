@@ -69,7 +69,8 @@ limit on what that sale may issue.
 Pausing blocks minter and delegate mints. The project owner may still mint while paused.
 
 For an edition, the project has both an ID-space cap and a per-ID copy cap. Neither can increase after it
-is set.
+is set. The copy cap limits live supply: on a burnable edition, burned copies may be minted again. A
+Series cap limits lifetime-issued IDs, so an ERC-721 burn does not reopen a mint slot.
 
 ## Events and trust
 

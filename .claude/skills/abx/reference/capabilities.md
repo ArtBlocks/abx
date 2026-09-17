@@ -93,6 +93,10 @@ The transfer hook runs for mints (`from == 0`), ordinary transfers, and burns (`
 vetoes the entire operation. It can implement vesting, soulbinding, redemption, escrow settlement,
 provenance counters, and lifecycle rules.
 
+On ERC-721 projects it also receives self-transfers (`from == to`) because those emit `Transfer`.
+That is intentional; a hook concerned only with ownership-set changes should ignore the case itself.
+ERC-1155 projects skip self-transfers and zero-amount entries before invoking the hook.
+
 It cannot initiate a transfer; it only observes or rejects one. Burn-based mechanics require the
 collection to have been deployed burnable. On editions, ids may have many holders, so shared per-id
 state cannot model a single current owner.

@@ -101,6 +101,24 @@ contract ReferenceHooksTest is Test {
         assertEq(transfers.transferCount(0), 0);
     }
 
+    function test_TransferCounterCountsSelfAndOrdinaryTransfers() public {
+        TransferCounterHook transfers = new TransferCounterHook(address(token));
+
+        vm.startPrank(owner);
+        token.setParamHooks(address(0), address(0), address(transfers));
+        uint256 id = token.mint(collector);
+        vm.stopPrank();
+
+        // ERC-721 emits Transfer for a self-transfer, and its transfer hook observes that event.
+        vm.prank(collector);
+        token.transferFrom(collector, collector, id);
+        assertEq(transfers.transferCount(id), 1);
+
+        vm.prank(collector);
+        token.transferFrom(collector, recipient, id);
+        assertEq(transfers.transferCount(id), 2);
+    }
+
     function test_EmptyBlobIsRejectedByTheRealTokenBeforeTheHook() public {
         MaxDataLengthConfigureHook configure = new MaxDataLengthConfigureHook(address(token), 8);
         vm.startPrank(owner);

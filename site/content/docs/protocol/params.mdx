@@ -94,10 +94,14 @@ A code project can set three hooks:
 | --- | --- | --- |
 | Configure | Before a write | Inspect or reject the new value |
 | Augment | During a read | Add or replace computed token data |
-| Transfer | During mint or transfer | Update state or reject the move |
+| Transfer | During mint, transfer, or burn | Update state or reject the move |
 
 A reverting transfer hook blocks the transfer. Because a mint is a transfer from the zero address, it
 can block minting too.
+
+On ERC-721 projects, the hook observes every `Transfer`, including a self-transfer where `from == to`.
+That is useful for event-level accounting; a hook concerned only with ownership-set changes can ignore
+that case. ERC-1155 projects skip self-transfers and zero-amount entries before calling the hook.
 
 ```bash
 abx set-param-hooks 0xYourContract --transfer 0xYourHook

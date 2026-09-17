@@ -44,6 +44,10 @@ An ERC-1155 edition has a collection default and optional per-ID overrides:
 `maxSupply(id)` returns zero for both an open ID and an ID explicitly closed at zero. The event history
 distinguishes them. The SDK exposes `defaultMaxSupply`, `maxSupplyOverridden`, and `editionCapOf()`.
 
+The per-ID cap limits **live supply**. On a burnable edition, burning copies lowers `totalSupply(id)`
+and makes that many slots available to mint again; total copies ever issued may therefore exceed the
+cap. An ERC-721 Series cap instead limits lifetime-issued IDs, so burning never reopens a slot.
+
 ## Discovery and trust
 
 Any contract can emit `AbxDeployed`, so the event proves discovery, not authenticity. Verify canonical
