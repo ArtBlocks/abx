@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.41
+
+### Patch Changes
+
+- 8ccbede: Enable Robinhood Chain production as beta after canonical deployment, paired-testnet qualification,
+  and managed-service validation. Surface the same real-funds warning and testnet-first gate used for
+  other production beta networks.
+
 ## 0.1.0-alpha.40
 
 ### Patch Changes

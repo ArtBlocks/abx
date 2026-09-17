@@ -1,5 +1,14 @@
 # @artblocks/abx-token-api
 
+## 0.1.0-alpha.44
+
+### Patch Changes
+
+- Updated dependencies [8ccbede]
+  - @artblocks/abx-sdk@0.1.0-alpha.41
+  - @artblocks/abx-indexer@0.1.0-alpha.42
+  - @artblocks/abx-storage@0.1.0-alpha.41
+
 ## 0.1.0-alpha.43
 
 ### Patch Changes
