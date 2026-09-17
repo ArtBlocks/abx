@@ -367,15 +367,15 @@ edit a contract, walk this list — an agent making the change is expected to do
      if two different source builds shared an identity.
 4. **Redeploy + verify** (if step 3 said so) — deploy on each chain with `script/Deploy*.s.sol` (CREATE2
    canonical salts, so the new address is identical cross-chain and predictable; see [Deterministic
-   addresses](#deterministic-addresses-create2) for the `SeriesCode` `--libraries` pin and the
+   addresses](#deterministic-addresses-create2) for the post-compile library-linking rule and the
    `--slow` nonce note), then confirm on-chain (`cast call <addr> "specVersion()(uint256)"`,
    `cast code <addr>`).
-5. **Publish the source on Etherscan** — a redeploy is not done until every new address is
-   source-verified on **every** chain. `forge script --broadcast` does **not** verify unless you pass
+5. **Publish the source** — a redeploy is not done until every new address has an exact-match source
+   record on **every** chain. `forge script --broadcast` does **not** verify unless you pass
    `--verify`, and it cannot verify a contract it didn't send directly (a factory's implementation is
    `CREATE`d inside the factory constructor), so the implementations always need a separate
    `forge verify-contract`. See [Source verification](#source-verification) for the exact commands and
-   the two settings that bite.
+   the settings that bite.
 6. **Record the addresses** in **both**:
    - `packages/sdk/src/deployments.ts` (the machine source of truth), and
    - [`site/content/docs/reference/deployments.mdx`](../site/content/docs/reference/deployments.mdx) (the human mirror).
@@ -391,10 +391,11 @@ edit a contract, walk this list — an agent making the change is expected to do
 
 ## Source verification
 
-Every canonical address in the manifest must be source-verified on every supported chain — it's what
-lets anyone read the trust anchors instead of trusting our word for them. One Etherscan **V2** API key
-covers all chains (`ETHERSCAN_API_KEY` in `.env`; the `[etherscan]` block in `foundry.toml` maps the
-chain names).
+Every canonical address in the manifest must have an exact-match source record on every supported
+chain — it's what lets anyone read the trust anchors instead of trusting our word for them. One
+Etherscan **V2** API key covers its supported chains (`ETHERSCAN_API_KEY` in `.env`; the `[etherscan]`
+block in `foundry.toml` maps the chain names). Sourcify is the chain-independent verifier and records
+whether both creation and runtime bytecode match exactly.
 
 Some contracts are a plain one-liner — they compile at the profile default (1,000,000 runs):
 
@@ -410,7 +411,18 @@ official deployment guide.
 `--compilation-profile default` is required whenever the build cache holds more than one profile
 (otherwise forge stops with *"Ambiguous compilation profiles found in cache"*).
 
-**Three settings bite, each on a different set of paths.** Miss any and Etherscan returns the same
+If Robinhood's Blockscout API returns a Cloudflare HTML challenge to non-browser clients, submit the
+same source to Sourcify and require `Status: exact_match`; do not weaken the check to a similarity
+match. Sourcify also attempts to forward successful verification to the explorer, but the Sourcify
+record and explorer display are separate outcomes:
+
+```bash
+ETHERSCAN_API_KEY=unused forge verify-contract <addr> <source>:<contract> \
+  --chain-id 4663 --rpc-url https://rpc.mainnet.chain.robinhood.com \
+  --verifier sourcify --compilation-profile default --watch
+```
+
+**Three settings matter, each on a different set of paths.** Miss any and a verifier returns the same
 unhelpful *"Compiled contract deployment bytecode does NOT match"*:
 
 - **`--optimizer-runs 200`** — for **every path listed in `compilation_restrictions`** in
@@ -427,30 +439,22 @@ unhelpful *"Compiled contract deployment bytecode does NOT match"*:
   `DeployAbxGenerator` run printed, or read them back off the deployed contract
   (`defaultDependencyRegistry()` / `abxJsPointer()` / `gunzipScriptPointer()` /
   `defaultIpfsGateway()` / `defaultArweaveGateway()`).
-- **`--libraries` (every pin)** — for the units that link write-path libraries. They were deployed
-  with the libraries pinned, which lands in `settings.libraries` in the compile input and therefore in
-  the metadata hash. The linked bytecode alone is not enough; the *compile input* has to match.
-
-Pass **every** library the unit links, not just the ones you remember. `SeriesCode` links three
-because the on-chain metadata field store lives in `AbxMetadataLib`; a missing pin fails with the
-same unhelpful "bytecode does NOT match". The authoritative list is the artifact's
-`bytecode.linkReferences`; the deploy scripts construct the same sets in `script/AbxLink.sol` and
-tests reject unresolved placeholders. Read addresses from the `metadataLib` / `paramsLib` /
-`codeLib` / `editionLib` entries in `packages/sdk/src/deployments.ts` rather than this example, which
-is a snapshot and will age:
+- **Do not pass `--libraries` for the current canonical generation.** `script/AbxLink.sol` substitutes
+  library placeholders in the compiled artifact *after* compilation so the SDK and Forge deploy the
+  same CREATE2 initcode. Passing `--libraries` recompiles with a different `settings.libraries` map,
+  changes the metadata hash, and no longer matches what was deployed. Sourcify reads the artifact's
+  link references and exact-matches the substituted addresses without that flag. The authoritative
+  link set is the artifact's `bytecode.linkReferences`; the deploy scripts construct the same set and
+  tests reject unresolved placeholders.
 
 ```bash
 forge verify-contract <addr> src/tokens/SeriesCode.sol:SeriesCode \
-  --chain sepolia --compilation-profile default --optimizer-runs 200 \
-  --libraries src/libraries/AbxMetadataLib.sol:AbxMetadataLib:0x404B48AA9784FCC042B317c64bE917390Ec4b55F \
-  --libraries src/libraries/AbxParamsLib.sol:AbxParamsLib:0x7200fAb33E5CbDAAb00d0b5ED3b27174F11bCf90 \
-  --libraries src/libraries/AbxCodeLib.sol:AbxCodeLib:0xD6b9cbC480D172B7Ba3f475f73bB197Dd20B047C \
-  --watch
+  --chain sepolia --compilation-profile default --optimizer-runs 200 --watch
 ```
 
-The two ERC-721 image types link `AbxMetadataLib` alone; the three ERC-1155 types add
-`AbxEditionLib` (and `AbxParamsLib`, which `AbxEditionLib` itself links). `EditionCode` needs all
-four.
+For bytecode auditing, the two ERC-721 image types link `AbxMetadataLib` alone; the three ERC-1155
+types add `AbxEditionLib` (which itself links `AbxParamsLib`). `EditionCode` uses all four write-path
+libraries.
 
 `AbxGenerator` is per-chain and takes constructor args, so it needs `--constructor-args` matching the
 chain it was deployed to (and the same `--optimizer-runs 200`). `AbxMetadataRenderer` sits at the same

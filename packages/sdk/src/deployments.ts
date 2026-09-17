@@ -21,9 +21,9 @@
  *   - manifest: the canonical address below
  *
  * DEPLOYMENT SCOPE: canonical infrastructure is live on Base Sepolia (the default, chainId 84532),
- * Sepolia (11155111), and Base (8453). `chain-support.json` separately records whether each
- * deployment is selectable; an address here does not by itself enable a network. Absence here
- * always means no canonical deployment.
+ * Sepolia (11155111), Robinhood Chain Testnet (46630), Base (8453), and Robinhood Chain (4663).
+ * `chain-support.json` separately records whether each deployment is selectable; an address here
+ * does not by itself enable a network. Absence here always means no canonical deployment.
  *
  * Changing a contract → redeploy → repoint here: see contracts/README.md#changing-a-contract.
  */
@@ -183,6 +183,16 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
   // abxJsPointer 0xbeD5a9dec0c94fF39F7874df979eBdC3Adab568D,
   // gunzipScriptPointer 0x686CE62bdE8FE4Fc3de70c8fC65b574A05a23D52.
   8453: {
+    ...CANONICAL,
+    generator: '0x4F74De4835B51414a4DA83527589aEDc41A26FaE',
+  },
+  // Robinhood Chain (production candidate). Contracts were deployed from this release on
+  // 2026-09-17 and have exact-match source records on Sourcify. The network remains disabled until
+  // the separate services and low-value acceptance gates pass. No canonical dependency registry
+  // exists, so the generator fallback is address(0). SSTORE2 asset pointers:
+  // abxJsPointer 0xbeD5a9dec0c94fF39F7874df979eBdC3Adab568D,
+  // gunzipScriptPointer 0x686CE62bdE8FE4Fc3de70c8fC65b574A05a23D52.
+  4663: {
     ...CANONICAL,
     generator: '0x4F74De4835B51414a4DA83527589aEDc41A26FaE',
   },

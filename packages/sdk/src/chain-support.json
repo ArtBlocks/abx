@@ -44,7 +44,7 @@
       "name": "Robinhood Chain",
       "environment": "production",
       "pairedChain": "robinhood-testnet",
-      "contractStatus": "not-deployed",
+      "contractStatus": "deployed",
       "supportLevel": "disabled"
     },
     {
