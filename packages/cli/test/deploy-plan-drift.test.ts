@@ -185,6 +185,7 @@ test('deploy --onchain-image --dry-run --json: renderer address, image file meta
   assert.match(stderr, /1 deploy \(bakes the reader field\)/);
   assert.doesNotMatch(stderr, /bakes the reader field \+ mints/);
   assert.match(stderr, /one-transaction alternative:[^\n]*--onchain-uri[^\n]*instead of[^\n]*--onchain-image[^\n]*2 transactions/);
+  assert.ok(plan.warnings.some((warning: string) => /one-transaction alternative/.test(warning)));
   assert.equal(plan.mint.deferred, true, DRIFT_MSG);
   assert.equal(plan.mint.count, 0, DRIFT_MSG);
 

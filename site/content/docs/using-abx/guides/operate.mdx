@@ -165,6 +165,10 @@ neither manifest keeps a history of superseded singleton addresses to further cl
 [deployments](/docs/reference/deployments)). A canonical singleton-address change is always called
 out in that package's release notes.
 
+For code projects, `onChainUri.chainComplete` reports whether the template dependency graph resolves
+entirely to on-chain bytes. Static image projects have no code dependency graph, so this field is
+`null` (not applicable), not `false`.
+
 ## Local state
 
 `abx state <address>` reads the contract, including every irreversible lock (see "Permanent locks"
