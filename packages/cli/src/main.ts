@@ -1113,7 +1113,8 @@ const COMMAND_HELP: Record<string, string> = {
     --remote-token <t>    override the token for this invocation (--token means a token ID elsewhere, hence the name)
     ${g('--no-wait')}             ${dim('with --remote: return as soon as the service accepts it, instead of waiting out its catch-up.')}
                           ${dim('A service may answer "accepted, still indexing" (202) for a long backfill; by default abx polls')}
-                          ${dim('to')} ${g('live')} ${dim('and prints the same summary. The registration is durable either way —')} ${g('abx status <addr> --remote')} ${dim('checks later.')}`,
+                          ${dim('to')} ${g('live')} ${dim('and prints the same summary. The registration is durable either way —')} ${g('abx status <addr> --remote')} ${dim('checks later.')}
+    ${g('--json')}                registration result as data: target, chain/address, status, scan floor, and completion state`,
   index: `
   ${bold('abx index')} [<address>] ${dim('— re-index from chain (read-only). Incremental by default.')}
     ${g('--full')}   force a full replay from the deploy block (the durability proof)   --yes   allow a very large scan
@@ -1172,6 +1173,7 @@ const COMMAND_HELP: Record<string, string> = {
                           ${dim('address holds (the question supply/cap cannot answer). Refused on a 721, where the owner column already says it.')}`,
   contracturi: `
   ${bold('abx contracturi')} <address> ${dim('— read contractURI() (ERC-7572 collection metadata) from the contract, FOLLOW it, and decode (read-only).')}
+    ${g('--json')}               emit the resolved collection document as the only stdout payload (narration stays on stderr)
     ${dim('The collection-level counterpart of')} ${g('tokenuri')}${dim('. On-chain lane: decodes the data: URI. Off-chain lane: fetches the')}
     ${dim('URL the contract itself commits to and prints the JSON.')}
     ${bold('Never hand-build a resolver URL to check this')} ${dim('— the contract holds the answer, so a URL from here is right by')}

@@ -72,11 +72,11 @@ function seededStore(): {dataDir: string; store: SqliteStore} {
   return {dataDir, store};
 }
 
-function runCli(args: string[], env: NodeJS.ProcessEnv): Promise<{code: number | null; out: string}> {
+function runCli(args: string[], env: NodeJS.ProcessEnv): Promise<{code: number | null; out: string; stdout: string; stderr: string}> {
   return new Promise((res) => {
     execFile(process.execPath, ['--import', 'tsx', MAIN, ...args], {env, timeout: 60_000}, (err, stdout, stderr) => {
       const c = err && typeof (err as {code?: number}).code === 'number' ? (err as {code: number}).code : err ? 1 : 0;
-      res({code: c, out: `${stdout}\n${stderr}`});
+      res({code: c, out: `${stdout}\n${stderr}`, stdout, stderr});
     });
   });
 }
@@ -121,6 +121,30 @@ test('--no-wait returns at the 202 without polling, and names the command that c
     assert.match(out, /backfilling/);
     assert.match(out, /abx status .* --remote provider/, 'a returning-early command must say how to finish the thought');
     assert.equal(seen.filter((s) => s.endsWith('/status')).length, 0, '--no-wait must not poll at all');
+  } finally {
+    server.close();
+    store.destroy();
+  }
+});
+
+test('add --remote --json reports an accepted 202 as durable but still backfilling', async () => {
+  const {dataDir, store} = seededStore();
+  const {server, port, seen} = await mockAsyncService({pollsUntilLive: 99});
+  try {
+    const {code, stdout, stderr} = await runCli(['add', ADDR, '--remote', 'provider', '--no-wait', '--json'], env(dataDir, port));
+    assert.equal(code, 0, `expected success; got ${code}\n${stdout}\n${stderr}`);
+    assert.deepEqual(JSON.parse(stdout), {
+      target: {surface: 'remote', name: 'PROVIDER', url: `http://127.0.0.1:${port}`},
+      chainId: 11155111,
+      address: ADDR,
+      status: 'backfilling',
+      scanFloor: DEPLOY_BLOCK,
+      completed: false,
+      backfilling: true,
+    });
+    assert.match(stderr, /backfilling/);
+    assert.doesNotMatch(stdout, /\u001b|registered|abx status/);
+    assert.equal(seen.filter((s) => s.endsWith('/status')).length, 0);
   } finally {
     server.close();
     store.destroy();

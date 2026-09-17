@@ -745,7 +745,13 @@ export async function detectCanonicalFactory(
  * local branch is a thin call to this). Kept self-sufficient (recomputes any `--attributes`/`--traits`
  * edit from `flags` itself) so it never depends on a caller's local variables.
  */
-export async function registerAndIndexLocally(address: Address, flags: Flags): Promise<void> {
+export interface LocalRegistrationOutcome {
+  state: ProjectState;
+  elapsedMs: number;
+  scanFloor: string;
+}
+
+export async function registerAndIndexLocally(address: Address, flags: Flags): Promise<LocalRegistrationOutcome> {
   const attrRaw = flags.attributes ? readFileSync(resolvePath(process.cwd(), String(flags.attributes)), 'utf8') : undefined;
   const perTokenEdit = attrRaw != null && looksPerTokenAttributes(attrRaw);
   const flagTraits: OpenSeaAttribute[] = [];
@@ -826,4 +832,5 @@ export async function registerAndIndexLocally(address: Address, flags: Flags): P
     warn(`registered ${state.name ?? address}, but with NO reconstructed state — it will serve empty until the index succeeds.`);
   }
   info(`serve it from here with ${bold('abx serve')} — or push it to a hosted resolver with ${bold('abx add ' + address + ' --remote')}`);
+  return {state, elapsedMs, scanFloor};
 }

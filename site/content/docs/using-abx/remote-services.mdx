@@ -56,7 +56,8 @@ The version 1 control plane uses bearer authentication:
 | `GET /v1/projects/{chainId}/{address}/status` | Read progress and freshness. |
 
 Registration may return `202` while a cold replay continues. `abx add` waits by default. Pass
-`--no-wait` if another process will watch the status.
+`--no-wait` if another process will watch the status. Add `--json` for the target, chain/address,
+scan floor, lifecycle status, and whether catch-up completed or remains backfilling.
 
 The status words are `queued`, `backfilling`, `live`, `stale`, and `failed`. A stale service keeps
 serving its last indexed state.
@@ -72,7 +73,7 @@ Do not guess metadata routes. Read the URI stored by the contract:
 
 ```bash
 abx tokenuri 0xYourContract --token 0
-abx contracturi 0xYourContract
+abx contracturi 0xYourContract --json
 ```
 
 The public API distinguishes a bad route, an unsupported chain, an unregistered project, and a burned

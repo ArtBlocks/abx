@@ -81,7 +81,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   capabilities: set(['json']),
   predict: set(['salt', 'for', 'factory', 'copies', 'script', 'code-dir', 'image-renderer', 'dir', 'image']),
   tokenuri: set(['token', 'fetch', 'json']),
-  contracturi: set([]),
+  contracturi: set(['json']),
   tokens: set(['json', 'limit', 'from', 'holder']),
   state: set(['json']),
   status: set(['watch'], REMOTE),
@@ -97,7 +97,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
 
   // ── indexing / projection ──
   add: set(
-    ['from-block', 'factory', 'label', 'description', 'external-url', 'full', 'yes', 'traits', 'attributes', 'no-wait', 'dry-run'],
+    ['from-block', 'factory', 'label', 'description', 'external-url', 'full', 'yes', 'traits', 'attributes', 'no-wait', 'dry-run', 'json'],
     REMOTE,
     STORAGE_OVERRIDE,
   ),
