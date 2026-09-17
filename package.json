@@ -49,6 +49,7 @@
     "sandbox": "bash scripts/sandbox.sh",
     "tier2": "bash scripts/tier2-packaged.sh",
     "sandbox:cold": "bash scripts/sandbox.sh --cold",
+    "sandbox:smoke": "bash scripts/sandbox.sh --smoke",
     "sandbox:status": "bash scripts/sandbox-clean.sh",
     "sandbox:clean": "bash scripts/sandbox-clean.sh --void",
     "abx-effects": "tsx packages/effects/src/main.ts",

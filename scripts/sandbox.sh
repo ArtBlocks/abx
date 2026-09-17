@@ -11,6 +11,12 @@
 #   pnpm sandbox:cold            scaffold + run the default cold scenario, print a friction scorecard
 #   pnpm sandbox:cold <scenario> ... run a specific scenario from contributor/agent-eval/scenarios/
 #   pnpm sandbox:cold all        ... run every scenario in sequence
+#   pnpm sandbox:smoke --chain <testnet> --name <run> --with-remote <name> --model sonnet <scenario>
+#                             ... one bounded, pre-authorized live test in an isolated room. The
+#                             scenario is the authorization boundary; the agent dry-runs, sends,
+#                             verifies, and records FEEDBACK.md without per-transaction prompts.
+#                             A fresh wallet is funded with 0.001 test ETH by default, so the worker
+#                             never receives the shared deployer key. Override with --ephemeral <ETH>.
 #   bash scripts/sandbox.sh --cold --creative <scenario> [--model X] [--funded]
 #                             ... CREATIVE mode: the agent arrives with an artistic BRIEF (not files),
 #                             AUTHORS the art, then deploys/previews it. Uses rubric-creative.md +
@@ -18,7 +24,7 @@
 #   bash scripts/sandbox.sh --no-launch   scaffold only (inspect it yourself)
 #   bash scripts/sandbox.sh --name <ns> --no-launch [--funded] [--port N]   a NAMESPACED clean-room
 #                             (.sandbox-<ns>/, its own port + .env + FEEDBACK.md) — run MANY in
-#                             PARALLEL for concurrent agent testing; --funded seeds a real Sepolia
+#                             PARALLEL for concurrent agent testing; --funded seeds a real testnet
 #                             key + the localhost dev-escape (real LOCAL code-project e2e). Each
 #                             sandbox ships FEEDBACK.md (the standard scorecard) — collect them after.
 #
@@ -37,6 +43,7 @@ RUBRIC="$EVAL_DIR/rubric.md"
 SCENARIOS="$EVAL_DIR/scenarios"
 
 MODE="interactive"; YES=0; WITH_STORAGE=0; LIVE=0; FUNDED=0; NAME=""; PORT=""; MODEL=""; CREATIVE=0
+CHAIN="${ABX_CHAIN:-base-sepolia}"; CHAIN_SET=0; WITH_REMOTE=""; SMOKE=0
 EPHEMERAL=""   # non-empty => this room gets its own generated deployer key, funded with this much ETH
 
 while [ $# -gt 0 ]; do
@@ -46,20 +53,57 @@ while [ $# -gt 0 ]; do
     --creative)          CREATIVE=1; shift ;;      # creative mode: the agent arrives with an IDEA, not files — it AUTHORS the art then deploys it.
                                                    #   uses rubric-creative.md + scenarios/creative/, clears the example art crutches, and grants Write/Edit.
     --cold|--print)      MODE="cold"; shift ;;
+    --smoke)             MODE="cold"; LIVE=1; SMOKE=1; [ -n "$EPHEMERAL" ] || EPHEMERAL="${ABX_SMOKE_FUND_ETH:-0.001}"; shift ;;
     --no-launch)         MODE="scaffold"; shift ;;
     --yes|-y)            YES=1; shift ;;         # skip the wipe confirmation (for automation/CI)
     --with-storage)      WITH_STORAGE=1; shift ;; # seed durable-storage creds (PINATA_JWT) for storage-path testing
-    --live)              LIVE=1; WITH_STORAGE=1; shift ;; # seed a FUNDED Sepolia key + use the live rubric → agents do REAL testnet deploys
-    --funded)            FUNDED=1; WITH_STORAGE=1; shift ;; # seed a FUNDED Sepolia key + storage, but KEEP the preview rubric (for an orchestrator that drives its own agents)
-    --ephemeral)         FUNDED=1; WITH_STORAGE=1; EPHEMERAL="${2:-0.005}"; shift 2 ;; # like --funded, but this room gets its OWN fresh, small-funded key
-    --ephemeral=*)       FUNDED=1; WITH_STORAGE=1; EPHEMERAL="${1#*=}"; shift ;;
+    --live)              LIVE=1; WITH_STORAGE=1; shift ;; # seed a funded key + use the live rubric → agents do real selected-testnet deploys
+    --funded)            FUNDED=1; WITH_STORAGE=1; shift ;; # seed a funded key + storage, but keep the preview rubric (for an orchestrator that drives its own agents)
+    --ephemeral)         FUNDED=1; EPHEMERAL="${2:-0.005}"; shift 2 ;; # funded with its OWN fresh key; add --with-storage only when that scenario needs it
+    --ephemeral=*)       FUNDED=1; EPHEMERAL="${1#*=}"; shift ;;
     --name)              NAME="$2"; shift 2 ;;   # namespaced clean-room .sandbox-<name>/ — run MANY in PARALLEL without collision
     --name=*)            NAME="${1#*=}"; shift ;;
+    --chain)             CHAIN="$2"; CHAIN_SET=1; shift 2 ;;  # pin the room to one registry chain; live/funded lanes require a testnet
+    --chain=*)           CHAIN="${1#*=}"; CHAIN_SET=1; shift ;;
+    --with-remote)       WITH_REMOTE="$2"; shift 2 ;; # copy exactly one named remote URL/token pair, never the whole .env
+    --with-remote=*)     WITH_REMOTE="${1#*=}"; shift ;;
     --port)              PORT="$2"; shift 2 ;;    # the serve/effects port for THIS sandbox (parallel runs need distinct ports)
     --port=*)            PORT="${1#*=}"; shift ;;
     *) break ;;
   esac
 done
+
+# Validate the requested chain from the single source of truth. Preview rooms may inspect any
+# selectable chain; funded/live rooms are physically limited to testnets.
+CHAIN_ENVIRONMENT="$(node -e '
+  const registry=require(process.argv[1]);
+  const chain=registry.chains.find((item)=>item.key===process.argv[2]);
+  if(!chain || chain.supportLevel==="disabled") process.exit(2);
+  process.stdout.write(chain.environment);
+' "$DEV_ROOT/packages/sdk/src/chain-support.json" "$CHAIN")" || { echo "✗ unknown or disabled --chain '$CHAIN'" >&2; exit 2; }
+if { [ "$LIVE" -eq 1 ] || [ "$FUNDED" -eq 1 ]; } && [ "$CHAIN_ENVIRONMENT" != "testnet" ]; then
+  echo "✗ funded smoke rooms are testnet-only; '$CHAIN' is $CHAIN_ENVIRONMENT" >&2
+  exit 2
+fi
+if [ "$LIVE" -eq 1 ] || [ "$FUNDED" -eq 1 ]; then
+  grep -q -E '^ABX_DEPLOYER_PK=' "$DEV_ROOT/.env" 2>/dev/null || {
+    echo "✗ funded room needs ABX_DEPLOYER_PK in the developer .env (for an ephemeral room it stays parent-side and only funds the worker wallet)" >&2
+    exit 2
+  }
+fi
+CHAIN_ENV_SUFFIX="$(printf '%s' "$CHAIN" | tr '[:lower:]' '[:upper:]' | sed -E 's/[^A-Z0-9]+/_/g')"
+RPC_ENV_VAR="ABX_RPC_URLS_$CHAIN_ENV_SUFFIX"
+
+REMOTE_ENV_SUFFIX=""
+if [ -n "$WITH_REMOTE" ]; then
+  REMOTE_ENV_SUFFIX="$(printf '%s' "$WITH_REMOTE" | tr '[:lower:]' '[:upper:]' | sed -E 's/[^A-Z0-9]+/_/g')"
+  grep -q -E "^ABX_REMOTE_${REMOTE_ENV_SUFFIX}_URL=" "$DEV_ROOT/.env" 2>/dev/null || {
+    echo "✗ named remote '$WITH_REMOTE' has no URL in the developer .env" >&2; exit 2;
+  }
+  grep -q -E "^ABX_REMOTE_${REMOTE_ENV_SUFFIX}_TOKEN=" "$DEV_ROOT/.env" 2>/dev/null || {
+    echo "✗ named remote '$WITH_REMOTE' has no token in the developer .env" >&2; exit 2;
+  }
+fi
 # --name: run parallel agent sandboxes. Each is an isolated .sandbox-<name>/ (own .env, own local
 # .abx-self-host projection since abx is cwd-relative, own port), so N agents test concurrently and
 # feedback lands independently. Without --name it's the single shared .sandbox/ (unchanged).
@@ -75,8 +119,9 @@ if [ -z "$PORT" ]; then
   fi
 fi
 EFFECTS_PORT=$((PORT + 1))
-# --live: the cold agent completes a REAL Sepolia deploy (not preview). Seeds ABX_DEPLOYER_PK +
-# storage creds and swaps in the live rubric. Testnet only; use deliberately (agents can spend).
+# --live/--smoke: the cold agent completes a REAL deploy on the selected testnet (not preview).
+# Both use the live rubric. Smoke uses a fresh small-funded key and only explicitly requested
+# credentials; the older --live lane preserves its shared-key + storage setup.
 [ "$LIVE" -eq 1 ] && RUBRIC="$EVAL_DIR/rubric-live.md"
 # --creative: the agent starts from an artistic BRIEF (no supplied art), authors the art, then
 # deploys/previews it. Its own rubric + scenario set take precedence (even alongside --funded, where
@@ -90,6 +135,12 @@ if [ "$CREATIVE" -eq 1 ]; then
 fi
 # remaining arg: an interactive seed prompt, OR (cold mode) the scenario name / `all`.
 SEED="${*:-}"
+if [ "$SMOKE" -eq 1 ]; then
+  [ "$CHAIN_SET" -eq 1 ] || { echo "✗ sandbox:smoke requires an explicit --chain <testnet>" >&2; exit 2; }
+  [ -n "$NAME" ] || { echo "✗ sandbox:smoke requires --name <run>" >&2; exit 2; }
+  [ -n "$SEED" ] && [ "$SEED" != "all" ] || { echo "✗ sandbox:smoke requires exactly one named scenario" >&2; exit 2; }
+  MODEL="${MODEL:-sonnet}"
+fi
 
 # ── 1) the fresh clean room (wiped each run) ──
 # A fresh run always starts from a clean .sandbox/. Confirm first if one already exists (an
@@ -150,17 +201,10 @@ fi
 # minimal .env: RPC only (so the tool works) + signing guidance. NOT the full dev .env — that
 # would seed PINATA_JWT / resolver tokens and bias the agent toward the wrong custody path.
 {
-  # RPC endpoints are CHAIN-SCOPED (ABX_RPC_URLS_<CHAIN>); the default chain is Base Sepolia. Seed
-  # whatever the dev .env has per chain, else fall back to the keyless public defaults (which the
-  # SDK also uses when unset) so the clean room works on the DEFAULT chain out of the box — never
-  # a wrong-network URL (the bare ABX_RPC_URLS holding another network's URLs is the classic break).
-  # Full-archive endpoint FIRST. The fallback transport rotates on ERROR only, and a PRUNED
-  # endpoint answers a deep scan with an empty-but-SUCCESSFUL `[]` -- so it never errors, never
-  # rotates, and a reconstruction of an older project silently returns nothing instead of failing
-  # over. `abx doctor` flags the wrong order; a regression room that inherits it produces results
-  # that look clean and are not. publicnode stays as the fallback, second.
-  grep -E '^ABX_RPC_URLS_BASE_SEPOLIA=' "$DEV_ROOT/.env" 2>/dev/null || echo 'ABX_RPC_URLS_BASE_SEPOLIA=https://sepolia.base.org,https://base-sepolia-rpc.publicnode.com'
-  grep -E '^ABX_RPC_URLS_SEPOLIA=' "$DEV_ROOT/.env" 2>/dev/null || echo '# ABX_RPC_URLS_SEPOLIA=<your Sepolia RPC URL(s)> — only needed if you set ABX_CHAIN=sepolia'
+  # Seed only the selected chain's scoped RPC when the developer configured one. Otherwise the CLI
+  # uses that chain's public registry default. Never copy a bare ABX_RPC_URLS value that might belong
+  # to another network.
+  grep -E "^${RPC_ENV_VAR}=" "$DEV_ROOT/.env" 2>/dev/null || echo "# ${RPC_ENV_VAR} unset — using the CLI registry default"
   # PIN THE ROOM'S CHAIN. Without this the room silently falls back to the SDK default
   # (base-sepolia) no matter what chain the operator scaffolded under, because an exported
   # ABX_CHAIN does not survive into the agent's own shell. That cost a real contract once: a w8
@@ -168,7 +212,10 @@ fi
   # a ~190x underestimate — so the clone leg confirmed, the setup leg reverted for insufficient
   # funds, and the address was left permanently dead with a spent salt. The room must state its
   # chain rather than inherit an invisible default.
-  echo "ABX_CHAIN=${ABX_CHAIN:-base-sepolia}"
+  echo "ABX_CHAIN=$CHAIN"
+  # This checkout deliberately runs the source CLI + freshly copied local skill. Suppress the
+  # routine global-install update nudge inside the room; `abx doctor` still reports provenance once.
+  echo 'ABX_NO_UPDATE_CHECK=1'
   echo '# Signing: add a key ONLY for hot/unattended signing; otherwise use `abx deploy --sign`'
   echo '# (approve in your own wallet — no key needed here), e.g.:  ABX_DEPLOYER_PK=0x...'
   echo '# DEV: `abx deploy-resolver` builds the resolver image from local source (no npm publish'
@@ -187,7 +234,13 @@ fi
     grep -E '^PINATA_JWT=' "$DEV_ROOT/.env" 2>/dev/null && echo '# PINATA_JWT provisioned (ipfs custody testable); arweave/Turbo is keyless + free under 100 KB'
     grep -E '^ABX_REMOTE_SELF_TOKEN=' "$DEV_ROOT/.env" 2>/dev/null || true
   fi
-  # --live / --funded: seed a FUNDED Sepolia key so the agent can complete a REAL testnet deploy
+  # A smoke scenario may exercise one named hosted provider. Copy only that URL/token pair; values
+  # stay inside the gitignored room and are never echoed to the terminal.
+  if [ -n "$WITH_REMOTE" ]; then
+    grep -E "^ABX_REMOTE_${REMOTE_ENV_SUFFIX}_URL=" "$DEV_ROOT/.env"
+    grep -E "^ABX_REMOTE_${REMOTE_ENV_SUFFIX}_TOKEN=" "$DEV_ROOT/.env"
+  fi
+  # --live / --funded: seed a funded key so the agent can complete a real deploy on the selected testnet
   # (hot lane). TESTNET ONLY. Off by default (a keyless sandbox can't spend unsupervised).
   if [ "$LIVE" -eq 1 ] || [ "$FUNDED" -eq 1 ]; then
     # An EPHEMERAL room signs with its OWN generated key (written after this env file is built, by
@@ -197,7 +250,7 @@ fi
     if [ -n "$EPHEMERAL" ]; then
       echo '# EPHEMERAL: ABX_DEPLOYER_PK for this room is appended below — its own fresh, small-funded key.'
     else
-      grep -E '^ABX_DEPLOYER_PK=' "$DEV_ROOT/.env" 2>/dev/null && echo '# FUNDED: real Sepolia key provisioned → real deploys via the default (hot) lane. Testnet only.'
+      grep -E '^ABX_DEPLOYER_PK=' "$DEV_ROOT/.env" 2>/dev/null && echo '# FUNDED: testnet key provisioned → real deploys via the default (hot) lane.'
     fi
     # A code project bakes a resolver base on-chain and refuses localhost — but a funded LOCAL
     # sandbox has no public host, so allow the dev-escape so code-project e2e (deploy→serve→render)
@@ -218,12 +271,12 @@ fi
 if [ -n "$EPHEMERAL" ]; then
   WALLET_FILE="$SANDBOX/.ephemeral-wallet.json"
   echo "  ephemeral wallet"
-  if ! node --import tsx "$DEV_ROOT/scripts/sandbox-wallet.ts" preflight --chain "${ABX_CHAIN:-base-sepolia}" >/dev/null 2>&1; then
+  if ! node --import tsx "$DEV_ROOT/scripts/sandbox-wallet.ts" preflight --chain "$CHAIN" >/dev/null 2>&1; then
     echo "  ✗ singleton preflight FAILED — not scaffolding a funded room that would race to bootstrap."
-    echo "    run: node --import tsx scripts/sandbox-wallet.ts preflight --chain ${ABX_CHAIN:-base-sepolia}"
+    echo "    run: node --import tsx scripts/sandbox-wallet.ts preflight --chain $CHAIN"
     exit 1
   fi
-  EPH_ADDR=$(node --import tsx "$DEV_ROOT/scripts/sandbox-wallet.ts" new --out "$WALLET_FILE" --chain "${ABX_CHAIN:-base-sepolia}" | tail -1)
+  EPH_ADDR=$(node --import tsx "$DEV_ROOT/scripts/sandbox-wallet.ts" new --out "$WALLET_FILE" --chain "$CHAIN" | tail -1)
   node --import tsx "$DEV_ROOT/scripts/sandbox-wallet.ts" fund --file "$WALLET_FILE" --eth "$EPHEMERAL" | sed 's/^/    /'
   # Appended AFTER the env file is composed, so it wins the last-value-wins dotenv rule even if the
   # treasury key was written above. The key itself never reaches stdout.
@@ -265,15 +318,23 @@ parallel sandboxes from colliding. When you finish, record what you found in \`F
 MD
 fi
 
+if [ -n "$WITH_REMOTE" ]; then
+  cat >> "$SANDBOX/CLAUDE.md" <<MD
+
+The smoke harness provisioned the named hosted provider `$WITH_REMOTE`. Use that exact remote for
+the scenario; do not try another account or start an interactive login.
+MD
+fi
+
 # session-scoped permissions: let an agent use abx + read freely, never anything destructive.
-# CREATIVE mode also grants Write/Edit + the authoring Bash tools (mkdir/node/python3) so the agent
-# can create its own art files; still no rm/push/sudo.
-if [ "$CREATIVE" -eq 1 ]; then
+# CREATIVE and LIVE modes grant Write/Edit inside the disposable room: creative agents author art,
+# and live agents must write the required FEEDBACK.md evidence. Still no rm/push/sudo.
+if [ "$CREATIVE" -eq 1 ] || [ "$LIVE" -eq 1 ]; then
 cat > "$SANDBOX/.claude/settings.local.json" <<MD
 {
   "env": {"PATH": "$BIN_DIR:$PATH"},
   "permissions": {
-    "allow": ["Read", "Grep", "Glob", "Write", "Edit", "Bash(abx:*)", "Bash(ABX_CHAIN=sepolia abx:*)", "Bash(ABX_CHAIN=base-sepolia abx:*)", "Bash(cast:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(pwd)", "Bash(curl:*)", "Bash(mkdir:*)", "Bash(node:*)", "Bash(python3:*)"],
+    "allow": ["Read", "Grep", "Glob", "Write", "Edit", "Bash(abx:*)", "Bash(ABX_CHAIN=$CHAIN abx:*)", "Bash(cast:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(pwd)", "Bash(curl:*)", "Bash(mkdir:*)", "Bash(node:*)", "Bash(python3:*)"],
     "deny": ["Bash(rm:*)", "Bash(git push:*)", "Bash(sudo:*)"]
   }
 }
@@ -283,7 +344,7 @@ cat > "$SANDBOX/.claude/settings.local.json" <<MD
 {
   "env": {"PATH": "$BIN_DIR:$PATH"},
   "permissions": {
-    "allow": ["Read", "Grep", "Glob", "Bash(abx:*)", "Bash(ABX_CHAIN=sepolia abx:*)", "Bash(ABX_CHAIN=base-sepolia abx:*)", "Bash(cast:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(pwd)", "Bash(curl:*)"],
+    "allow": ["Read", "Grep", "Glob", "Bash(abx:*)", "Bash(ABX_CHAIN=$CHAIN abx:*)", "Bash(cast:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(pwd)", "Bash(curl:*)"],
     "deny": ["Bash(rm:*)", "Bash(git push:*)", "Bash(sudo:*)"]
   }
 }
@@ -328,16 +389,22 @@ run_scenario() {                        # $1 = scenario name
     echo "✗ unknown scenario '$name'. Available: $(ls "$SCENARIOS" 2>/dev/null | sed 's/\.md$//' | tr '\n' ' ')all" >&2
     return 1
   fi
-  echo "▸ cold agent · scenario '$name'${CREATIVE:+ (creative)} in $SANDBOX (headless; preview-only; abx + reads, nothing destructive)${MODEL:+ · model=$MODEL}…" >&2
-  # allowlist makes it autonomous without prompts; the keyless .env means it physically cannot spend.
+  local lane="preview-only"
+  [ "$LIVE" -eq 1 ] && lane="authorized testnet live"
+  local creative_label=""
+  [ "$CREATIVE" -eq 1 ] && creative_label=" (creative)"
+  echo "▸ cold agent · scenario '$name'$creative_label in $SANDBOX (headless; $lane; scoped tools)${MODEL:+ · model=$MODEL}…" >&2
+  # The allowlist makes the run autonomous without permission prompts. Preview rooms are keyless;
+  # smoke rooms hold only their small-funded ephemeral key plus explicitly requested credentials.
   # --model optionally exercises the workflow with a different model tier.
   # CREATIVE mode additionally grants Write/Edit + authoring Bash so the agent can create its own art.
-  # `Bash(abx:*)` does NOT match an env-prefixed command, so `ABX_CHAIN=sepolia abx …` hits a
-  # permission wall — and the chain has no flag by design. The two supported chains are allowlisted
-  # explicitly so a scenario can select its stated network.
-  local chainprefix="Bash(ABX_CHAIN=sepolia abx:*),Bash(ABX_CHAIN=base-sepolia abx:*)"
+  # `Bash(abx:*)` does NOT match an env-prefixed command, so the room's one pinned chain is also
+  # allowlisted explicitly. A cold agent cannot hop to another network through an env prefix.
+  local chainprefix="Bash(ABX_CHAIN=$CHAIN abx:*)"
   local tools="Read,Grep,Glob,Bash(abx:*),$chainprefix,Bash(cast:*),Bash(ls:*),Bash(cat:*)"
-  [ "$CREATIVE" -eq 1 ] && tools="Read,Grep,Glob,Write,Edit,Bash(abx:*),$chainprefix,Bash(cast:*),Bash(ls:*),Bash(cat:*),Bash(mkdir:*),Bash(node:*),Bash(python3:*)"
+  if [ "$CREATIVE" -eq 1 ] || [ "$LIVE" -eq 1 ]; then
+    tools="Read,Grep,Glob,Write,Edit,Bash(abx:*),$chainprefix,Bash(cast:*),Bash(ls:*),Bash(cat:*),Bash(mkdir:*),Bash(node:*),Bash(python3:*)"
+  fi
   prompt="$(compose_prompt "$file")" || return 1
   env PATH="$BIN_DIR:$PATH" claude -p "$prompt" \
     ${MODEL:+--model "$MODEL"} \
