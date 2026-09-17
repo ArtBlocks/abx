@@ -65,6 +65,9 @@ This source is pseudorandom, not secret or lottery-grade randomness. Contract ca
 can inspect or influence transaction execution. Use a commitment scheme or VRF-backed source when one
 outcome has material prize value.
 
+On OP Stack networks such as Base, `block.prevrandao` comes from the L1 origin and may remain the same
+across several L2 blocks. Do not treat it as fresh entropy for each L2 block.
+
 On an ERC-721 Series, minting is sequential. The buyer accepts or rejects the next outcome. On an
 edition, the buyer names the ID. A code edition assigns its seed on that ID's first mint, so an unminted
 ID is a selection input.

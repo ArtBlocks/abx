@@ -35,6 +35,10 @@ function onTokenTransfer(uint256, address from, address, address, uint256) exter
 Mints, transfers, and burns all pass through this hook. A mistake can block issuance or redemption.
 Test every path. Lock the hook address with `abx lock-param-hooks` only after deployment is proven.
 
+An ERC-721 self-transfer also reaches the hook because it emits a `Transfer` event. Ignore
+`from == to` in the hook when the mechanic cares only about changes to the ownership set. ERC-1155
+projects skip self-transfers and zero-amount entries before calling the hook.
+
 ## Values that only increase
 
 A configure hook reads the current value before the new one is stored:

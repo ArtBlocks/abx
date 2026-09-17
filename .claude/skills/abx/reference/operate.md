@@ -167,9 +167,9 @@ Use `set-royalty` to change receiver/rate within the collection's permanent roya
 `set-royalty-cap` only to lower that ceiling. State the old and new values and confirm the irreversible
 loss of future headroom.
 
-Series supply caps and edition per-id caps are monotonic downward. Read current minted supply before
-lowering a cap; never propose a value below already minted supply. For editions, name the id and
-distinguish its per-id cap from aggregate collection supply.
+Series supply caps and edition per-id caps are monotonic downward. Before lowering one, read the
+Series issuance cursor or the edition id's live supply, respectively; never propose a value below that
+floor. For editions, name the id and distinguish its live per-id cap from aggregate collection supply.
 
 Pause/unpause controls the supported mint gate, not transfers or every external minter behavior.
 Read state after changing it.
