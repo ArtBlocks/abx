@@ -3,13 +3,17 @@ title: "Networks and deployments"
 description: "ABX network support and canonical contract addresses."
 ---
 
-Start on Base Sepolia. Sepolia is supported, Robinhood Chain Testnet is experimental, and Base
-production is beta after the same flow has passed on its testnet pair.
+Start on Base Sepolia. Sepolia is supported, Robinhood Chain Testnet is experimental, and production
+deployments on Base and Robinhood Chain are beta after the same flow has passed on the paired testnet.
 
-**Base beta:** transactions use real ETH and create irreversible state. ABX is prerelease software,
-has not had an independent third-party audit, and may fail through software bugs, configuration
-mistakes, or nondeterministic agent behavior. Review the network, signer, complete transaction group,
-value, and locks before sending. Use at your own risk.
+**Production beta:** transactions use real funds and create irreversible state. ABX is prerelease
+software, has not had an independent third-party audit, and may fail through software bugs,
+configuration mistakes, or nondeterministic agent behavior. Review the network, signer, complete
+transaction group, value, and locks before sending. Use at your own risk.
+
+Choose by audience first, then measured cost: use Base for projects aimed at Base users and Robinhood
+Chain for projects aimed at that network. Run the same dry run on the paired testnet before deciding.
+Large onchain payloads increase transaction cost on either network, so decide byte custody separately.
 
 | Network | Chain ID | Support | Canonical contracts |
 | --- | ---: | --- | --- |
@@ -17,7 +21,7 @@ value, and locks before sending. Use at your own risk.
 | Sepolia | `11155111` | supported | deployed |
 | Robinhood Chain Testnet | `46630` | experimental | deployed |
 | Base | `8453` | beta | deployed |
-| Robinhood Chain | `4663` | disabled | deployed |
+| Robinhood Chain | `4663` | beta | deployed |
 | Ethereum | `1` | disabled | not deployed |
 
 “Experimental” means deliberate testnet qualification. “Beta” means production use is enabled with

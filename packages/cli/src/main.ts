@@ -187,7 +187,7 @@ function assertKnownChainEnv(): void {
     process.stderr.write(
       `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
         (mainnetish
-          ? `  Base is available as beta with ABX_CHAIN=base. Other production networks remain disabled.\n` +
+          ? `  Base and Robinhood Chain are available as beta with ABX_CHAIN=base or ABX_CHAIN=robinhood. Ethereum remains disabled.\n` +
             `  Prove the same flow on the paired testnet before using real funds.\n\n`
           : `  Unset it to use the default (${DEFAULT_CHAIN_KEY}), or set one of the above.\n\n`),
     );

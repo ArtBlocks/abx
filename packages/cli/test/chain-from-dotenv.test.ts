@@ -78,27 +78,7 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
     }
   });
   assert.match(out, /is not a recognized chain/);
-  assert.match(out, /Base is available as beta/, 'a mainnet-ish alias gets the current production explanation');
-});
-
-test('a recognized but disabled production chain is REFUSED with its registry status', () => {
-  const out = withDotEnv('ABX_CHAIN=robinhood\n', (dir) => {
-    try {
-      execFileSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'doctor'], {
-        cwd: dir,
-        encoding: 'utf8',
-        env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
-        timeout: 60_000,
-      });
-      return '';
-    } catch (e) {
-      const err = e as {stdout?: string; stderr?: string};
-      return (err.stdout ?? '') + (err.stderr ?? '');
-    }
-  });
-  assert.match(out, /ABX_CHAIN="robinhood" is recognized but disabled/);
-  assert.match(out, /chain 4663, production/);
-  assert.match(out, /paired robinhood-testnet network/);
+  assert.match(out, /Base and Robinhood Chain are available as beta/, 'a mainnet-ish alias gets the current production explanation');
 });
 
 test('Base is selectable but every substantive invocation prints the production-beta warning', () => {
@@ -115,6 +95,23 @@ test('Base is selectable but every substantive invocation prints the production-
   assert.match(result.stderr, /Real funds and irreversible state are at risk/);
   const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
   assert.equal(capabilities.chains.find((chain) => chain.key === 'base')?.supportLevel, 'beta');
+});
+
+test('Robinhood Chain is selectable but every substantive invocation prints the production-beta warning', () => {
+  const result = withDotEnv('ABX_CHAIN=robinhood\n', (dir) =>
+    spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
+      timeout: 60_000,
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Robinhood Chain production beta \(chain 4663\)/);
+  assert.match(result.stderr, /Real funds and irreversible state are at risk/);
+  assert.match(result.stderr, /Prove the flow on robinhood-testnet/);
+  const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'robinhood')?.supportLevel, 'beta');
 });
 
 test('Robinhood Chain Testnet is selectable but every substantive invocation prints the experimental warning', () => {

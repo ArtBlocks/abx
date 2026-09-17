@@ -45,7 +45,7 @@
       "environment": "production",
       "pairedChain": "robinhood-testnet",
       "contractStatus": "deployed",
-      "supportLevel": "disabled"
+      "supportLevel": "beta"
     },
     {
       "key": "ethereum",
