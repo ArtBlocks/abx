@@ -55,6 +55,7 @@ test('hot lane with no key is refused — and the message says nothing was spent
 test('the lanes that deliberately have no local key are NOT refused', () => {
   withKey('', () => {
     assertLaneCanSign({sign: true, for: WALLET} as unknown as Flags); // browser wallet
+    assertLaneCanSign({sponsor: true} as unknown as Flags); // ABX creator wallet
     assertLaneCanSign({unsigned: true} as unknown as Flags); // offline signer
     assertLaneCanSign({'dry-run': true, for: WALLET} as unknown as Flags); // preview spends nothing
   });

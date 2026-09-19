@@ -11,11 +11,23 @@ import type {Flags} from './flags.js';
  * matrices in prose.
  */
 export const ABX_CAPABILITIES = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   defaultChain: DEFAULT_CHAIN_KEY,
   chains: CHAIN_SUPPORT,
   /** Compatibility field for consumers that only need selectable chain keys. */
   supportedChains: [...KNOWN_CHAIN_KEYS],
+  signingLanes: {
+    send: {flag: '--send', summary: 'local environment key pays gas', supportLevel: 'supported'},
+    sign: {flag: '--sign', summary: 'connected browser wallet pays gas', supportLevel: 'supported'},
+    sponsor: {
+      flag: '--sponsor',
+      summary: 'account-bound ABX creator wallet; ABX Services pays eligible gas',
+      supportLevel: 'beta',
+      chainIds: [84_532],
+      limits: ['zero value', '3,000,000 gas per transaction', 'no direct CREATE', 'no staged --onchain-image'],
+    },
+    unsigned: {flag: '--unsigned', summary: 'print for an external signer', supportLevel: 'supported'},
+  },
   deploymentCommands: {
     deploy: {
       artifact: 'one static work',
@@ -129,13 +141,17 @@ export function cmdCapabilities(flags: Flags): void {
     return;
   }
 
-  console.log('ABX capability contract v2\n');
+  console.log(`ABX capability contract v${ABX_CAPABILITIES.schemaVersion}\n`);
   console.log(`Default chain: ${ABX_CAPABILITIES.defaultChain}`);
   console.log('Networks:');
   for (const chain of ABX_CAPABILITIES.chains) {
     console.log(
       `  ${chain.key} (${chain.chainId}): ${chain.environment} · ${chain.supportLevel} · contracts ${chain.contractStatus}`,
     );
+  }
+  console.log('Signing lanes:');
+  for (const lane of Object.values(ABX_CAPABILITIES.signingLanes)) {
+    console.log(`  ${lane.flag}: ${lane.summary} · ${lane.supportLevel}`);
   }
   console.log('Native deployment lanes:');
   for (const [name, lane] of Object.entries(ABX_CAPABILITIES.deploymentCommands)) {

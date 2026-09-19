@@ -1,0 +1,35 @@
+---
+title: "Creator wallet"
+description: "Deploy on Base Sepolia without bringing a wallet or faucet funds."
+---
+
+ABX Services can give a verified account one embedded creator wallet. The wallet address stays tied
+to the account's email and API key; the API key cannot sign.
+
+This is an early beta on **Base Sepolia only**. Sponsorship is policy-limited and may be paused.
+Bring-your-own wallet flows remain available everywhere.
+
+```bash
+abx auth login
+abx deploy ... --dry-run --json
+abx deploy ... --sponsor
+```
+
+The real send opens Privy once. Match the code, review the transaction group, and authorize the
+agent. The CLI keeps that grant only in memory, signs each exact request, and discards it when the
+command ends. ABX Services adds its provider credential and relays only eligible transactions.
+
+Current limits:
+
+- Base Sepolia (`84532`) only;
+- zero ETH value;
+- at most 3,000,000 gas per transaction;
+- no direct contract creation—ABX factory deployments are supported;
+- staged `--onchain-image` uploads are not yet supported in this lane.
+
+An ambiguous submission is never retried. Keep the operation ID from the error and check its status
+before taking another action.
+
+ABX sponsorship is a convenience, not part of the protocol. You can use `--send`, `--sign`, or
+`--unsigned` instead. Before any production-network work, prove the flow on its paired testnet and
+use your own funded signer.

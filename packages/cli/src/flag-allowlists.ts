@@ -32,6 +32,7 @@
 export const SHARED_WRITE = [
   'send',
   'sign',
+  'sponsor',
   'unsigned',
   'dry-run',
   'yes',

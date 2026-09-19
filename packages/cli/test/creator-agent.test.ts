@@ -1,0 +1,68 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
+import {assertSponsorConfigured} from '../src/creator-signer.js';
+
+const json = (value: unknown, status = 200) =>
+  new Response(JSON.stringify(value), {status, headers: {'content-type': 'application/json'}});
+
+test('creator agent starts a device grant without sending credentials', async () => {
+  let request: RequestInit | undefined;
+  const auth = new CreatorAgentAuthorization({
+    appId: 'app_test',
+    fetchImpl: (async (url, init) => {
+      assert.equal(url, 'https://auth.privy.io/api/oauth/v2/device_authorization');
+      request = init;
+      return json({
+        device_code: 'device_123',
+        user_code: 'ABCD-EFGH',
+        verification_uri: 'https://auth.privy.io/activate',
+        verification_uri_complete: 'https://auth.privy.io/activate?code=ABCD-EFGH',
+        expires_in: 600,
+        interval: 5,
+      });
+    }) as typeof fetch,
+  });
+  const device = await auth.start();
+  assert.equal(device.userCode, 'ABCD-EFGH');
+  assert.equal(device.verificationUriComplete, 'https://auth.privy.io/activate?code=ABCD-EFGH');
+  assert.equal((request?.headers as Record<string, string>).authorization, undefined);
+  assert.equal((request?.headers as Record<string, string>)['privy-app-id'], 'app_test');
+  auth.dispose();
+});
+
+test('creator agent refuses an unsafe verification URL', async () => {
+  const auth = new CreatorAgentAuthorization({
+    appId: 'app_test',
+    fetchImpl: (async () =>
+      json({
+        device_code: 'device_123',
+        user_code: 'ABCD-EFGH',
+        verification_uri: 'http://attacker.example/activate',
+        expires_in: 600,
+      })) as typeof fetch,
+  });
+  await assert.rejects(() => auth.start(), (error: unknown) => {
+    assert.ok(error instanceof CreatorAuthorizationError);
+    assert.equal(error.code, 'invalid_verification_url');
+    return true;
+  });
+});
+
+test('creator agent validates the public app id before any request', () => {
+  assert.throws(() => new CreatorAgentAuthorization({appId: 'bad app id'}), /invalid_app_id/);
+});
+
+test('sponsor preflight is Base Sepolia only and requires the account API key', () => {
+  const before = process.env.ABX_SERVICES_API_KEY;
+  try {
+    delete process.env.ABX_SERVICES_API_KEY;
+    assert.throws(() => assertSponsorConfigured('base'), /Base Sepolia only/);
+    assert.throws(() => assertSponsorConfigured('base-sepolia'), /ABX_SERVICES_API_KEY/);
+    process.env.ABX_SERVICES_API_KEY = 'abx_test_key';
+    assert.doesNotThrow(() => assertSponsorConfigured('base-sepolia'));
+  } finally {
+    if (before === undefined) delete process.env.ABX_SERVICES_API_KEY;
+    else process.env.ABX_SERVICES_API_KEY = before;
+  }
+});
