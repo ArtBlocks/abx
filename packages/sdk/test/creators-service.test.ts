@@ -98,3 +98,26 @@ test('errors expose only stable service codes and writes are never retried', asy
   );
   assert.equal(calls, 1);
 })
+
+test('service URL normalization is bounded and strips trailing slashes', async () => {
+  let seen = '';
+  const client = new CreatorApiClient({
+    baseUrl: 'https://api.example///',
+    token: 'api-key',
+    fetchImpl: (async (url) => {
+      seen = String(url);
+      return Response.json({
+        accountId: 'account-1',
+        emailVerified: true,
+        wallet: null,
+        capabilities: {wallet: false, sponsorship: false, sponsoredChains: []},
+      });
+    }) as typeof fetch,
+  });
+  await client.account();
+  assert.equal(seen, 'https://api.example/v1/account');
+  assert.throws(
+    () => new CreatorApiClient({baseUrl: `https://api.example/${'/'.repeat(2_048)}`, token: 'api-key'}),
+    /URL is too long/,
+  );
+})

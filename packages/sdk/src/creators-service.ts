@@ -111,7 +111,10 @@ export class CreatorApiClient {
   readonly #timeoutMs: number;
 
   constructor(options: CreatorApiClientOptions) {
-    this.#baseUrl = (options.baseUrl ?? ABX_CREATORS_API_URL).replace(/\/+$/, '');
+    let baseUrl = options.baseUrl ?? ABX_CREATORS_API_URL;
+    if (baseUrl.length > 2_048) throw new Error('ABX Creators service URL is too long');
+    while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+    this.#baseUrl = baseUrl;
     this.#token = options.token;
     this.#fetch = options.fetchImpl ?? fetch;
     this.#timeoutMs = options.timeoutMs ?? 20_000;
