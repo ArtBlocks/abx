@@ -29,9 +29,10 @@ function allSourceFiles(): string[] {
 
 // ── laneFromFlags: the one place --sign/--unsigned/default-send is decided ───
 
-test('laneFromFlags: default send; --sign → wallet; --unsigned → cold', () => {
+test('laneFromFlags: default send; named wallet, sponsor, and cold lanes', () => {
   assert.equal(laneFromFlags({}), 'send');
   assert.equal(laneFromFlags({sign: 'true'}), 'sign');
+  assert.equal(laneFromFlags({sponsor: 'true'}), 'sponsor');
   assert.equal(laneFromFlags({unsigned: 'true'}), 'unsigned');
   // `--sign --unsigned` used to resolve by precedence (unsigned won). It is refused now — see the
   // lane-flag tests at the bottom of this file for why a silent pick is the wrong answer.
@@ -45,6 +46,7 @@ test('previewSigner: hot lane derives the env-key account; explicit and non-hot 
   const explicit = '0x0248A8d137bdAd8ed91D5Bf9eddcDC09d095b13C' as Address;
   assert.equal(previewSigner({} as Flags, explicit, key), explicit);
   assert.equal(previewSigner({sign: 'true'} as Flags, undefined, key), undefined);
+  assert.equal(previewSigner({sponsor: 'true'} as Flags, undefined, key), undefined);
   assert.equal(previewSigner({unsigned: 'true'} as Flags, undefined, key), undefined);
   assert.equal(previewSigner({} as Flags, undefined, '0x1234'), undefined);
 });
@@ -193,6 +195,7 @@ test('laneFromFlags: --send is the hot/env lane, and bare is the same lane', () 
   assert.equal(laneFromFlags({send: 'true'} as Flags), 'send');
   assert.equal(laneFromFlags({} as Flags), 'send');
   assert.equal(laneFromFlags({sign: 'true'} as Flags), 'sign');
+  assert.equal(laneFromFlags({sponsor: 'true'} as Flags), 'sponsor');
   assert.equal(laneFromFlags({unsigned: 'true'} as Flags), 'unsigned');
 });
 
@@ -201,6 +204,7 @@ test('laneFromFlags: a lane named with an EMPTY value still selects that lane', 
   // they asked for a browser approval and would have got an unattended signature from the env key
   // instead, which is the only direction of this bug that costs anything. Presence selects.
   assert.equal(laneFromFlags({sign: ''} as Flags), 'sign');
+  assert.equal(laneFromFlags({sponsor: ''} as Flags), 'sponsor');
   assert.equal(laneFromFlags({unsigned: ''} as Flags), 'unsigned');
   assert.equal(laneFromFlags({send: ''} as Flags), 'send');
 });
@@ -209,7 +213,7 @@ test('laneFromFlags: two lane flags is refused, not silently resolved by precede
   // The precedence order is an implementation detail. An agent assembling flags from two help lines
   // gets `--send --sign`, and silently picking the wallet page means a browser wait it reads as a
   // hang — so the refusal names all three lanes and what each does.
-  for (const flags of [{send: '', sign: ''}, {send: '', unsigned: ''}, {sign: '', unsigned: ''}, {send: '', sign: '', unsigned: ''}]) {
+  for (const flags of [{send: '', sign: ''}, {send: '', sponsor: ''}, {sponsor: '', unsigned: ''}, {sign: '', unsigned: ''}, {send: '', sign: '', sponsor: '', unsigned: ''}]) {
     assert.throws(() => laneFromFlags(flags as Flags), /pick ONE signing lane/);
   }
 });
@@ -231,7 +235,7 @@ test('every deploy family allowlist accepts the three lane flags its help docume
     ['DEPLOY_CODE_FLAGS', DEPLOY_CODE_FLAGS],
     ['DEPLOY_CODE_EDITION_FLAGS', DEPLOY_CODE_EDITION_FLAGS],
   ] as Array<[string, Set<string>]>) {
-    for (const lane of ['send', 'sign', 'unsigned']) {
+    for (const lane of ['send', 'sign', 'sponsor', 'unsigned']) {
       assert.ok(set.has(lane), `${name} rejects --${lane}, which its own help advertises`);
     }
   }

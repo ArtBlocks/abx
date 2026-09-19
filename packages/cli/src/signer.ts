@@ -17,6 +17,7 @@ import {
 } from '@artblocks/abx-sdk';
 import type {TransactionReceipt} from 'viem';
 import {faucetHint} from './config.js';
+import {openSponsoredSession} from './creator-signer.js';
 
 /**
  * The signing harness — the one place a write transaction turns into a signature.
@@ -26,13 +27,14 @@ import {faucetHint} from './config.js';
  *   • send (hot)     — sign with the env key and broadcast. Autonomous agents, testnet, low stakes.
  *   • sign (wallet)  — serve a one-shot, operation-aware localhost page; a human approves in their
  *                      own wallet (the key never touches this process). Real value, mainnet.
+ *   • sponsor        — one ephemeral Privy authorization; ABX Services relays an eligible testnet tx.
  *   • unsigned (cold)— print the tx data to sign elsewhere (a multisig / offline signer).
  *
  * The agent picks the lane; the CLI owns the mechanics. Signing is the only step
  * that ever differs — everything up to the prepared tx, and the re-index after,
  * is identical across lanes.
  */
-export type Lane = 'send' | 'sign' | 'unsigned';
+export type Lane = 'send' | 'sign' | 'sponsor' | 'unsigned';
 
 /** A prepared tx, or — when the signer's address is needed to build it (deploy) — a builder of one. */
 export type TxProvider = PreparedTx | ((signer: Address) => PreparedTx | Promise<PreparedTx>);
@@ -152,8 +154,28 @@ export async function signTx(provider: TxProvider, opts: SignOptions): Promise<S
       return signHot(provider, opts);
     case 'sign':
       return signWallet(provider, opts);
+    case 'sponsor':
+      return signSponsored(provider, opts);
     case 'unsigned':
       return signCold(provider, opts);
+  }
+}
+
+async function signSponsored(provider: TxProvider, opts: SignOptions): Promise<SignResult> {
+  const session = await openSponsoredSession(opts.chainKey);
+  try {
+    if (opts.expectedSigner && opts.expectedSigner.toLowerCase() !== session.address.toLowerCase()) {
+      throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${opts.expectedSigner}.`);
+    }
+    const prepared = await resolveTx(provider, session.address);
+    printIntent(prepared, {...opts, expectedSigner: session.address});
+    console.log(`\n  ${dim(`requesting sponsored send from ${session.address} …`)}`);
+    const {txHash, receipt} = await session.send(prepared);
+    console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${txHash}`);
+    console.log(`  ${green('✓')} sponsored and confirmed`);
+    return {txHash, prepared, blockNumber: receipt.blockNumber};
+  } finally {
+    session.close();
   }
 }
 

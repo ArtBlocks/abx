@@ -17,6 +17,8 @@ function run(args: string[]): string {
 
 test('capabilities --json emits the typed capability contract exactly', () => {
   assert.deepEqual(JSON.parse(run(['capabilities', '--json'])), ABX_CAPABILITIES);
+  assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.chainIds, [84_532]);
+  assert.equal(ABX_CAPABILITIES.signingLanes.sponsor.supportLevel, 'beta');
 });
 
 test('EditionCode supported capability flags reach its exhaustive allowlist', () => {

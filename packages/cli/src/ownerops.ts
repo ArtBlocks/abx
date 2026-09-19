@@ -145,6 +145,7 @@ import {detectTokenKind, describeKind, isEditionContract, assertHasParamsSurface
 import {planOnChainScript} from './script-chunks.js';
 import {fetchServedTokenUri, servedOk} from './served.js';
 import {openWalletSession, type SignResult, type TxProvider, type WalletSession} from './signer.js';
+import {openSponsoredSession} from './creator-signer.js';
 import {gatedSend, laneFromFlags} from './riskgate.js';
 import {withJson} from './jsonout.js';
 import {resolveRemote, serviceClient} from './remote.js';
@@ -213,14 +214,14 @@ function fitsLiteralBytes32(value: string): boolean {
 }
 
 /** Flags `abx attach` recognizes — anything else warns (non-fatal), so a silent no-op flag surfaces. */
-const ATTACH_FLAGS = ['file', 'compress', 'collection', 'token', 'send', 'sign', 'unsigned', 'yes', 'dry-run', 'confirm', 'port', 'sign-url-file', 'remote'];
+const ATTACH_FLAGS = ['file', 'compress', 'collection', 'token', 'send', 'sign', 'sponsor', 'unsigned', 'yes', 'dry-run', 'confirm', 'port', 'sign-url-file', 'remote'];
 
 /**
  * The flags EVERY owner write accepts, regardless of command — the signing lane (`laneFromFlags`),
  * the opt-in confirm gate, the wallet-lane plumbing, the post-write reindex nudge, and `--json`.
  * Factored out so a per-command allowlist below only has to name that command's OWN flags.
  */
-const SHARED_WRITE_FLAGS = ['send', 'sign', 'unsigned', 'dry-run', 'yes', 'confirm', 'port', 'sign-url-file', 'remote', 'remote-token', 'json'];
+const SHARED_WRITE_FLAGS = ['send', 'sign', 'sponsor', 'unsigned', 'dry-run', 'yes', 'confirm', 'port', 'sign-url-file', 'remote', 'remote-token', 'json'];
 
 /**
  * Per-command allowlists for the owner ops where a silently-ignored flag changes MONEY or SUPPLY.
@@ -1968,7 +1969,7 @@ export function envStagingSender(): SendTx {
 /** Wallet-lane staging signer: each chunk-store write is approved in the human's browser
  *  wallet through the open {@link WalletSession}, sharing one connection with the final tx. A
  *  {@link PreparedTx} already carries everything `session.send` needs, so this is a thin adapter. */
-export function sessionStagingSender(session: WalletSession): SendTx {
+export function sessionStagingSender(session: Pick<WalletSession, 'send'>): SendTx {
   return async (tx) => (await session.send(tx)).receipt;
 }
 
@@ -2427,6 +2428,24 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
       'Staging on-chain content (--file) needs interactive signing — each chunk tx feeds the next, ' +
         "so it can't run on the cold lane (--unsigned). Use the hot lane (a funded key) or --sign (browser wallet).",
     );
+  }
+
+  if (staging && lane === 'sponsor') {
+    const compress = parseCompress(flags.compress);
+    const bytes = readFileSync(resolvePath(flags.file as string));
+    const session = await openSponsoredSession(CHAIN);
+    if (session.address.toLowerCase() !== owner.toLowerCase()) {
+      session.close();
+      throw new Error(`The ABX creator wallet ${session.address} is not this contract's owner ${owner}.`);
+    }
+    try {
+      const {value, representation} = await putContentOnChain(bytes, compress, field, sessionStagingSender(session));
+      await session.send(buildTx(value, representation));
+    } finally {
+      session.close();
+    }
+    await reindexIfKnown(contract, flags);
+    return;
   }
 
   // Wallet lane + on-chain staging: ONE sign session signs every chunk write AND the field-set,

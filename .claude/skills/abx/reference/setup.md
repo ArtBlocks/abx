@@ -166,3 +166,8 @@ human confirmation authorizes execution.
 7. Run `abx remote <name>` before relying on a configured managed service.
 8. Run command help, then a JSON dry run.
 9. Confirm the plan and only then execute.
+
+For an eligible first-party account on Base Sepolia, `--sponsor` replaces the local private key and
+faucet balance with an account-bound creator wallet plus one ephemeral Privy authorization per CLI
+transaction group. Read [services.md](services.md) before using it. It is beta, testnet-only,
+zero-value, and never a reason to skip the dry run or transaction summary.

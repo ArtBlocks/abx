@@ -194,6 +194,7 @@ import {describeSchema, editionSchemaAdvisory, parseSchemaSpecs} from '../schema
 import {parseSeriesTraits} from '../series-traits.js';
 import {decodeOnChainJson} from '../served.js';
 import {openWalletSession, signHotSequence, signTx, type SignResult} from '../signer.js';
+import {assertSponsorConfigured, openSponsoredSession} from '../creator-signer.js';
 
 // ── plan-object warning capture ──────────────────────────────────────────────────────────────────
 // The structured `--json` plan object (deploy-plan.ts) reports "the warnings the lane raised"
@@ -819,6 +820,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // for their browser wallet — a signing choke point that ignored the lane it was handed. The demo
   // deploy is a single tx, so the wallet lane works here exactly as it does for `deploy`.
   const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   // The cold lane only PRINTS a tx; demo's whole point is to index + serve what it just deployed,
   // and there is nothing to index until someone broadcasts. Refuse the combo instead of doing
   // half the job — `abx deploy --unsigned` is the command for that lane.
@@ -1032,10 +1034,10 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     if (!flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
     // On-chain staging is a SEQUENCE (chunk write(s) → the deploy that references the manifest)
     // where each tx's receipt feeds the next, so it can't be signed offline in one run.
-    if (lane === 'unsigned') {
+    if (lane === 'unsigned' || lane === 'sponsor') {
       throw new Error(
         'Staging an on-chain image (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-          "the next, so it can't run on the cold lane (--unsigned). Use the hot lane (a funded key) or --sign (browser wallet).",
+          "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
       );
     }
     step('Stage on-chain image');
@@ -1575,6 +1577,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   if (editionSize === 1n) info(copiesOneNote('deploy'));
 
   const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const dryRun = isDryRun(flags);
   const onchainImage = !!flags['onchain-image'];
   // Pure flag-combo validation — checked BEFORE any chain read (predict/factory/renderer all touch
@@ -1584,10 +1587,10 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   // every lineage, 721 and edition alike. The wallet lane CAN do it (one session signs the chunk
   // writes and the deploy); this edition path was hot-lane-only purely because it lacked that
   // session branch, which it now has.
-  if (onchainImage && lane === 'unsigned') {
+  if (onchainImage && (lane === 'unsigned' || lane === 'sponsor')) {
     throw new Error(
       'Staging an on-chain image (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-        "the next, so it can't run on the cold lane (--unsigned). Use the hot lane (a funded key) or --sign (browser wallet).",
+        "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
     );
   }
   if (dryRun) assertPreviewDeployer(flags);
@@ -2047,6 +2050,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   if (dryRun) assertPreviewDeployer(flags); // fail fast, before the preview does any work (see cmdDeploy)
   assertRealIdentity(flags, {name, symbol, dryRun});
   const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const publicClient = makePublicClient({chainKey: CHAIN});
   // Catch a wrong-network RPC with the clear mismatch message even on dry-run (which still reads
   // the chain to predict the address); tolerate an unreachable RPC so an offline preview still works.
@@ -2069,10 +2073,10 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   // Staging is a SEQUENCE (chunk write(s) → the deploy that references each manifest) where each
   // receipt feeds the next, so it can't be signed offline in one pass — reject the cold lane
   // up front (same rule as the 1/1's --onchain-image).
-  if (onchainImage && lane === 'unsigned') {
+  if (onchainImage && (lane === 'unsigned' || lane === 'sponsor')) {
     throw new Error(
       'Staging on-chain images (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-        "the next, so it can't run on the cold lane (--unsigned). Use the hot lane (a funded key) or --sign (browser wallet).",
+        "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
     );
   }
   // Whole-collection WRITE-cost guard: a set of many small files can still sum to an expensive
@@ -2711,15 +2715,16 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   if (dryRun) assertPreviewDeployer(flags);
   assertRealIdentity(flags, {name, symbol, dryRun});
   const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const onchainImage = !!flags['onchain-image'];
   const compress = parseCompress(flags.compress);
   // Staging is a SEQUENCE (chunk writes → the deploy that references each manifest) where every tx's
   // receipt feeds the next, so it can't be signed offline in one run. Refused on the cold lane for the
   // same reason on every lineage, 721 and edition alike; hot + wallet both work.
-  if (onchainImage && lane === 'unsigned') {
+  if (onchainImage && (lane === 'unsigned' || lane === 'sponsor')) {
     throw new Error(
       'Staging on-chain images (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-        "the next, so it can't run on the cold lane (--unsigned). Use the hot lane (a funded key) or --sign (browser wallet).",
+        "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
     );
   }
   const publicClient = makePublicClient({chainKey: CHAIN});
@@ -3421,7 +3426,7 @@ export const DEPLOY_CODE_FLAGS = new Set([
   // storage (directory mode) — mirrors storageOverrides()
   'backend', 'endpoint', 'bucket', 'region', 'prefix', 'public-base', 'gateway', 'mode', 'api-url', 'upload-url', 'provider', 'storage-signer',
   // signing lane + safety + trust anchor ('send' = the default lane, stated explicitly; see SHARED_DEPLOY_FLAGS)
-  'send', 'sign', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'sponsor', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   // preview / confirm
   'dry-run', 'confirm', 'yes',
   'json', // the deployed address as data, narration to stderr
@@ -3447,7 +3452,7 @@ export const SHARED_DEPLOY_FLAGS = [
   // ignored — the guard firing on the tool's own documentation. Explicit is also better than bare for
   // a script or an agent: the lane that signs and sends is worth stating out loud.
   'send',
-  'sign', 'unsigned', 'for', 'sign-url-file', 'dry-run', 'confirm', 'yes', 'salt', 'factory', 'bootstrap-factory', 'port', 'renderer', 'public-base-url',
+  'sign', 'sponsor', 'unsigned', 'for', 'sign-url-file', 'dry-run', 'confirm', 'yes', 'salt', 'factory', 'bootstrap-factory', 'port', 'renderer', 'public-base-url',
   '721c', // opt-in ERC-721C enrollment (recommended | 0x…) — every deploy path takes it
   'json', // the deployed address as data, narration to stderr — every deploy path takes it
 ];
@@ -4520,6 +4525,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
 
   step('Deploy');
   const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   // --onchain-uri with no explicit public URL: leave the off-chain pointer EMPTY rather than
   // baking a misleading localhost (the renderer is authoritative while set) — the same rule as
   // the 1/1's on-chain lane. The renderers themselves are set as setup-multicall legs, so the
@@ -4906,6 +4912,24 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     } finally {
       session.close();
     }
+  } else if (lane === 'sponsor') {
+    const session = await openSponsoredSession(CHAIN);
+    try {
+      if (flags.for && String(flags.for).toLowerCase() !== session.address.toLowerCase()) {
+        throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
+      }
+      deployerAddr = session.address;
+      const {clone: predicted, txs} = await preparedFor(session.address);
+      let first: bigint | undefined;
+      for (const tx of txs) {
+        const sent = await session.send(tx);
+        if (first === undefined) first = sent.receipt.blockNumber;
+      }
+      clone = predicted;
+      deployBlock = first ?? 0n;
+    } finally {
+      session.close();
+    }
   } else {
     // hot lane: the env key signs the WHOLE sequence (deploy, then the setup multicall that
     // targets the clone the deploy just created) through one `makeHotSender` — nonce pinned once,
@@ -5073,7 +5097,7 @@ export const DEPLOY_CODE_EDITION_FLAGS = new Set<string>([
   'max', 'mint-count', 'mint-all', 'no-mint', 'mint-amount', 'unpaused', 'minter', 'primary-payee', 'royalty-bps', 'royalty-cap', 'burnable', '721c',
   'schema', 'no-seed', 'seed-source',
   'public-base-url', 'onchain-uri', 'generator', 'renderer', 'port',
-  'send', 'sign', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'sponsor', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   'dry-run', 'confirm', 'yes', 'json', 'copies',
   // storage (directory mode + --image-base's off-chain still) — mirrors storageOverrides(), same
   // allowlist entries as the 721 twin's DEPLOY_CODE_FLAGS.
@@ -5410,6 +5434,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
 
   step('Deploy');
   const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const minter = (flags.minter as Address) ?? zeroAddress;
   const primaryPayee = (flags['primary-payee'] as Address) ?? zeroAddress;
   const explicitSalt = parseSaltFlag(flags.salt);
@@ -5622,6 +5647,24 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
       const signer = await session.connect();
       deployerAddr = signer;
       const {clone: predicted, txs} = await preparedFor(signer);
+      let first: bigint | undefined;
+      for (const tx of txs) {
+        const sent = await session.send(tx);
+        if (first === undefined) first = sent.receipt.blockNumber;
+      }
+      clone = predicted;
+      deployBlock = first ?? 0n;
+    } finally {
+      session.close();
+    }
+  } else if (lane === 'sponsor') {
+    const session = await openSponsoredSession(CHAIN);
+    try {
+      if (flags.for && String(flags.for).toLowerCase() !== session.address.toLowerCase()) {
+        throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
+      }
+      deployerAddr = session.address;
+      const {clone: predicted, txs} = await preparedFor(session.address);
       let first: bigint | undefined;
       for (const tx of txs) {
         const sent = await session.send(tx);
