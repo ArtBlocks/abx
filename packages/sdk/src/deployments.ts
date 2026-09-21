@@ -21,7 +21,8 @@
  *   - manifest: the canonical address below
  *
  * DEPLOYMENT SCOPE: canonical infrastructure is live on Base Sepolia (the default, chainId 84532),
- * Sepolia (11155111), Robinhood Chain Testnet (46630), Base (8453), and Robinhood Chain (4663).
+ * Sepolia (11155111), Robinhood Chain Testnet (46630), Arbitrum Sepolia (421614), Base (8453),
+ * and Robinhood Chain (4663).
  * `chain-support.json` separately records whether each deployment is selectable; an address here
  * does not by itself enable a network. Absence here always means no canonical deployment.
  *
@@ -177,6 +178,15 @@ export const DEPLOYMENTS: Record<number, ChainDeployment> = {
   46630: {
     ...CANONICAL,
     generator: '0x4F74De4835B51414a4DA83527589aEDc41A26FaE',
+  },
+  // Arbitrum Sepolia (experimental). Canonical infrastructure deployed from this release on
+  // 2026-09-21. No canonical dependency registry exists, so the generator fallback is address(0).
+  // SSTORE2 asset pointers:
+  // abxJsPointer 0x3B5DE3BC8952a4ee2c6c8a593f5185e134942696,
+  // gunzipScriptPointer 0xfD621D47b26c6674d446d63B883539090e316918.
+  421614: {
+    ...CANONICAL,
+    generator: '0x53818B5d272E24BE03358350fbe67FBEe59cE239',
   },
   // Base (production beta). Contracts are deployed and source-verified. Base has no configured Art
   // Blocks DependencyRegistry. SSTORE2 asset pointers:

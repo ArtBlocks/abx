@@ -18,12 +18,25 @@ test('chain registry separates recognized networks from selectable networks', ()
     'base-sepolia',
     'sepolia',
     'robinhood-testnet',
+    'arbitrum-sepolia',
     'base',
     'robinhood',
+    'arbitrum',
     'ethereum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'base', 'robinhood']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 5);
+  assert.deepEqual(KNOWN_CHAIN_KEYS, [
+    'base-sepolia',
+    'sepolia',
+    'robinhood-testnet',
+    'arbitrum-sepolia',
+    'base',
+    'robinhood',
+  ]);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 6);
+  assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
+  assert.equal(chainSupportByKey('arbitrum-sepolia')?.supportLevel, 'experimental');
+  assert.equal(chainSupportByKey('arbitrum')?.contractStatus, 'not-deployed');
+  assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'disabled');
   assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
@@ -50,6 +63,14 @@ test('Base has a keyless default RPC for beta access', () => {
 
 test('Robinhood Chain has a keyless default RPC for beta access', () => {
   assert.deepEqual(resolveRpcUrls('robinhood'), ['https://rpc.mainnet.chain.robinhood.com']);
+});
+
+test('Arbitrum Sepolia has a keyless default RPC for qualification', () => {
+  assert.deepEqual(resolveRpcUrls('arbitrum-sepolia'), ['https://sepolia-rollup.arbitrum.io/rpc']);
+});
+
+test('Arbitrum One has a keyless default RPC ready for production beta', () => {
+  assert.deepEqual(resolveRpcUrls('arbitrum'), ['https://arb1.arbitrum.io/rpc']);
 });
 
 test('redactRpcUrlsInText removes credential-bearing configured endpoints from upstream errors', () => {

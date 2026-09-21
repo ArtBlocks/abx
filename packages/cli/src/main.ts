@@ -183,11 +183,11 @@ function assertKnownChainEnv(): void {
         `  This release will not operate on it. Qualify the paired ${support.pairedChain} network and wait for an enabled release.\n\n`,
     );
   } else {
-    const mainnetish = /^(mainnet|homestead|eth|1|8453|4663)$/i.test(key.trim());
+    const mainnetish = /^(mainnet|homestead|eth|1|8453|4663|42161)$/i.test(key.trim());
     process.stderr.write(
       `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
         (mainnetish
-          ? `  Base and Robinhood Chain are available as beta with ABX_CHAIN=base or ABX_CHAIN=robinhood. Ethereum remains disabled.\n` +
+          ? `  Base and Robinhood Chain are available as beta with ABX_CHAIN=base or ABX_CHAIN=robinhood. Arbitrum and Ethereum remain disabled.\n` +
             `  Prove the same flow on the paired testnet before using real funds.\n\n`
           : `  Unset it to use the default (${DEFAULT_CHAIN_KEY}), or set one of the above.\n\n`),
     );

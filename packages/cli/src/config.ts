@@ -222,6 +222,7 @@ export function faucetHint(chainKey: string): string {
   const url: Record<string, string> = {
     'base-sepolia': 'https://portal.cdp.coinbase.com/products/faucet',
     sepolia: 'https://www.alchemy.com/faucets/ethereum-sepolia',
+    'arbitrum-sepolia': 'https://www.alchemy.com/faucets/arbitrum-sepolia',
   };
   return url[chainKey]
     ? `get free test ETH from a ${chainKey} faucet (${url[chainKey]} — or search "${chainKey} faucet"), usually ≤1 min`

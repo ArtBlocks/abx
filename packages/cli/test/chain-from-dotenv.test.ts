@@ -114,6 +114,22 @@ test('Robinhood Chain is selectable but every substantive invocation prints the 
   assert.equal(capabilities.chains.find((chain) => chain.key === 'robinhood')?.supportLevel, 'beta');
 });
 
+test('Arbitrum Sepolia is selectable but every substantive invocation prints the experimental warning', () => {
+  const result = withDotEnv('ABX_CHAIN=arbitrum-sepolia\n', (dir) =>
+    spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
+      timeout: 60_000,
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Arbitrum Sepolia experimental \(chain 421614\)/);
+  assert.match(result.stderr, /testnet integration is under qualification/);
+  const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'arbitrum-sepolia')?.supportLevel, 'experimental');
+});
+
 test('Robinhood Chain Testnet is selectable but every substantive invocation prints the experimental warning', () => {
   const result = withDotEnv('ABX_CHAIN=robinhood-testnet\n', (dir) =>
     spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {

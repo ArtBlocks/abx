@@ -61,6 +61,8 @@ export interface MintPageArtifact {
 export const PUBLIC_RPC: Record<number, string> = {
   1: 'https://ethereum-rpc.publicnode.com',
   11155111: 'https://ethereum-sepolia-rpc.publicnode.com',
+  42161: 'https://arb1.arbitrum.io/rpc',
+  421614: 'https://sepolia-rollup.arbitrum.io/rpc',
   8453: 'https://mainnet.base.org',
   84532: 'https://sepolia.base.org',
 };

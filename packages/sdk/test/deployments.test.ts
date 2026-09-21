@@ -23,10 +23,12 @@ const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
 const ROBINHOOD_TESTNET = 46630;
 const ROBINHOOD = 4663;
+const ARBITRUM_SEPOLIA = 421614;
 const BASE = 8453;
 const UNDEPLOYED = 10;
 const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
 const BASE_GENERATOR = '0x4F74De4835B51414a4DA83527589aEDc41A26FaE';
+const ARBITRUM_SEPOLIA_GENERATOR = '0x53818B5d272E24BE03358350fbe67FBEe59cE239';
 const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
 
 // Every recorded address must be a VALID EIP-55 checksum, not merely 40 hex characters.
@@ -61,6 +63,8 @@ test('manifest: shipped chains include the canonical generator + current rendere
   assert.equal(resolveRenderer(ROBINHOOD_TESTNET), RENDERER);
   assert.equal(resolveGenerator(ROBINHOOD), BASE_GENERATOR);
   assert.equal(resolveRenderer(ROBINHOOD), RENDERER);
+  assert.equal(resolveGenerator(ARBITRUM_SEPOLIA), ARBITRUM_SEPOLIA_GENERATOR);
+  assert.equal(resolveRenderer(ARBITRUM_SEPOLIA), RENDERER);
   // an unshipped chain resolves to nothing (the CLI degrades to guidance, never a silent deploy)
   assert.equal(resolveGenerator(UNDEPLOYED), undefined);
   assert.deepEqual(getDeployment(UNDEPLOYED), {});
@@ -83,9 +87,12 @@ test('lazy-deploy CREATE2 predictions equal the manifest addresses (all shipped 
   assert.equal(DEPLOYMENTS[ROBINHOOD_TESTNET].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(DEPLOYMENTS[ROBINHOOD].renderer, DEPLOYMENTS[SEPOLIA].renderer);
   assert.equal(DEPLOYMENTS[ROBINHOOD].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].renderer, DEPLOYMENTS[SEPOLIA].renderer);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].chunkStore, DEPLOYMENTS[SEPOLIA].chunkStore);
   assert.equal(DEPLOYMENTS[BASE].generator, BASE_GENERATOR);
   assert.equal(DEPLOYMENTS[ROBINHOOD_TESTNET].generator, BASE_GENERATOR);
   assert.equal(DEPLOYMENTS[ROBINHOOD].generator, BASE_GENERATOR);
+  assert.equal(DEPLOYMENTS[ARBITRUM_SEPOLIA].generator, ARBITRUM_SEPOLIA_GENERATOR);
 });
 
 // Precedence is override → env → manifest — identical to every other resolver (resolveRenderer
