@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: '%s · ABX',
   },
   description:
-    'Testnet tools for launching, selling, and serving NFTs with a CLI, SDK, or coding agent.',
+    'Launch, sell, and serve NFTs on Base and other EVM networks with the ABX CLI, SDK, or a coding agent.',
 };
 
 export default function Layout({ children }: LayoutProps<'/'>) {

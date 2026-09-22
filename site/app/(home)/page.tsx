@@ -14,7 +14,7 @@ export default function HomePage() {
         </div>
 
         <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>ABX / TESTNET</p>
+          <p className={styles.eyebrow}>ABX / OPEN PROTOCOL</p>
           <h1>Put it onchain.</h1>
           <p className={styles.lede}>
             ABX helps builders document digital objects on the blockchain. Agent-forward,
@@ -35,7 +35,7 @@ export default function HomePage() {
       </section>
 
       <footer className={styles.facts}>
-        <span>Alpha</span>
+        <span>Base mainnet</span>
         <span>Base Sepolia</span>
         <span>Built by the team at Art Blocks</span>
       </footer>
