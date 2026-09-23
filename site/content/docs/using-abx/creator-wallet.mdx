@@ -1,14 +1,15 @@
 ---
 title: "Creator wallet"
-description: "Deploy on Base Sepolia without bringing a wallet or faucet funds."
+description: "Deploy on eligible Base networks without bringing a funded wallet."
 ---
 
 ABX Services can give a verified account one embedded creator wallet. The wallet address stays tied
 to the account's email and API key; the API key cannot sign.
 
-This is an early beta on **Base Sepolia only**. Sponsorship is policy-limited and may be paused.
-When it is available, it is the recommended path for a first testnet launch: no private key, funded
-wallet, or faucet visit is required. Bring-your-own wallet flows remain available everywhere.
+This is a beta on **Base Sepolia** and, when the live service explicitly advertises it, **Base
+mainnet**. Sponsorship is policy-limited and may be paused. When it is available, it is the
+recommended path for a first testnet launch: no private key, funded wallet, or faucet visit is
+required. Bring-your-own wallet flows remain available everywhere.
 
 ```bash
 abx auth login
@@ -23,7 +24,8 @@ command ends. ABX Services adds its provider credential and relays only eligible
 
 Current limits:
 
-- Base Sepolia (`84532`) only;
+- Base Sepolia (`84532`), plus Base (`8453`) only when both the live provider and your account
+  advertise it;
 - zero ETH value;
 - at most 3,000,000 gas per transaction;
 - no direct contract creation—ABX factory deployments are supported;
@@ -34,5 +36,6 @@ before taking another action.
 
 The live remote and account response determine whether sponsorship is enabled. ABX sponsorship is a
 convenience, not part of the protocol. You can always use `--send`, `--sign`, or `--unsigned`
-instead. Before any production-network work, prove the flow on its paired testnet and use your own
-funded signer until the production chain is explicitly advertised for sponsorship.
+instead. Before a sponsored Base mainnet operation, prove the exact flow on Base Sepolia, review the
+production-network warning and permanent choices, and confirm that both the live descriptor and
+your account advertise chain `8453`.

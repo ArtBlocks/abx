@@ -19,13 +19,15 @@ import type {TransactionReceipt} from 'viem';
 import {CreatorAgentAuthorization} from './creator-agent.js';
 import {ABX_SERVICES_URL} from './remote.js';
 
-const BASE_SEPOLIA = 84_532;
+const SPONSORABLE_BASE_CHAINS = new Set([8_453, 84_532]);
 const MAX_SPONSORED_GAS = 3_000_000n;
 
 /** Synchronous preflight for commands that may upload content before opening the signing lane. */
 export function assertSponsorConfigured(chainKey: string): void {
-  if (resolveChain(chainKey).id !== BASE_SEPOLIA) {
-    throw new Error('--sponsor is an early beta on Base Sepolia only. Use --send, --sign, or --unsigned on this network.');
+  if (!SPONSORABLE_BASE_CHAINS.has(resolveChain(chainKey).id)) {
+    throw new Error(
+      '--sponsor is a beta for Base and Base Sepolia only, and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
+    );
   }
   if (!process.env.ABX_SERVICES_API_KEY) {
     throw new Error('--sponsor needs ABX_SERVICES_API_KEY in your ignored .env. Run `abx auth login` first.');

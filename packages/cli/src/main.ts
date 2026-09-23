@@ -64,7 +64,7 @@
  *
  * Every write picks a signing lane: default hot (env key signs), `--sign` (a human
  * approves in their own wallet via a one-shot localhost page), `--sponsor` (an eligible
- * Base Sepolia creator wallet), or `--unsigned` (print for a multisig / offline signer).
+ * eligible Base-network creator wallet), or `--unsigned` (print for a multisig / offline signer).
  *
  * Command bodies live in `commands/*.ts`, grouped by domain (deploy / project / reads / storage /
  * service / scaffold) — see `.claude/skills` and `contracts/README.md` conventions aside, this file
@@ -513,7 +513,7 @@ const COMMAND_HELP: Record<string, string> = {
                             ${dim('gateway and seeds the serving one for the backend in use, so passing only it still does what you meant.')}
     ${g('--storage-signer')} arweave|eth   who signs+pays Turbo (arweave) uploads: the CLI-managed key (default) or your ${g('.env')} EVM key
                             ${dim('(eth reuses credits you funded on that wallet; with --sign your browser wallet pays instead)')}
-    signing: ${g('--send')} hot/env key ${dim('(default)')} · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(Base Sepolia beta)')} · ${g('--unsigned')} print tx
+    signing: ${g('--send')} hot/env key ${dim('(default)')} · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} print tx
     ${dim('No key in .env? Deploy from your own wallet: ')}${g('--sign --for <your-addr>')}${dim(' (you approve in the browser; nothing is pasted).')}
     ${g('--dry-run')}             preview (commitment · URIs · mint plan · approvals) WITHOUT sending or storing
                             ${dim('(needs a deployer to compute anything address-dependent — pass --for 0x.. if no signing key is set)')}
@@ -1276,7 +1276,7 @@ function help() {
                             ${g('--salt')} 0x..  use a fixed/reserved address (see ${g('abx predict')})
                             storage override (else uses config): --backend --endpoint --bucket --region --gateway --upload-url
                             served-gateway preference (ipfs/arweave images): --ipfs-gateway <prefix> --arweave-gateway <prefix>  (floors: ipfs.io · arweave.net)
-                            signing: ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(Base Sepolia beta)')} · ${g('--unsigned')} print tx
+                            signing: ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} print tx
                             ${g('--dry-run')}  preview (commitment · URIs · mint plan · approvals) without sending or storing — address only WITH --salt
                             ${bold(g('--copies <n|open>'))}  copies of this SAME work (ERC-1155 edition) instead of a unique token —
                               ${g('open')} = uncapped OPEN EDITION, the flagship edition product. See ${g('abx help deploy')}.
@@ -1365,7 +1365,7 @@ function help() {
                             ${dim('edition:')} ${g('--token-id <n>')} required on every subcommand · ${g('buy --quantity <n>')} (pays price × quantity)
     ${g('abx mint-page')} <token>   scaffold a self-contained Next.js mint site (fixed-price minter) — deploy to Vercel
                             ${dim('editions get the token-id + quantity purchase shape (no gallery in this v1 page — see the README)')}
-    ${dim('signing lane (all of the above):')} ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(Base Sepolia beta)')} · ${g('--unsigned')} print tx
+    ${dim('signing lane (all of the above):')} ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} print tx
     ${dim('--sign blocks until you approve in the browser; --sign-url-file <path> writes the sign URL there (for backgrounded/agent runs)')}
 
     ${g('abx storage')} show        show the resolved byte custody (fs | cloud | ipfs | arweave)   [--check]
