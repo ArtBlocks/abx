@@ -3,17 +3,16 @@ title: "Networks and deployments"
 description: "ABX network support and canonical contract addresses."
 ---
 
-Start on Base Sepolia. Sepolia is supported, Robinhood Chain Testnet is experimental, and production
-deployments on Base and Robinhood Chain are beta after the same flow has passed on the paired testnet.
+Base mainnet (`8453`) is the primary production network. Base Sepolia (`84532`) is the CLI default
+for development. Sepolia is another supported testnet. Robinhood Chain Testnet is experimental;
+Robinhood mainnet is in experimental beta.
 
-**Production beta:** transactions use real funds and create irreversible state. ABX is prerelease
-software, has not had an independent third-party audit, and may fail through software bugs,
-configuration mistakes, or nondeterministic agent behavior. Review the network, signer, complete
-transaction group, value, and locks before sending. Use at your own risk.
+Production transactions use real funds and create irreversible state. Software is pre-1.0 and has not
+had an independent third-party audit. Review the network, signer, transaction group, value, and locks
+before sending.
 
-Choose by audience first, then measured cost: use Base for projects aimed at Base users and Robinhood
-Chain for projects aimed at that network. Run the same dry run on the paired testnet before deciding.
-Large onchain payloads increase transaction cost on either network, so decide byte custody separately.
+Use Base for Base users and Robinhood Chain for Robinhood users. Dry run on the paired testnet before
+mainnet when you can.
 
 | Network | Chain ID | Support | Canonical contracts |
 | --- | ---: | --- | --- |
@@ -24,9 +23,9 @@ Large onchain payloads increase transaction cost on either network, so decide by
 | Robinhood Chain | `4663` | beta | deployed |
 | Ethereum | `1` | disabled | not deployed |
 
-“Experimental” means deliberate testnet qualification. “Beta” means production use is enabled with
-explicit warnings and paired-testnet proof, but is not yet general production support. “Disabled”
-means the CLI refuses to operate on the network.
+Supported: ready testnets (Base Sepolia, Sepolia). Experimental: qualifying testnets (Robinhood Chain
+Testnet). Beta: production networks the CLI allows with warnings (Base, Robinhood Chain). Disabled:
+the CLI refuses the network.
 
 The machine-readable sources of truth are
 [`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)
