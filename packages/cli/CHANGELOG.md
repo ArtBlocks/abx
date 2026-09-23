@@ -1,5 +1,13 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.58
+
+### Patch Changes
+
+- b8f2876: Keep sponsored deploy guidance consistent: an ABX creator wallet no longer receives a faucet warning when its native balance is intentionally zero.
+- e89896a: Reject deterministic deploy salts reserved to a different signer before authorization or broadcast.
+- cf2708c: Allow the beta creator-wallet sponsorship lane on Base mainnet when the live provider and account explicitly advertise eligibility, while retaining Base Sepolia as the recommended first run.
+
 ## 0.1.0-alpha.57
 
 ### Patch Changes
