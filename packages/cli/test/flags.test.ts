@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {isDryRun, parseBlockTagFlag, parseFlags, parseSaltFlag, REPEATABLE_FLAGS} from '../src/flags.js';
+import {
+  assertSaltGuardForDeployer,
+  isDryRun,
+  parseBlockTagFlag,
+  parseFlags,
+  parseSaltFlag,
+  REPEATABLE_FLAGS,
+} from '../src/flags.js';
 import {editionSchemaAdvisory, parseSchemaSpecs} from '../src/schema.js';
 
 test('parseFlags: a normal repeated flag is last-wins', () => {
@@ -72,6 +79,20 @@ test('parseSaltFlag: still validates shape', () => {
   assert.throws(() => parseSaltFlag('0xdeadbeef'), /32-byte hex/);
   assert.equal(parseSaltFlag(undefined), undefined);
   assert.equal(parseSaltFlag('true'), undefined, 'a bare --salt is not a value');
+});
+
+test('assertSaltGuardForDeployer: accepts permissionless or matching guards and refuses another signer', () => {
+  const deployer = '0xadCaecC6539F91646293ea058A9f398dCC2271A6';
+  assert.doesNotThrow(() =>
+    assertSaltGuardForDeployer(`0x${'0'.repeat(40)}${'ab'.repeat(12)}`, deployer),
+  );
+  assert.doesNotThrow(() =>
+    assertSaltGuardForDeployer(`0x${deployer.slice(2)}${'ab'.repeat(12)}`, deployer),
+  );
+  assert.throws(
+    () => assertSaltGuardForDeployer(`0x${'ab'.repeat(32)}`, deployer),
+    /reserved to 0xABaBaBaBABabABabAbAbABAbABabababaBaBABaB.*signs as 0xadCaecC6539F91646293ea058A9f398dCC2271A6.*factory will reject/i,
+  );
 });
 
 // A holder-writable param on an ERC-1155 edition is SHARED by

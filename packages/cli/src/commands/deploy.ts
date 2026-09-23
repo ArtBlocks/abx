@@ -129,7 +129,15 @@ import {
   storageSignerChoice,
 } from '../config.js';
 import {parseDepFlag} from '../deps.js';
-import {type Flags, isDryRun, parseSaltFlag, refuseStrayFlags, unknownFlags, warnSignWithoutFor} from '../flags.js';
+import {
+  assertSaltGuardForDeployer,
+  type Flags,
+  isDryRun,
+  parseSaltFlag,
+  refuseStrayFlags,
+  unknownFlags,
+  warnSignWithoutFor,
+} from '../flags.js';
 import {isEditionContract} from '../kind.js';
 import {jsonSafe, withJson} from '../jsonout.js';
 import {planOnChainScript} from '../script-chunks.js';
@@ -1113,6 +1121,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   const buildForDeployer = async (deployer: Address) => {
     assertLaneCanSign(flags); // no upload before we know this run can be signed — see `assertLaneCanSign`
     const salt = explicitSalt ?? saltFor(deployer);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, deployer);
     const clone = await predictClone(publicClient, {factory, salt});
     // A baked on-chain image (--onchain-image) replaces prepareContent's image field —
     // the bytes already live on-chain behind the reader, nothing to custody or hash. On a
@@ -1727,6 +1736,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   const buildForDeployer = async (deployer: Address) => {
     assertLaneCanSign(flags); // no upload before we know this run can be signed — see `assertLaneCanSign`
     const salt = explicitSalt ?? saltFor(deployer);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, deployer);
     const clone = await predictClone(publicClient, {factory, salt});
     const {tokenFields, contentNote} = bakedImage
       ? {tokenFields: [bakedImage], contentNote: 'content: image staged ON-CHAIN via reader (self-resolving, no custody)'}
@@ -2329,6 +2339,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   const buildForDeployer = async (deployer: Address) => {
     assertLaneCanSign(flags); // no upload before we know this run can be signed — see `assertLaneCanSign`
     const salt = explicitSalt ?? saltFor(deployer);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, deployer);
     const clone = await predictClone(publicClient, {factory, salt});
     const params: SeriesInitParams = {
       owner: deployer,
@@ -2964,6 +2975,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   const buildForDeployer = async (deployer: Address) => {
     assertLaneCanSign(flags); // no upload before we know this run can be signed — see `assertLaneCanSign`
     const salt = explicitSalt ?? saltFor(deployer);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, deployer);
     const clone = await predictClone(publicClient, {factory, salt});
     const params: EditionImageInitParams = {
       owner: deployer,
@@ -4233,6 +4245,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     }
     const explicitSalt = parseSaltFlag(flags.salt);
     const salt = deployer ? (explicitSalt ?? saltFor(deployer)) : null;
+    if (explicitSalt && deployer) assertSaltGuardForDeployer(explicitSalt, deployer);
     const predicted = salt
       ? ((await publicClient.readContract({address: factory, abi: seriesCodeFactoryAbi, functionName: 'predictDeterministicAddress', args: [salt]})) as Address)
       : null;
@@ -4569,7 +4582,9 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   // identical split — see `planCodeSetupBatches`'s doc), this time with real mint calldata.
   const cid = resolveChain(CHAIN).id;
   const preparedFor = async (owner: Address) => {
-    const salt = parseSaltFlag(flags.salt) ?? saltFor(owner);
+    const explicitSalt = parseSaltFlag(flags.salt);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, owner);
+    const salt = explicitSalt ?? saltFor(owner);
     const clone = (await publicClient.readContract({address: factory, abi: seriesCodeFactoryAbi, functionName: 'predictDeterministicAddress', args: [salt]})) as Address;
     const g = setupLegGroups(owner);
     const batches = planCodeSetupBatches({
@@ -5504,6 +5519,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   const editionSetupBatches = planCodeSetupBatches({chunks: chunkLegs, config: configLegs, mints: mintLegsFor(zeroAddress)});
   const preparedFor = async (owner: Address): Promise<{clone: Address; txs: PreparedTx[]}> => {
     const salt = explicitSalt ?? saltFor(owner);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, owner);
     const clone = await predictClone(publicClient, {factory, salt});
     const setupTxs = codeSetupTxsFromBatches(
       planCodeSetupBatches({chunks: chunkLegs, config: configLegs, mints: mintLegsFor(owner)}),
@@ -5558,6 +5574,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
       }
     }
     const salt = deployer ? (explicitSalt ?? saltFor(deployer)) : null;
+    if (explicitSalt && deployer) assertSaltGuardForDeployer(explicitSalt, deployer);
     const predicted = salt ? await predictClone(publicClient, {factory, salt}) : null;
     const shownAddr = explicitSalt ? predicted : null;
     step(`Deploy plan — up to ${max} id(s), ${editionSize === 0n ? 'open' : editionSize.toString()} cop${editionSize === 1n ? 'y' : 'ies'} each, to ${CHAIN}`);
