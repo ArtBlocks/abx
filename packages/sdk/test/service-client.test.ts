@@ -69,6 +69,9 @@ test('interface discovery keeps old descriptors on the catalog origin and permit
 });
 
 test('interface discovery will not forward credentials to an unsafe or contradictory endpoint', () => {
+  const credentialed = new URL('https://api.example');
+  credentialed.username = 'user';
+  credentialed.password = 'pass';
   const descriptor = {
     interfaces: [CREATOR_WALLET_INTERFACE],
     chains: [84532],
@@ -96,7 +99,7 @@ test('interface discovery will not forward credentials to an unsafe or contradic
         'https://services.example',
         {
           ...descriptor,
-          endpoints: {[CREATOR_WALLET_INTERFACE]: {baseUrl: 'https://user:pass@api.example'}},
+          endpoints: {[CREATOR_WALLET_INTERFACE]: {baseUrl: credentialed.toString()}},
         },
         CREATOR_WALLET_INTERFACE,
       ),
