@@ -1,5 +1,23 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.56
+
+### Minor Changes
+
+- ea57f7a: Add provider-neutral remote interface discovery, the ABX Creators account API client, and the Base
+  Sepolia creator-wallet `--sponsor` signing lane. A provider catalog may advertise its account and
+  wallet interfaces at a separate HTTPS origin without changing existing same-origin remotes.
+
+### Patch Changes
+
+- f9ba363: Clarify edition live-supply caps, intentional ERC-721 self-transfer hook callbacks, and OP Stack
+  seed-source behavior in the bundled ABX skill.
+- Updated dependencies [ea57f7a]
+  - @artblocks/abx-sdk@0.1.0-alpha.42
+  - @artblocks/abx-indexer@0.1.0-alpha.43
+  - @artblocks/abx-storage@0.1.0-alpha.42
+  - @artblocks/abx-token-api@0.1.0-alpha.45
+
 ## 0.1.0-alpha.55
 
 ### Patch Changes
