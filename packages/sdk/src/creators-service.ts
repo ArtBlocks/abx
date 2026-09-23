@@ -1,7 +1,5 @@
 import type {Address, Hex} from 'viem';
 
-export const ABX_CREATORS_API_URL = 'https://api.abx.io';
-
 export type CreatorOperationState = 'prepared' | 'submitting' | 'pending' | 'confirmed' | 'failed' | 'unknown';
 
 export interface CreatorWallet {
@@ -43,7 +41,8 @@ export interface CreatorPreparedOperation {
 }
 
 export interface CreatorApiClientOptions {
-  baseUrl?: string;
+  /** Explicit provider endpoint, normally resolved from `abx-creator-wallet/v1` in its remote descriptor. */
+  baseUrl: string;
   token: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
@@ -111,7 +110,7 @@ export class CreatorApiClient {
   readonly #timeoutMs: number;
 
   constructor(options: CreatorApiClientOptions) {
-    let baseUrl = options.baseUrl ?? ABX_CREATORS_API_URL;
+    let baseUrl = options.baseUrl;
     if (baseUrl.length > 2_048) throw new Error('ABX Creators service URL is too long');
     while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
     this.#baseUrl = baseUrl;

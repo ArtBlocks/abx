@@ -11,6 +11,9 @@ import {
   AbxIndexTimeoutError,
   AbxServiceClient,
   AbxServiceError,
+  ACCOUNT_API_INTERFACE,
+  CREATOR_WALLET_INTERFACE,
+  resolveServiceInterfaceEndpoint,
   type RegisterProjectAccepted,
   type RegisterProjectSummary,
 } from '../src/service.js';
@@ -35,6 +38,71 @@ const json = (res: ServerResponse, status: number, body: unknown) => {
 };
 
 const client = (base: string, token?: string) => new AbxServiceClient({baseUrl: base, token, retryDelayMs: 1});
+
+test('interface discovery keeps old descriptors on the catalog origin and permits an advertised HTTPS split', () => {
+  const legacy = {interfaces: [ACCOUNT_API_INTERFACE], chains: [84532], baseUrl: 'https://ignored.example'};
+  assert.deepEqual(resolveServiceInterfaceEndpoint('https://catalog.example', legacy, ACCOUNT_API_INTERFACE), {
+    baseUrl: 'https://catalog.example',
+    chains: [84532],
+  });
+
+  const split = {
+    interfaces: [ACCOUNT_API_INTERFACE, CREATOR_WALLET_INTERFACE],
+    chains: [8453, 84532],
+    baseUrl: 'https://services.example',
+    endpoints: {
+      [CREATOR_WALLET_INTERFACE]: {
+        baseUrl: 'https://api.example///',
+        chains: [84532],
+        supportLevel: 'beta' as const,
+        auth: 'bearer' as const,
+      },
+    },
+  };
+  assert.deepEqual(resolveServiceInterfaceEndpoint('https://services.example', split, CREATOR_WALLET_INTERFACE), {
+    baseUrl: 'https://api.example',
+    chains: [84532],
+    supportLevel: 'beta',
+    auth: 'bearer',
+  });
+  assert.equal(resolveServiceInterfaceEndpoint('https://services.example', split, 'abx-unadvertised/v1'), undefined);
+});
+
+test('interface discovery will not forward credentials to an unsafe or contradictory endpoint', () => {
+  const descriptor = {
+    interfaces: [CREATOR_WALLET_INTERFACE],
+    chains: [84532],
+    endpoints: {[CREATOR_WALLET_INTERFACE]: {baseUrl: 'http://api.example', chains: [84532]}},
+  };
+  assert.throws(
+    () => resolveServiceInterfaceEndpoint('https://services.example', descriptor, CREATOR_WALLET_INTERFACE),
+    /must use HTTPS/,
+  );
+  assert.throws(
+    () =>
+      resolveServiceInterfaceEndpoint(
+        'https://services.example',
+        {
+          ...descriptor,
+          endpoints: {[CREATOR_WALLET_INTERFACE]: {baseUrl: 'https://api.example', chains: [8453]}},
+        },
+        CREATOR_WALLET_INTERFACE,
+      ),
+    /subset of the service chains/,
+  );
+  assert.throws(
+    () =>
+      resolveServiceInterfaceEndpoint(
+        'https://services.example',
+        {
+          ...descriptor,
+          endpoints: {[CREATOR_WALLET_INTERFACE]: {baseUrl: 'https://user:pass@api.example'}},
+        },
+        CREATOR_WALLET_INTERFACE,
+      ),
+    /must not contain credentials/,
+  );
+});
 
 test('5xx retries with backoff and succeeds when the service recovers (fly cold-start weather)', async () => {
   await withServer(

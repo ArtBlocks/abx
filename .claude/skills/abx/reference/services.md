@@ -72,14 +72,17 @@ terms before making a durable hosting choice and keep the exit route explicit: t
 contract supports another provider or a creator-operated resolver/effects deployment.
 
 Before depending on hosted behavior, inspect the live descriptor with `abx remote abx`; do not infer
-capabilities from this file. Use `--remote abx` on commands that accept a managed remote and verify
-the resulting public surfaces as described in [hosting.md](hosting.md).
+capabilities from this file. A remote is a provider catalog and may advertise different HTTPS
+origins for token resolution, account operations, and creator wallets. Trust the advertised
+interface endpoint, not a guessed hostname. Use `--remote abx` on commands that accept a managed
+resolver and verify the resulting public surfaces as described in [hosting.md](hosting.md).
 
 ## Creator wallet and sponsorship
 
 An account with a verified email can use one persistent ABX creator wallet. The
-`ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` provisions or reuses the
-wallet, starts a Privy device authorization, and asks the human to match one code before an agent may
+`ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` discovers the provider's
+`abx-creator-wallet/v1` endpoint, provisions or reuses the wallet, starts a Privy device authorization,
+and asks the human to match one code before an agent may
 sign the exact transaction group. Tokens and signing material stay in memory for that command and
 are discarded afterward.
 

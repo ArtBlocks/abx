@@ -32,6 +32,10 @@ export const CONTROL_PLANE_INTERFACE = 'abx-control-plane/v1';
 /** Provider-specific feedback discovery, submission, and account history at `/feedback`. Core ABX
  *  feedback is deliberately not this interface: it belongs to the ABX team, not a remote provider. */
 export const SERVICE_FEEDBACK_INTERFACE = 'abx-service-feedback/v1';
+/** Stable account identity, API-key, and entitlement surface. It need not share the resolver origin. */
+export const ACCOUNT_API_INTERFACE = 'abx-account/v1';
+/** Account-bound creator wallet and sponsored-operation surface. */
+export const CREATOR_WALLET_INTERFACE = 'abx-creator-wallet/v1';
 
 /**
  * Why this locator can't be accepted for a referenced artifact, or `null` if it passes.
@@ -210,6 +214,91 @@ export interface ServiceDescriptor {
   render?: {attached: boolean; effects: Array<{key: string; outputs: Array<{key: string; mimeType: string}>}> | null};
   /** The public base this node believes it serves — a sanity echo for misconfig detection. */
   baseUrl?: string;
+  /** Optional per-interface origins and policy. When absent, an advertised interface is served at
+   *  `baseUrl` (or the descriptor origin for an older descriptor). This keeps a remote a provider
+   *  profile rather than forcing every capability into one HTTP process. */
+  endpoints?: Record<string, ServiceInterfaceEndpoint>;
+}
+
+export type ServiceInterfaceSupportLevel = 'experimental' | 'beta' | 'supported';
+
+export interface ServiceInterfaceEndpoint {
+  /** Absolute interface base. Paths named by that interface append to this value. */
+  baseUrl: string;
+  /** Optional subset of the descriptor's global `chains`. */
+  chains?: number[];
+  /** Provider maturity for this interface, separate from protocol chain support. */
+  supportLevel?: ServiceInterfaceSupportLevel;
+  /** HTTP authentication expected by the interface. Wallet authorization remains a separate act. */
+  auth?: 'none' | 'bearer';
+}
+
+export interface ResolvedServiceInterfaceEndpoint extends ServiceInterfaceEndpoint {
+  chains: number[];
+}
+
+const SERVICE_INTERFACE_SUPPORT_LEVELS = new Set<ServiceInterfaceSupportLevel>(['experimental', 'beta', 'supported']);
+
+function loopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || host === '127.0.0.1' || host.startsWith('127.');
+}
+
+function interfaceBaseUrl(catalogBaseUrl: string, raw: string): string {
+  if (raw.length > 2_048) throw new Error('ABX service interface URL is too long');
+  let catalog: URL;
+  let endpoint: URL;
+  try {
+    catalog = new URL(catalogBaseUrl);
+    endpoint = new URL(raw);
+  } catch {
+    throw new Error('ABX service interface URL must be absolute');
+  }
+  if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+    throw new Error('ABX service interface URL must not contain credentials, a query, or a fragment');
+  }
+  // Preserve existing same-origin HTTP self-hosting, but never let a descriptor move a bearer
+  // credential to a new plaintext origin. Loopback HTTP remains available for local development.
+  if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && (endpoint.origin === catalog.origin || loopbackHost(endpoint.hostname)))) {
+    throw new Error('A cross-origin ABX service interface must use HTTPS');
+  }
+  return endpoint.toString().replace(/\/+$/, '');
+}
+
+/**
+ * Resolve one advertised interface without assuming every capability shares the catalog origin.
+ * The catalog URL is the trust root selected by the caller (`--remote <name>`). Older descriptors
+ * remain same-origin. An endpoint entry without the matching interface id grants no capability.
+ */
+export function resolveServiceInterfaceEndpoint(
+  catalogBaseUrl: string,
+  descriptor: ServiceDescriptor,
+  interfaceId: string,
+): ResolvedServiceInterfaceEndpoint | undefined {
+  if (!descriptor.interfaces?.includes(interfaceId)) return undefined;
+  const declared = descriptor.endpoints?.[interfaceId];
+  // Only an explicit endpoint record may move an interface away from the catalog trust root.
+  // `descriptor.baseUrl` is a diagnostic echo, not redirect authority.
+  const baseUrl = interfaceBaseUrl(catalogBaseUrl, declared?.baseUrl ?? catalogBaseUrl);
+  const chains = declared?.chains ?? descriptor.chains;
+  if (!Array.isArray(chains) || chains.some((chainId) => !Number.isSafeInteger(chainId) || chainId <= 0)) {
+    throw new Error(`ABX service interface ${interfaceId} advertises invalid chains`);
+  }
+  if (new Set(chains).size !== chains.length || chains.some((chainId) => !descriptor.chains.includes(chainId))) {
+    throw new Error(`ABX service interface ${interfaceId} must use a unique subset of the service chains`);
+  }
+  if (declared?.supportLevel && !SERVICE_INTERFACE_SUPPORT_LEVELS.has(declared.supportLevel)) {
+    throw new Error(`ABX service interface ${interfaceId} advertises an invalid support level`);
+  }
+  if (declared?.auth && declared.auth !== 'none' && declared.auth !== 'bearer') {
+    throw new Error(`ABX service interface ${interfaceId} advertises an invalid authentication scheme`);
+  }
+  return {
+    baseUrl,
+    chains: [...chains],
+    ...(declared?.supportLevel ? {supportLevel: declared.supportLevel} : {}),
+    ...(declared?.auth ? {auth: declared.auth} : {}),
+  };
 }
 
 export const FEEDBACK_KINDS = ['bug', 'friction', 'gap', 'confusion', 'praise', 'other'] as const;

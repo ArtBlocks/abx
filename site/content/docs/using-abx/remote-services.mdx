@@ -42,8 +42,15 @@ A named remote reads only its matching token. It never falls back to your self-h
 ## What a compatible service exposes
 
 `GET /.well-known/abx-service` returns the supported chains, interface versions, authentication
-method, rendering support, and the contract generations the implementation understands. Inspect it
-with `abx remote <name-or-url>` before registration.
+method, rendering support, and the contract generations the implementation understands. A remote is
+a provider profile, not necessarily one server: its optional `endpoints` map can place an advertised
+interface at another HTTPS origin. Interfaces without an entry remain at the catalog origin, so
+existing and self-hosted services stay compatible. Inspect the catalog with
+`abx remote <name-or-url>` before using a provider.
+
+The first-party catalog remains at `services.abx.io`. Public token and project-control interfaces
+are served there; account and creator-wallet interfaces may resolve to `api.abx.io`. The CLI follows
+the descriptor. It does not infer capabilities from either hostname.
 
 The version 1 control plane uses bearer authentication:
 

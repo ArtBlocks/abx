@@ -1,11 +1,13 @@
 import {randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {
-  ABX_CREATORS_API_URL,
+  AbxServiceClient,
+  CREATOR_WALLET_INTERFACE,
   CreatorApiClient,
   makePublicClient,
   pinGas,
   resolveChain,
+  resolveServiceInterfaceEndpoint,
   sleep,
   TxRevertedError,
   waitForCodeAt,
@@ -15,6 +17,7 @@ import {
 } from '@artblocks/abx-sdk';
 import type {TransactionReceipt} from 'viem';
 import {CreatorAgentAuthorization} from './creator-agent.js';
+import {ABX_SERVICES_URL} from './remote.js';
 
 const BASE_SEPOLIA = 84_532;
 const MAX_SPONSORED_GAS = 3_000_000n;
@@ -40,14 +43,36 @@ export interface SponsoredSession {
   close(): void;
 }
 
-function creatorApiUrl(): string {
-  const raw = process.env.ABX_CREATORS_API_URL ?? ABX_CREATORS_API_URL;
+function checkedCreatorApiUrl(raw: string): string {
   const parsed = new URL(raw);
   const local = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]';
-  if (parsed.username || parsed.password || (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:'))) {
-    throw new Error('ABX_CREATORS_API_URL must be HTTPS (or localhost HTTP for development).');
+  if (
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash ||
+    (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:'))
+  ) {
+    throw new Error(
+      'ABX_CREATORS_API_URL must be HTTPS (or localhost HTTP for development) without credentials, a query, or a fragment.',
+    );
   }
-  return parsed.toString().replace(/\/$/, '');
+  return parsed.toString().replace(/\/+$/, '');
+}
+
+/** Resolve the first-party wallet API from its public remote catalog. The env override is an
+ * explicit local/staging escape hatch; production callers do not need to know `api.abx.io`. */
+export async function creatorApiUrl(chainId: number, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  if (env.ABX_CREATORS_API_URL) return checkedCreatorApiUrl(env.ABX_CREATORS_API_URL);
+  const descriptor = await new AbxServiceClient({baseUrl: ABX_SERVICES_URL, timeoutMs: 10_000}).descriptor();
+  const endpoint = resolveServiceInterfaceEndpoint(ABX_SERVICES_URL, descriptor, CREATOR_WALLET_INTERFACE);
+  if (!endpoint) {
+    throw new Error('The ABX remote does not advertise an account-bound creator-wallet service. Use --send, --sign, or --unsigned.');
+  }
+  if (!endpoint.chains.includes(chainId)) {
+    throw new Error(`The ABX creator-wallet service does not support chain ${chainId}. Use --send, --sign, or --unsigned.`);
+  }
+  return endpoint.baseUrl;
 }
 
 function openBrowser(url: string): void {
@@ -78,7 +103,7 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
   const apiKey = process.env.ABX_SERVICES_API_KEY;
   if (!apiKey) throw new Error('ABX Services API key disappeared after sponsorship preflight.');
 
-  const api = new CreatorApiClient({baseUrl: creatorApiUrl(), token: apiKey});
+  const api = new CreatorApiClient({baseUrl: await creatorApiUrl(chain.id), token: apiKey});
   const wallet = await api.provisionWallet();
   const account = await api.account();
   if (!account.wallet || account.wallet.address.toLowerCase() !== wallet.address.toLowerCase()) {

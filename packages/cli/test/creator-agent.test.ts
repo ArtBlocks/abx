@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {assertSponsorConfigured} from '../src/creator-signer.js';
+import {assertSponsorConfigured, creatorApiUrl} from '../src/creator-signer.js';
 
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), {status, headers: {'content-type': 'application/json'}});
@@ -65,4 +65,19 @@ test('sponsor preflight is Base Sepolia only and requires the account API key', 
     if (before === undefined) delete process.env.ABX_SERVICES_API_KEY;
     else process.env.ABX_SERVICES_API_KEY = before;
   }
+});
+
+test('the explicit creator API override is a bounded development escape hatch', async () => {
+  assert.equal(
+    await creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'https://api.example///'}),
+    'https://api.example',
+  );
+  await assert.rejects(
+    () => creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'http://api.example'}),
+    /must be HTTPS/,
+  );
+  await assert.rejects(
+    () => creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'https://api.example?token=secret'}),
+    /must be HTTPS/,
+  );
 });
