@@ -27,7 +27,7 @@ import {openSponsoredSession} from './creator-signer.js';
  *   • send (hot)     — sign with the env key and broadcast. Autonomous agents, testnet, low stakes.
  *   • sign (wallet)  — serve a one-shot, operation-aware localhost page; a human approves in their
  *                      own wallet (the key never touches this process). Real value, mainnet.
- *   • sponsor        — one ephemeral Privy authorization; ABX Services relays an eligible testnet tx.
+ *   • sponsor        — one ephemeral Privy authorization; ABX Services relays an eligible Base-network tx.
  *   • unsigned (cold)— print the tx data to sign elsewhere (a multisig / offline signer).
  *
  * The agent picks the lane; the CLI owns the mechanics. Signing is the only step

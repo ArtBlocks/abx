@@ -124,7 +124,7 @@ Important boundaries:
   `--mint-amount` if the original deploy premint ids).
 - `--onchain-image` works for static 721s and editions in hot or wallet-signing lanes. It cannot be
   prepared as one cold `--unsigned` bundle because staged transactions depend on prior receipts;
-  the initial Base Sepolia `--sponsor` beta also excludes this staged-content lane.
+  the `--sponsor` beta also excludes this staged-content lane.
 - A code project may need no public host when its image/traits are computed by Solidity renderers.
   A JavaScript program still needs a deliberate marketplace-image plan even when its animation is
   chain-complete.

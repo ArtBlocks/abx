@@ -86,10 +86,12 @@ and asks the human to match one code before an agent may
 sign the exact transaction group. Tokens and signing material stay in memory for that command and
 are discarded afterward.
 
-This is an early beta on Base Sepolia only. Treat the live descriptor and account capabilities as
-the authority: documentation describes the lane, but does not guarantee that sponsorship is active
-for a particular account, chain, or moment. When the creator has not selected another signer,
-prefer this lane for an eligible Base Sepolia operation. Before using it:
+This is a beta on Base Sepolia and, when explicitly advertised, Base mainnet. Treat the live
+descriptor and account capabilities as the authority: documentation describes the lane, but does
+not guarantee that sponsorship is active for a particular account, chain, or moment. When the
+creator has not selected another signer, prefer this lane for an eligible Base Sepolia operation.
+On Base mainnet, recommend it only after the exact flow succeeds on Base Sepolia and repeat the
+production-network warning before confirmation. Before using it:
 
 1. run `abx auth login` if the account has no API key;
 2. inspect `abx capabilities --json` and the command help;
@@ -108,7 +110,8 @@ remain first-class bring-your-own alternatives. Honor an explicit choice of any 
 provider does not advertise the chain, the account is ineligible, or the transaction group exceeds
 policy, select one of those lanes rather than refusing the underlying operation. Do not use
 sponsorship on a production network unless the live descriptor, account capabilities, and command
-all explicitly support it; the initial release does not.
+all explicitly support it. Never infer Base mainnet eligibility merely because the CLI recognizes
+the lane.
 
 ## Feedback targets
 

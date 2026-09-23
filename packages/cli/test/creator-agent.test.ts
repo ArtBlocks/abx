@@ -55,13 +55,15 @@ test('creator agent validates the public app id before any request', () => {
   assert.throws(() => new CreatorAgentAuthorization({appId: 'bad app id'}), /invalid_app_id/);
 });
 
-test('sponsor preflight is Base Sepolia only and requires the account API key', () => {
+test('sponsor preflight permits Base networks behind the live account gate and requires the API key', () => {
   const before = process.env.ABX_SERVICES_API_KEY;
   try {
     delete process.env.ABX_SERVICES_API_KEY;
-    assert.throws(() => assertSponsorConfigured('base'), /Base Sepolia only/);
+    assert.throws(() => assertSponsorConfigured('sepolia'), /Base and Base Sepolia only/);
+    assert.throws(() => assertSponsorConfigured('base'), /ABX_SERVICES_API_KEY/);
     assert.throws(() => assertSponsorConfigured('base-sepolia'), /ABX_SERVICES_API_KEY/);
     process.env.ABX_SERVICES_API_KEY = 'abx_test_key';
+    assert.doesNotThrow(() => assertSponsorConfigured('base'));
     assert.doesNotThrow(() => assertSponsorConfigured('base-sepolia'));
   } finally {
     if (before === undefined) delete process.env.ABX_SERVICES_API_KEY;
