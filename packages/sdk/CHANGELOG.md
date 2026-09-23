@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.42
+
+### Minor Changes
+
+- ea57f7a: Add provider-neutral remote interface discovery, the ABX Creators account API client, and the Base
+  Sepolia creator-wallet `--sponsor` signing lane. A provider catalog may advertise its account and
+  wallet interfaces at a separate HTTPS origin without changing existing same-origin remotes.
+
 ## 0.1.0-alpha.41
 
 ### Patch Changes
