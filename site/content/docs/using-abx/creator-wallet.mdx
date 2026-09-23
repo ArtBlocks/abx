@@ -7,10 +7,12 @@ ABX Services can give a verified account one embedded creator wallet. The wallet
 to the account's email and API key; the API key cannot sign.
 
 This is an early beta on **Base Sepolia only**. Sponsorship is policy-limited and may be paused.
-Bring-your-own wallet flows remain available everywhere.
+When it is available, it is the recommended path for a first testnet launch: no private key, funded
+wallet, or faucet visit is required. Bring-your-own wallet flows remain available everywhere.
 
 ```bash
 abx auth login
+abx remote abx
 abx deploy ... --dry-run --json
 abx deploy ... --sponsor
 ```
@@ -30,6 +32,7 @@ Current limits:
 An ambiguous submission is never retried. Keep the operation ID from the error and check its status
 before taking another action.
 
-ABX sponsorship is a convenience, not part of the protocol. You can use `--send`, `--sign`, or
-`--unsigned` instead. Before any production-network work, prove the flow on its paired testnet and
-use your own funded signer.
+The live remote and account response determine whether sponsorship is enabled. ABX sponsorship is a
+convenience, not part of the protocol. You can always use `--send`, `--sign`, or `--unsigned`
+instead. Before any production-network work, prove the flow on its paired testnet and use your own
+funded signer until the production chain is explicitly advertised for sponsorship.

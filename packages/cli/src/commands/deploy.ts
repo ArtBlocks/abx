@@ -3446,7 +3446,8 @@ export const SHARED_DEPLOY_FLAGS = [
   // these override it when the two should differ. Every deploy path takes them.
   'ipfs-gateway', 'arweave-gateway',
   // `--send` is the DEFAULT lane, and it is accepted explicitly because every deploy's own help
-  // advertises it by name ("signing: --send hot/env key · --sign wallet page · --unsigned print tx").
+  // advertises it by name ("signing: --send hot/env key · --sign wallet page · --sponsor
+  // ABX creator wallet · --unsigned print tx").
   // It was the one of the three the parser rejected, so a reader who typed what the help showed got
   // `unrecognized flag(s): --send` from the guard whose whole job is catching flags that would be
   // ignored — the guard firing on the tool's own documentation. Explicit is also better than bare for

@@ -185,8 +185,8 @@ test('no NEW optimistic success verdict appears in cli/src without a justificati
 // ── the lane flags the help advertises are the lane flags the parser accepts ──────────────────
 //
 // `--send` is the default lane and was documented by name in 25 help strings
-// ("signing: --send hot/env key · --sign wallet page · --unsigned print tx") while being the one of
-// the three the deploy allowlist rejected. Typing what the help showed produced
+// (alongside `--sign`, `--sponsor`, and `--unsigned`) while being the only one of
+// the four that the deploy allowlist rejected. Typing what the help showed produced
 // `unrecognized flag(s): --send` — the stray-flag guard, whose entire purpose is catching flags that
 // would otherwise be silently ignored, firing on the tool's own documentation. Found by using the CLI
 // as a cold reader of its own `--help`, which is the only way this class shows up.
@@ -212,13 +212,13 @@ test('laneFromFlags: a lane named with an EMPTY value still selects that lane', 
 test('laneFromFlags: two lane flags is refused, not silently resolved by precedence', () => {
   // The precedence order is an implementation detail. An agent assembling flags from two help lines
   // gets `--send --sign`, and silently picking the wallet page means a browser wait it reads as a
-  // hang — so the refusal names all three lanes and what each does.
+    // hang — so the refusal names all four lanes and what each does.
   for (const flags of [{send: '', sign: ''}, {send: '', sponsor: ''}, {sponsor: '', unsigned: ''}, {sign: '', unsigned: ''}, {send: '', sign: '', sponsor: '', unsigned: ''}]) {
     assert.throws(() => laneFromFlags(flags as Flags), /pick ONE signing lane/);
   }
 });
 
-test('every deploy family allowlist accepts the three lane flags its help documents', async () => {
+test('every deploy family allowlist accepts the four lane flags its help documents', async () => {
   const {
     DEPLOY_FLAGS,
     DEPLOY_EDITION_FLAGS,

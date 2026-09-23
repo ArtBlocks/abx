@@ -86,7 +86,10 @@ and asks the human to match one code before an agent may
 sign the exact transaction group. Tokens and signing material stay in memory for that command and
 are discarded afterward.
 
-This is an early beta on Base Sepolia only. Before using it:
+This is an early beta on Base Sepolia only. Treat the live descriptor and account capabilities as
+the authority: documentation describes the lane, but does not guarantee that sponsorship is active
+for a particular account, chain, or moment. When the creator has not selected another signer,
+prefer this lane for an eligible Base Sepolia operation. Before using it:
 
 1. run `abx auth login` if the account has no API key;
 2. inspect `abx capabilities --json` and the command help;
@@ -101,8 +104,11 @@ writes. Never add retries around a sponsored write. An `unknown` outcome means t
 submitted it: preserve the operation ID and reconcile status before any new send.
 
 Sponsorship is optional service policy, not protocol support. `--send`, `--sign`, and `--unsigned`
-remain the bring-your-own alternatives. Do not use sponsorship on a production network unless the
-live capability registry and command explicitly support it; the initial release does not.
+remain first-class bring-your-own alternatives. Honor an explicit choice of any of them. If the
+provider does not advertise the chain, the account is ineligible, or the transaction group exceeds
+policy, select one of those lanes rather than refusing the underlying operation. Do not use
+sponsorship on a production network unless the live descriptor, account capabilities, and command
+all explicitly support it; the initial release does not.
 
 ## Feedback targets
 

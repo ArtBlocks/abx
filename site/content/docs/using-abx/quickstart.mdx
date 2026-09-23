@@ -10,15 +10,16 @@ import {QUICKSTART_PROMPT} from '@/lib/quickstart';
 
 - Node.js 22.13 or newer
 - A coding agent with shell access
-- A browser wallet with Base Sepolia test ETH
+- An email address for the recommended sponsored path, or your own wallet and Base Sepolia test ETH
 
 This guide uses Base Sepolia, the CLI default, so you can iterate without mainnet funds. ABX also
 supports Base mainnet for production deployments. Sepolia is another supported testnet. Robinhood
 mainnet is in experimental beta. See [Networks and deployments](/docs/reference/deployments) before
 using real funds on a production network.
 
-You do not need a private key: the agent can open your browser wallet for approval, or use a
-dedicated environment key for deliberate automation.
+You do not need a private key or faucet funds when Base Sepolia sponsorship is available for your
+account. The agent checks the live service and recommends that path first. You can instead use a
+browser wallet, a dedicated environment key for deliberate automation, or unsigned transactions.
 
 ## Quickstart
 

@@ -1276,7 +1276,7 @@ function help() {
                             ${g('--salt')} 0x..  use a fixed/reserved address (see ${g('abx predict')})
                             storage override (else uses config): --backend --endpoint --bucket --region --gateway --upload-url
                             served-gateway preference (ipfs/arweave images): --ipfs-gateway <prefix> --arweave-gateway <prefix>  (floors: ipfs.io · arweave.net)
-                            signing: ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--unsigned')} print tx
+                            signing: ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(Base Sepolia beta)')} · ${g('--unsigned')} print tx
                             ${g('--dry-run')}  preview (commitment · URIs · mint plan · approvals) without sending or storing — address only WITH --salt
                             ${bold(g('--copies <n|open>'))}  copies of this SAME work (ERC-1155 edition) instead of a unique token —
                               ${g('open')} = uncapped OPEN EDITION, the flagship edition product. See ${g('abx help deploy')}.
@@ -1365,7 +1365,7 @@ function help() {
                             ${dim('edition:')} ${g('--token-id <n>')} required on every subcommand · ${g('buy --quantity <n>')} (pays price × quantity)
     ${g('abx mint-page')} <token>   scaffold a self-contained Next.js mint site (fixed-price minter) — deploy to Vercel
                             ${dim('editions get the token-id + quantity purchase shape (no gallery in this v1 page — see the README)')}
-    ${dim('signing lane (all of the above):')} ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--unsigned')} print tx
+    ${dim('signing lane (all of the above):')} ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(Base Sepolia beta)')} · ${g('--unsigned')} print tx
     ${dim('--sign blocks until you approve in the browser; --sign-url-file <path> writes the sign URL there (for backgrounded/agent runs)')}
 
     ${g('abx storage')} show        show the resolved byte custody (fs | cloud | ipfs | arweave)   [--check]
