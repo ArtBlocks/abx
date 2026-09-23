@@ -100,13 +100,24 @@ directory](https://docs.abx.io/docs/using-abx/self-hosting#local-data-directory)
 
 ## Choose one signing lane
 
-Every write uses one of three lanes:
+Every write uses one of four lanes:
 
 | Lane | Select | Use when |
 |---|---|---|
+| Sponsored | `--sponsor` | The live remote advertises sponsorship for this chain and command |
 | Hot | `--send` or default | An environment key may sign unattended |
 | Wallet | `--sign --for 0x…` | A human approves in their browser wallet |
 | Cold | `--unsigned --for 0x…` | A multisig/offline signer needs prepared transactions |
+
+Honor an explicit creator choice. Otherwise run `abx capabilities --json`, the command help, and
+`abx remote abx`. Prefer `--sponsor` when the provider advertises the active chain, the command and
+transaction group are eligible, and sponsorship is enabled—especially on a testnet, where it removes
+wallet and faucet setup. Sponsorship is provider policy, not protocol support: if it is unavailable,
+paused, or ineligible, fall back to the appropriate bring-your-own lane rather than treating the ABX
+operation as unsupported.
+
+Select the lane before the JSON dry run. The signer can affect ownership, salts, and predicted
+addresses. If the lane changes, rerun the dry run and summarize the revised plan before execution.
 
 Run `abx doctor --for <address>` before a wallet or cold operation. On the wallet lane, give the
 human the locally generated signing page; never request or handle their key. On the cold lane, verify
@@ -154,7 +165,9 @@ human confirmation authorizes execution.
 1. Install Node 22.13+ and the desired CLI version.
 2. Install the co-versioned skill with `abx skill install`, then restart the agent.
 3. Select the testnet using `ABX_CHAIN` if not using Base Sepolia.
-4. Add RPC, signer, and storage configuration outside the transcript. For first-party hosted
+4. Add RPC and storage configuration outside the transcript. If the live first-party remote
+   advertises sponsorship for the chosen chain and command, recommend it before asking the creator
+   to configure a signer. Otherwise configure one of the bring-your-own lanes. For first-party hosted
    services, run `abx auth login --no-open` in a short-yield or resumable session: immediately hand
    its verified browser URL and matching code to the human, then resume that same polling process.
    Let the CLI store `ABX_SERVICES_API_KEY` in ignored `.env` without printing it. Never ask for the
@@ -170,4 +183,5 @@ human confirmation authorizes execution.
 For an eligible first-party account on Base Sepolia, `--sponsor` replaces the local private key and
 faucet balance with an account-bound creator wallet plus one ephemeral Privy authorization per CLI
 transaction group. Read [services.md](services.md) before using it. It is beta, testnet-only,
-zero-value, and never a reason to skip the dry run or transaction summary.
+zero-value, and never a reason to skip the dry run or transaction summary. Bring-your-own signing
+remains available even when sponsorship is advertised.

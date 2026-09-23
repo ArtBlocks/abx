@@ -103,13 +103,15 @@ Every write uses one lane:
 
 | Flag | Behavior |
 | --- | --- |
+| `--sponsor` | Use an eligible account-bound creator wallet and provider-paid gas |
 | `--sign` | Open a browser wallet |
 | `--send` | Sign with the configured hot key |
 | `--unsigned` | Print an unsigned transaction |
 | `--dry-run` | Simulate without sending |
 
-Browser signing is the safest default for an interactive launch. Never paste a private key into a chat
-or prompt.
+If the creator has not chosen a signer, use the live remote descriptor to prefer sponsorship when the
+chain and transaction group are eligible. Otherwise choose the appropriate bring-your-own lane.
+Never paste a private key into a chat or prompt.
 
 A deploy preview reports the wallet approvals it will need. A predicted address is stable only when you
 reuse the displayed salt with `--salt`.

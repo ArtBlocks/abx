@@ -52,14 +52,19 @@ Follow this state machine instead of accumulating retries:
 
 1. **Discover** — identify the working directory, CLI provenance/version, active chain, artifacts,
    existing contract addresses, configured remote, and signer preference. Run `abx doctor` for a
-   deployment or unfamiliar environment.
+   deployment or unfamiliar environment. If the creator has not chosen a signer, inspect the live
+   remote and prefer `--sponsor` when the active chain and command are advertised as eligible;
+   otherwise choose the appropriate bring-your-own lane. Never silently replace an explicit signer
+   choice.
 2. **Classify surfaces** — decide collection shape, runtime, required public surfaces, custody,
    resolution, authority, mutability, and mint/sale timing. Use the model below.
 3. **Inspect** — run `abx capabilities --json`; for code run `abx inspect` and `abx preview`. For an
    existing collection run `abx state`, `abx tokens`, `abx tokenuri`, and `abx verify` as relevant.
 4. **Plan** — use the selected deploy command with `--dry-run --json`. Read its normalized shape,
    addresses, surface warnings, transaction count, storage activity, and irreversible choices back
-   to the creator. A dry run may perform read-only network probes; it must not send or store.
+   to the creator. A dry run may perform read-only network probes; it must not send or store. Select
+   the signer before this dry run; changing lanes can change the owner, salt, and predicted address,
+   so rerun the preview after any signer change.
 5. **Confirm** — confirm name, symbol, token standard, code-capable/static type, burnability,
    ERC-721C/ERC-1155C enrollment, edition arithmetic, royalty ceiling, signer, costs, public URLs,
    initial mint, and every requested lock.

@@ -26,13 +26,17 @@ abx skill install --global
 
 Restart the agent after installation.
 
-## Keep signing human
+## Choose the signer deliberately
 
-Use `--sign` for browser-wallet approval. The agent prepares each transaction and opens the signing
-page. It never needs your private key.
+On a supported network, the agent checks the live ABX Services descriptor before asking you to set
+up a wallet. If sponsorship is advertised and the transaction group is eligible, it recommends
+`--sponsor`—especially on testnet. Your account-bound creator wallet signs through a short-lived
+authorization, and the service pays the eligible gas.
 
-`--send` uses a key from the environment and is meant for unattended testnet automation. `--dry-run`
-simulates a write without sending it. See [signing modes](/docs/reference/cli#signing-lanes).
+You can always bring your own signer instead: `--sign` opens a browser wallet, `--send` uses an
+environment key for deliberate automation, and `--unsigned` prepares transactions for a multisig or
+offline signer. The agent honors an explicit choice and reruns the dry run if the signer changes.
+See [signing modes](/docs/reference/cli#signing-lanes).
 
 ## What the skill does not do
 
