@@ -63,7 +63,7 @@ import {
   editionCodeFactoryAddress,
   storageOptions,
 } from '../config.js';
-import {type Flags, isDryRun, parseBlockTagFlag, parseSaltFlag} from '../flags.js';
+import {assertSaltGuardForDeployer, type Flags, isDryRun, parseBlockTagFlag, parseSaltFlag} from '../flags.js';
 import {jsonSafe, withJson} from '../jsonout.js';
 import {allowLargeScan, bold, c, detectCanonicalFactory, dim, g, info, ok, registerAndIndexLocally, resolveScanFloor, warn} from '../output.js';
 import {parseCopies} from './deploy.js';
@@ -154,6 +154,7 @@ export async function cmdPredict(flags: Flags) {
   }
 
   let salt = parseSaltFlag(flags.salt);
+  if (salt && flags.for) assertSaltGuardForDeployer(salt, flags.for as Address);
   if (!salt) {
     // No explicit salt: reserve one to a deployer (front-run-proof). Default to the env key.
     let deployer = flags.for as Address | undefined;

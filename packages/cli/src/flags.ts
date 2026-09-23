@@ -9,8 +9,8 @@
  * the first (a real footgun on a multi-param drop; a Select's options use `|` not `,`, so the
  * comma-join never collides with an option list).
  */
-import {type Hex} from 'viem';
-import {type ReconstructBlockTag} from '@artblocks/abx-sdk';
+import {getAddress, type Address, type Hex, zeroAddress} from 'viem';
+import {saltGuard, type ReconstructBlockTag} from '@artblocks/abx-sdk';
 import {bold, info, warn} from './output.js';
 
 export type Flags = Record<string, string | undefined>;
@@ -187,3 +187,17 @@ export function parseSaltFlag(raw: string | undefined): Hex | undefined {
   return raw as Hex;
 }
 
+/** Refuse an explicit deterministic salt whose deployer guard names somebody else.
+ *
+ * A factory reads the leading 20 salt bytes as either zero (permissionless) or the only address
+ * allowed to deploy it. Prediction itself cannot fail, so without this check a dry run can show a
+ * perfectly real address that the selected signer can never create. */
+export function assertSaltGuardForDeployer(salt: Hex, deployer: Address): void {
+  const guard = saltGuard(salt);
+  if (guard === zeroAddress || guard === getAddress(deployer)) return;
+  throw new Error(
+    `--salt is reserved to ${guard}, but this deployment signs as ${getAddress(deployer)}. ` +
+      `The factory will reject it. Drop --salt to generate a signer-bound salt, or use ` +
+      `0x${getAddress(deployer).slice(2)}<24 hex entropy> to pin an address for this signer.`,
+  );
+}

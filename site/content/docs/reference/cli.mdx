@@ -114,7 +114,9 @@ chain and transaction group are eligible. Otherwise choose the appropriate bring
 Never paste a private key into a chat or prompt.
 
 A deploy preview reports the wallet approvals it will need. A predicted address is stable only when you
-reuse the displayed salt with `--salt`.
+reuse the displayed salt with `--salt`. A salt's first 20 bytes are its deployer guard: they must be
+zero (permissionless) or the address that will sign. The CLI refuses a known signer/guard mismatch
+before authorization or broadcast.
 
 ### Structured deploy plan (`--dry-run --json`)
 
