@@ -6,6 +6,7 @@ For provider-independent hosting and migration, also read [hosting.md](hosting.m
 ## Contents
 
 - [First-party service](#first-party-service)
+- [Creator wallet and sponsorship](#creator-wallet-and-sponsorship)
 - [Feedback targets](#feedback-targets)
 
 ## First-party service
@@ -71,8 +72,37 @@ terms before making a durable hosting choice and keep the exit route explicit: t
 contract supports another provider or a creator-operated resolver/effects deployment.
 
 Before depending on hosted behavior, inspect the live descriptor with `abx remote abx`; do not infer
-capabilities from this file. Use `--remote abx` on commands that accept a managed remote and verify
-the resulting public surfaces as described in [hosting.md](hosting.md).
+capabilities from this file. A remote is a provider catalog and may advertise different HTTPS
+origins for token resolution, account operations, and creator wallets. Trust the advertised
+interface endpoint, not a guessed hostname. Use `--remote abx` on commands that accept a managed
+resolver and verify the resulting public surfaces as described in [hosting.md](hosting.md).
+
+## Creator wallet and sponsorship
+
+An account with a verified email can use one persistent ABX creator wallet. The
+`ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` discovers the provider's
+`abx-creator-wallet/v1` endpoint, provisions or reuses the wallet, starts a Privy device authorization,
+and asks the human to match one code before an agent may
+sign the exact transaction group. Tokens and signing material stay in memory for that command and
+are discarded afterward.
+
+This is an early beta on Base Sepolia only. Before using it:
+
+1. run `abx auth login` if the account has no API key;
+2. inspect `abx capabilities --json` and the command help;
+3. run the same command with `--dry-run --json`;
+4. summarize the network, creator-wallet address, transaction group, zero value, permanent choices,
+   and beta status;
+5. after approval, repeat with `--sponsor`.
+
+The initial lane accepts zero-value factory/contract calls up to the provider policy and a hard
+3,000,000-gas transaction ceiling. It does not support direct CREATE or staged `--onchain-image`
+writes. Never add retries around a sponsored write. An `unknown` outcome means the provider may have
+submitted it: preserve the operation ID and reconcile status before any new send.
+
+Sponsorship is optional service policy, not protocol support. `--send`, `--sign`, and `--unsigned`
+remain the bring-your-own alternatives. Do not use sponsorship on a production network unless the
+live capability registry and command explicitly support it; the initial release does not.
 
 ## Feedback targets
 

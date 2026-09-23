@@ -34,6 +34,7 @@ import {
   signTx,
   type SignResult,
 } from '../signer.js';
+import {openSponsoredSession} from '../creator-signer.js';
 
 /** Matches the App Store registry schema (`lib/submissions.ts` in abx-app-store). */
 export const APP_CATEGORIES = [
@@ -673,6 +674,19 @@ export async function cmdSubmitApp(address: string | undefined, flags: Flags): P
           results.push(...restResults);
           paramsHashes.push(...restResults.map((r) => r.txHash));
         }
+      }
+    } else if (lane === 'sponsor') {
+      const session = await openSponsoredSession(CHAIN);
+      try {
+        if (expectedSigner && expectedSigner.toLowerCase() !== session.address.toLowerCase()) {
+          throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${expectedSigner}.`);
+        }
+        await sendMintThenParams(async (tx) => {
+          const {txHash, receipt} = await session.send(tx);
+          return {txHash, logs: receipt.logs};
+        });
+      } finally {
+        session.close();
       }
     } else {
       const session = await openWalletSession({

@@ -82,7 +82,7 @@ for (const cmd of Object.keys(COMMAND_FLAGS).filter((c) => !MULTI_SUBCOMMAND_HEL
 }
 
 test('SHARED_WRITE covers the signing lane, the confirm gate, and the reindex nudge', () => {
-  for (const f of ['send', 'sign', 'unsigned', 'dry-run', 'yes', 'confirm', 'port', 'sign-url-file', 'remote', 'remote-token', 'json']) {
+  for (const f of ['send', 'sign', 'sponsor', 'unsigned', 'dry-run', 'yes', 'confirm', 'port', 'sign-url-file', 'remote', 'remote-token', 'json']) {
     assert.ok((SHARED_WRITE as readonly string[]).includes(f), `SHARED_WRITE missing ${f}`);
   }
 });

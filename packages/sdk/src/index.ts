@@ -44,6 +44,7 @@ export * from './mime.js';
 export * from './onchain-uri.js';
 export * from './policy.js';
 export * from './service.js';
+export * from './creators-service.js';
 export * from './staging.js';
 export * from './util.js';
 export {

@@ -63,8 +63,8 @@
  *                            (default: Claude Code + the neutral .agents/skills; --agent/--global)
  *
  * Every write picks a signing lane: default hot (env key signs), `--sign` (a human
- * approves in their own wallet via a one-shot localhost page), `--unsigned` (print
- * the tx for a multisig / offline signer). The agent picks the lane; the CLI signs.
+ * approves in their own wallet via a one-shot localhost page), `--sponsor` (an eligible
+ * Base Sepolia creator wallet), or `--unsigned` (print for a multisig / offline signer).
  *
  * Command bodies live in `commands/*.ts`, grouped by domain (deploy / project / reads / storage /
  * service / scaffold) — see `.claude/skills` and `contracts/README.md` conventions aside, this file
@@ -513,7 +513,7 @@ const COMMAND_HELP: Record<string, string> = {
                             ${dim('gateway and seeds the serving one for the backend in use, so passing only it still does what you meant.')}
     ${g('--storage-signer')} arweave|eth   who signs+pays Turbo (arweave) uploads: the CLI-managed key (default) or your ${g('.env')} EVM key
                             ${dim('(eth reuses credits you funded on that wallet; with --sign your browser wallet pays instead)')}
-    signing: ${g('--send')} hot/env key ${dim('(default — a bare deploy signs + sends)')} · ${g('--sign')} wallet page · ${g('--unsigned')} print tx
+    signing: ${g('--send')} hot/env key ${dim('(default)')} · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(Base Sepolia beta)')} · ${g('--unsigned')} print tx
     ${dim('No key in .env? Deploy from your own wallet: ')}${g('--sign --for <your-addr>')}${dim(' (you approve in the browser; nothing is pasted).')}
     ${g('--dry-run')}             preview (commitment · URIs · mint plan · approvals) WITHOUT sending or storing
                             ${dim('(needs a deployer to compute anything address-dependent — pass --for 0x.. if no signing key is set)')}

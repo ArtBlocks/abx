@@ -53,7 +53,9 @@ abx remote <name>
 OAuth login, manual recovery path, current access model, and provider-feedback path. Other providers
 use their configured name.
 
-This reports the service descriptor, supported chains, rendering policy, and authentication status.
+This reports the service descriptor, supported chains, rendering policy, authentication status, and
+any interface-specific origins. A remote names a provider catalog, not necessarily one process; an
+advertised account, wallet, or hosting interface may use a different HTTPS origin from its resolver.
 Do not infer provider capability from its hostname or marketing page.
 
 Interpret control-plane failures precisely:

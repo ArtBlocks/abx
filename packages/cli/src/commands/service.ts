@@ -31,6 +31,7 @@ import {
   probeRpcEndpoints,
   reconstructProject,
   resolveChain,
+  resolveServiceInterfaceEndpoint,
   verifyParity,
 } from '@artblocks/abx-sdk';
 import {assertPrivateEnvPath, saveEnvSecret, saveEnvSecrets} from './auth.js';
@@ -374,6 +375,15 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
   }
   info(`service    ${d.service?.name ?? '—'} ${dim(d.service?.version ?? '')}`);
   info(`serves     ${(d.interfaces ?? []).join(' · ') || '—'}`);
+  for (const interfaceId of d.interfaces ?? []) {
+    if (!d.endpoints?.[interfaceId]) continue;
+    const endpoint = resolveServiceInterfaceEndpoint(target.url, d, interfaceId);
+    if (!endpoint) continue;
+    const policy = [endpoint.supportLevel, endpoint.auth, endpoint.chains.length ? `chains ${endpoint.chains.join(',')}` : '']
+      .filter(Boolean)
+      .join(' · ');
+    info(`endpoint   ${interfaceId} → ${endpoint.baseUrl}${policy ? dim(` · ${policy}`) : ''}`);
+  }
   const chainId = resolveChain(CHAIN).id;
   const coversChain = (d.chains ?? []).includes(chainId);
   info(`chains     ${(d.chains ?? []).join(', ') || '—'}  ${coversChain ? g(`✓ covers ${CHAIN} (${chainId})`) : `${c.orange}⚠${c.reset} does NOT cover ${CHAIN} (${chainId}) — registrations will be refused`}`);

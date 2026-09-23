@@ -31,8 +31,8 @@ export const DEPLOY_PLAN_SCHEMA_VERSION = 2 as const;
  *  agree with each other across lanes: `kind: 'edition-code'` vs. this union's `'code-edition'`). */
 export type DeployPlanFamily = '1of1' | '1of1-edition' | 'series' | 'series-edition' | 'code' | 'code-edition';
 
-/** The three signing lanes `laneFromFlags` resolves to, reused verbatim. */
-export type DeployPlanLane = 'send' | 'sign' | 'unsigned';
+/** The signing lanes `laneFromFlags` resolves to, reused verbatim. */
+export type DeployPlanLane = 'send' | 'sign' | 'sponsor' | 'unsigned';
 
 export interface DeployPlanTransactions {
   /** Wallet TX SIGNATURES this run needs — the exact same count the lane's own dry-run/confirm

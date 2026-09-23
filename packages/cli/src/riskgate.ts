@@ -36,19 +36,19 @@ const C = {reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[38;5;
 const dim = (s: string) => `${C.dim}${s}${C.reset}`;
 const bold = (s: string) => `${C.bold}${s}${C.reset}`;
 
-/** Resolve the signing lane from flags: `--unsigned` (cold) · `--sign` (wallet) · default hot. The
- *  one place this decision is made — every write reads the same three flags the same way. */
+/** Resolve the signing lane from flags: `--unsigned` (cold) · `--sign` (wallet) · `--sponsor`
+ *  (ABX creator wallet) · default hot. The one place every write makes this decision. */
 export function laneFromFlags(flags: Flags): Lane {
   // Two lane flags at once is always a mistake, and silently picking one is how a caller ends up in a
   // lane they did not choose — an agent writing `--send --sign` from two different help lines gets a
   // browser wallet page when it meant the env key, and reads the wait as a hang. Refuse instead: the
   // precedence order below is an implementation detail, not an interface.
-  const named = (['send', 'sign', 'unsigned'] as const).filter((k) => flags[k] !== undefined);
+  const named = (['send', 'sign', 'sponsor', 'unsigned'] as const).filter((k) => flags[k] !== undefined);
   if (named.length > 1) {
     throw new Error(
       `pick ONE signing lane, not ${named.length}: ${named.map((n) => `--${n}`).join(' and ')}. ` +
         `--send signs with the hot/env key (the default, so it can also be omitted) · --sign opens a ` +
-        `wallet page · --unsigned prints the transaction for you to sign elsewhere.`,
+        `wallet page · --sponsor uses your ABX creator wallet · --unsigned prints the transaction for you to sign elsewhere.`,
     );
   }
   // PRESENCE, not truthiness. A bare `--sign` parses to `'true'`, but `--sign=` parses to `''`, which
@@ -57,6 +57,7 @@ export function laneFromFlags(flags: Flags): Lane {
   // an unattended key signature instead. Naming a lane selects it, full stop.
   if (named.includes('unsigned')) return 'unsigned';
   if (named.includes('sign')) return 'sign';
+  if (named.includes('sponsor')) return 'sponsor';
   return 'send';
 }
 
