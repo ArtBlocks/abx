@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
 import {assertSponsorConfigured, creatorApiUrl} from '../src/creator-signer.js';
+import {warnUnfunded} from '../src/commands/deploy.js';
 
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), {status, headers: {'content-type': 'application/json'}});
@@ -65,6 +67,23 @@ test('sponsor preflight is Base Sepolia only and requires the account API key', 
     if (before === undefined) delete process.env.ABX_SERVICES_API_KEY;
     else process.env.ABX_SERVICES_API_KEY = before;
   }
+});
+
+test('sponsored deploys skip the native-balance and faucet preflight', async () => {
+  let balanceReads = 0;
+  const publicClient = {
+    getBalance: async () => {
+      balanceReads += 1;
+      return 1n;
+    },
+  } as unknown as PublicClient;
+  const wallet = '0x0000000000000000000000000000000000000001' as Address;
+
+  await warnUnfunded(publicClient, wallet, 'sponsor');
+  assert.equal(balanceReads, 0, 'the service-funded lane must not inspect or require wallet gas');
+
+  await warnUnfunded(publicClient, wallet, 'send');
+  assert.equal(balanceReads, 1, 'self-funded lanes still retain the native-balance preflight');
 });
 
 test('the explicit creator API override is a bounded development escape hatch', async () => {

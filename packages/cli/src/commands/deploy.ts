@@ -193,7 +193,7 @@ import {assertLaneCanSign, confirmSend, gatedSend, laneFromFlags} from '../riskg
 import {describeSchema, editionSchemaAdvisory, parseSchemaSpecs} from '../schema.js';
 import {parseSeriesTraits} from '../series-traits.js';
 import {decodeOnChainJson} from '../served.js';
-import {openWalletSession, signHotSequence, signTx, type SignResult} from '../signer.js';
+import {openWalletSession, signHotSequence, signTx, type Lane, type SignResult} from '../signer.js';
 import {assertSponsorConfigured, openSponsoredSession} from '../creator-signer.js';
 
 // ── plan-object warning capture ──────────────────────────────────────────────────────────────────
@@ -329,7 +329,10 @@ export function assertPreviewDeployer(flags: Flags): void {
 
 // Funding preflight — a 0-balance signer fails only at the tx, with a confusing error. Surface it
 // up front. Especially the wallet lane (--sign/--for), which has no env key for `doctor` to check.
-export async function warnUnfunded(publicClient: PublicClient, address: Address): Promise<void> {
+// The sponsored lane is deliberately allowed to have a zero balance: funding is the service's job,
+// and telling that creator to visit a faucet contradicts the lane they explicitly selected.
+export async function warnUnfunded(publicClient: PublicClient, address: Address, lane: Lane): Promise<void> {
+  if (lane === 'sponsor') return;
   try {
     const bal = await publicClient.getBalance({address});
     if (bal === 0n) warn(`signer ${address} has 0 ${CHAIN} ETH — ${faucetHint(CHAIN)}, then sign.`);
@@ -877,7 +880,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     if (!signer && lane === 'send') {
       try { signer = makeWalletClient({chainKey: CHAIN}).account.address; } catch { /* no key yet — later steps handle it */ }
     }
-    if (signer) await warnUnfunded(publicClient, signer);
+    if (signer) await warnUnfunded(publicClient, signer, lane);
   }
 
   // `deploy` surfaces the trust anchor as a step; the demo does NOT. It briefly opened on "only this
@@ -1176,7 +1179,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     }
     const {clone: predicted, params, salt, contentNote} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
-    await warnUnfunded(publicClient, deployer); // advisory: fund this before the real deploy
+    await warnUnfunded(publicClient, deployer, lane); // advisory for self-funded signing lanes
     // The address is a pure function of (factory, salt), and without --salt this salt was just
     // freshly randomly reserved (saltFor mixes in entropy) — a plain re-run gets a DIFFERENT one, so
     // the address below is real for THIS preview but not reproducible by habit. Rather than print an
@@ -1611,7 +1614,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
         /* no key yet — later steps handle it */
       }
     }
-    if (signer) await warnUnfunded(publicClient, signer);
+    if (signer) await warnUnfunded(publicClient, signer, lane);
   }
 
   step('Trust anchor');
@@ -1780,7 +1783,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     }
     const {clone: predicted, params, salt, contentNote} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
-    await warnUnfunded(publicClient, deployer);
+    await warnUnfunded(publicClient, deployer, lane);
     if (explicitSalt) info(`deterministic address: ${predicted}`);
     info(`name    "${name}"${flags.name ? '' : dim('  (default — pass --name)')}`);
     info(`symbol  ${symbol}${flags.symbol ? '' : dim('  (default — pass --symbol)')}`);
@@ -3008,7 +3011,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
     }
     const {clone: predicted, params, salt} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
-    await warnUnfunded(publicClient, deployer);
+    await warnUnfunded(publicClient, deployer, lane);
     if (explicitSalt) info(`deterministic address: ${predicted}`);
     info(`name    "${name}"${flags.name ? '' : dim('  (default — pass --name)')}`);
     info(`symbol  ${symbol}${flags.symbol ? '' : dim('  (default — pass --symbol)')}`);
