@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.46
+
+### Patch Changes
+
+- ddb2e0b: Refuse irreversible URI locks when the current token or collection base uses `abx.io`. Clarify that
+  managed resolver URLs must remain mutable unless a creator-controlled domain is routed and verified.
+- 76cfc6a: Follow each remote service interface's advertised origin so provider catalogs can separate token data from account and control APIs.
+
 ## 0.1.0-alpha.45
 
 ### Patch Changes
