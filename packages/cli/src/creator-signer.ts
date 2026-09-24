@@ -20,7 +20,17 @@ import {CreatorAgentAuthorization} from './creator-agent.js';
 import {ABX_SERVICES_URL} from './remote.js';
 
 const SPONSORABLE_BASE_CHAINS = new Set([8_453, 84_532]);
-const MAX_SPONSORED_GAS = 3_000_000n;
+
+/** Preserve the exact RPC estimate across the JSON service boundary. This is a serialization
+ * guard, not a sponsorship-policy ceiling; real EVM transaction limits are many orders of
+ * magnitude below Number.MAX_SAFE_INTEGER. */
+export function sponsoredGasLimit(gas: bigint): number {
+  const limit = Number(gas);
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    throw new Error(`Sponsored transaction gas estimate ${gas} cannot be represented safely.`);
+  }
+  return limit;
+}
 
 /** Synchronous preflight for commands that may upload content before opening the signing lane. */
 export function assertSponsorConfigured(chainKey: string): void {
@@ -182,10 +192,6 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           value: tx.value,
           gasFloor: tx.gasFloor,
         });
-        if (gas > MAX_SPONSORED_GAS) {
-          throw new Error(`This transaction needs ${gas} gas; the ABX sponsorship beta caps each transaction at ${MAX_SPONSORED_GAS}.`);
-        }
-
         const operationId = `op_${randomUUID().replaceAll('-', '')}`;
         const prepared = await api.prepare({
           operationId,
@@ -193,7 +199,7 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           to: tx.to,
           value: tx.value,
           data: tx.data,
-          gasLimit: Number(gas),
+          gasLimit: sponsoredGasLimit(gas),
         });
         const signed = authorization.sign({
           walletId: prepared.signingRequest.walletId,

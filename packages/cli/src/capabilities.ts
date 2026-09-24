@@ -24,7 +24,7 @@ export const ABX_CAPABILITIES = {
       summary: 'account-bound ABX creator wallet; ABX Services pays eligible gas',
       supportLevel: 'beta',
       chainIds: [8_453, 84_532],
-      limits: ['zero value', '3,000,000 gas per transaction', 'no direct CREATE', 'no staged --onchain-image'],
+      limits: ['zero value', 'network and provider gas policy', 'no direct CREATE', 'no staged --onchain-image'],
     },
     unsigned: {flag: '--unsigned', summary: 'print for an external signer', supportLevel: 'supported'},
   },

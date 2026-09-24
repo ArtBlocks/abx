@@ -100,10 +100,11 @@ production-network warning before confirmation. Before using it:
    and beta status;
 5. after approval, repeat with `--sponsor`.
 
-The initial lane accepts zero-value factory/contract calls up to the provider policy and a hard
-3,000,000-gas transaction ceiling. It does not support direct CREATE or staged `--onchain-image`
-writes. Never add retries around a sponsored write. An `unknown` outcome means the provider may have
-submitted it: preserve the operation ID and reconcile status before any new send.
+The initial lane accepts zero-value factory/contract calls up to the live network and provider
+policy. ABX does not impose an additional per-transaction gas ceiling. It does not support direct
+CREATE or staged `--onchain-image` writes. Never add retries around a sponsored write. An `unknown`
+outcome means the provider may have submitted it: preserve the operation ID and reconcile status
+before any new send.
 
 Sponsorship is optional service policy, not protocol support. `--send`, `--sign`, and `--unsigned`
 remain first-class bring-your-own alternatives. Honor an explicit choice of any of them. If the

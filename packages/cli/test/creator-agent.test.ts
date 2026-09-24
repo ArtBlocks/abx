@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {assertSponsorConfigured, creatorApiUrl, sponsoredPreviewAddress} from '../src/creator-signer.js';
+import {assertSponsorConfigured, creatorApiUrl, sponsoredGasLimit, sponsoredPreviewAddress} from '../src/creator-signer.js';
 import {warnUnfunded} from '../src/commands/deploy.js';
 
 const json = (value: unknown, status = 200) =>
@@ -86,6 +86,12 @@ test('sponsored deploys skip the native-balance and faucet preflight', async () 
 
   await warnUnfunded(publicClient, wallet, 'send');
   assert.equal(balanceReads, 1, 'self-funded lanes still retain the native-balance preflight');
+});
+
+test('sponsored transactions preserve large network gas estimates without an ABX policy cap', () => {
+  assert.equal(sponsoredGasLimit(4_933_890n), 4_933_890);
+  assert.equal(sponsoredGasLimit(30_000_000n), 30_000_000);
+  assert.throws(() => sponsoredGasLimit(BigInt(Number.MAX_SAFE_INTEGER) + 1n), /cannot be represented safely/);
 });
 
 test('the explicit creator API override is a bounded development escape hatch', async () => {
