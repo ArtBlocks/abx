@@ -6,11 +6,9 @@ description: "Deploy on eligible Base networks without bringing a funded wallet.
 ABX Services can give a verified account one embedded creator wallet. The wallet address stays tied
 to the account's email and API key; the API key cannot sign.
 
-The sponsored signing lane is supported on **Base Sepolia** and, when the live service explicitly
-advertises it, **Base mainnet**. Base mainnet protocol support remains beta. Sponsorship is
-policy-limited and may be paused. When it is available, it is the recommended path for a first
-testnet launch: no private key, funded wallet, or faucet visit is required. Bring-your-own wallet
-flows remain available everywhere.
+Gas sponsorship is supported on **Base Sepolia** and **Base**. Base mainnet protocol support remains
+beta. Sponsorship may be limited or paused. When it is available, it is the recommended path for a
+first testnet launch: no private key, funded wallet, or faucet visit is required.
 
 ```bash
 abx auth login
@@ -19,29 +17,9 @@ abx deploy ... --dry-run --json
 abx deploy ... --sponsor
 ```
 
-The real send opens Privy once. Match the code, review the transaction group, and authorize the
-agent. The CLI keeps that grant only in memory, signs each exact request, and discards it when the
-command ends. ABX Services adds its provider credential and relays only eligible transactions.
+For the real send, match the code shown by the CLI, review the transaction group, and approve it.
+Sponsored operations cannot send ETH. If sponsorship is unavailable or the operation is not
+eligible, use your own wallet with `--send`, `--sign`, or `--unsigned`.
 
-Current limits:
-
-- Base Sepolia (`84532`), plus Base (`8453`) only when both the live provider and your account
-  advertise it;
-- zero ETH value;
-- gas must be accepted by the network and live sponsorship provider; ABX adds no lower gas ceiling.
-
-Factory deployments, `abx deploy-contract`, and staged `--onchain-image` transaction groups use the
-same lane. Sponsored custom contracts deploy through ABX's existing keyless CREATE2 proxy because
-the provider-backed lane requires a call target. The initcode is exact, but its constructor sees the
-proxy—not the creator wallet—as `msg.sender`; pass ownership explicitly when that distinction
-matters. Each group is serialized under one short-lived authorization, and a later transaction is
-not prepared until the receipt it depends on is confirmed.
-
-An ambiguous submission is never retried. Keep the operation ID from the error and check its status
-before taking another action.
-
-The live remote and account response determine whether sponsorship is enabled. ABX sponsorship is a
-convenience, not part of the protocol. You can always use `--send`, `--sign`, or `--unsigned`
-instead. Before a sponsored Base mainnet operation, prove the exact flow on Base Sepolia, review the
-production-network warning and permanent choices, and confirm that both the live descriptor and
-your account advertise chain `8453`.
+Prove the exact flow on Base Sepolia before using Base. On Base, review the production-network
+warning, transaction group, and every permanent choice before approving.

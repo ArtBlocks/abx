@@ -99,6 +99,7 @@ import {
   type Compress,
   type ContentPlan,
   type StagingEvent,
+  assertUriBaseLockable,
 } from '@artblocks/abx-sdk';
 import {
   encodeScalarParam,
@@ -3013,6 +3014,8 @@ export async function cmdSetRenderer(address: string | undefined, flags: Flags):
 export async function cmdLockUri(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(address, 'abx lock-uri <address> [--collection] [--sign|--unsigned]');
   const collection = !!flags.collection;
+  const uriBase = await read<string>(contract, collection ? 'contractURIBase' : 'tokenURIBase');
+  assertUriBaseLockable(uriBase);
   const owner = await read<Address>(contract, 'owner');
   console.log(
     dim(
