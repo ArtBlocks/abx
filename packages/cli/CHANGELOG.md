@@ -1,5 +1,12 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.61
+
+### Patch Changes
+
+- 04c0919: Remove ABX's artificial 3,000,000-gas ceiling from sponsored transactions. Sponsored calls now use
+  the network estimate and remain subject to the active chain and provider sponsorship policy.
+
 ## 0.1.0-alpha.60
 
 ### Patch Changes
