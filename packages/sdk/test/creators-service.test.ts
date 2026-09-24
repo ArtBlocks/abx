@@ -82,31 +82,6 @@ test('prepare, submit, and status preserve the exact signed operation contract',
   assert.equal((bodies[1] as {data: string}).data, '0x1234');
 })
 
-test('prepare preserves the null target used by direct contract creation', async () => {
-  let requestBody: unknown;
-  const client = new CreatorApiClient({
-    baseUrl: 'https://api.example',
-    token: 'api-key',
-    fetchImpl: async (_url, init) => {
-      requestBody = JSON.parse(String(init?.body));
-      return Response.json({
-        operation: {
-          operationId: 'direct_create_001', chainId: 84532, walletId: 'wallet-1', state: 'prepared',
-          providerTransactionId: null, transactionHash: null, userOperationHash: null, errorCode: null,
-          updatedAt: '2026-09-18T00:00:00.000Z',
-        },
-        signingRequest: {
-          walletId: 'wallet-1', idempotencyKey: 'direct_create_001', requestExpiry: '1789776000000', body: {},
-        },
-      });
-    },
-  });
-  await client.prepare({
-    operationId: 'direct_create_001', chainId: 84532, to: null, value: '0x0', data: '0x60006000f3', gasLimit: 150000,
-  });
-  assert.equal((requestBody as {to: unknown}).to, null);
-})
-
 test('errors expose only stable service codes and writes are never retried', async () => {
   let calls = 0;
   const client = new CreatorApiClient({

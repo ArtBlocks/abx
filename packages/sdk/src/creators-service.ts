@@ -159,8 +159,8 @@ export class CreatorApiClient {
   async prepare(input: {
     operationId: string;
     chainId: number;
-    /** Null for direct EVM contract creation. */
-    to: Address | null;
+    /** Sponsored operations are calls; custom-contract deployment targets the CREATE2 proxy. */
+    to: Address;
     value: Hex;
     data: Hex;
     gasLimit: number;

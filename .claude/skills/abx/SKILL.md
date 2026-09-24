@@ -126,7 +126,9 @@ Important boundaries:
   be prepared as one cold `--unsigned` bundle because staged transactions depend on prior receipts.
 - Deploy tested custom hooks/renderers from exact compiled initcode with `abx deploy-contract`.
   ABX sends the bytes; it does not compile, link, audit, or infer constructor types. Test on the
-  paired testnet and source-verify before wiring a production address.
+  paired testnet and source-verify before wiring a production address. Under `--sponsor`, the
+  keyless CREATE2 proxy is the constructor caller, so pass ownership explicitly instead of relying
+  on `msg.sender` in the constructor.
 - A code project may need no public host when its image/traits are computed by Solidity renderers.
   A JavaScript program still needs a deliberate marketplace-image plan even when its animation is
   chain-complete.

@@ -111,5 +111,8 @@ abx deploy-contract \
 
 Use `cast abi-encode` for constructor arguments, run the command with `--dry-run --json` first, and
 prove the same bytecode on the paired testnet. ABX refuses unresolved library placeholders and never
-guesses argument types. Source-verify the deployed contract, then wire its address with
+guesses argument types. Under `--sponsor`, deployment uses the keyless CREATE2 proxy and the preview
+prints its salt and predicted address. That means a constructor observes the proxy as `msg.sender`;
+use an explicit owner argument instead of relying on constructor caller semantics. Other signing
+lanes use direct CREATE. Source-verify the deployed contract, then wire its address with
 `abx set-param-hooks` or the matching renderer flag.

@@ -15,7 +15,14 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, resolve} from 'node:path';
 import {keccak256, toBytes} from 'viem';
-import {ABX_SALT, saltHash} from '../src/create2.js';
+import {
+  ABX_SALT,
+  create2Calldata,
+  create2CalldataFromSalt,
+  predictCreate2Address,
+  predictCreate2AddressFromSalt,
+  saltHash,
+} from '../src/create2.js';
 
 const SALTS_SOL = resolve(dirname(fileURLToPath(import.meta.url)), '../../../contracts/script/AbxSalts.sol');
 
@@ -69,6 +76,15 @@ test('the three write-path library salts hash to the values the deploy scripts u
   assert.equal(saltHash(ABX_SALT.editionLib), '0x84bb4cc42185d7007eb139933b5ef32e59c09e94267ed5e0a4a6b3ad71c14d4a');
   // …and that `saltHash` is plain keccak256 of the utf-8 string, like Solidity's keccak256("literal").
   assert.equal(saltHash(ABX_SALT.paramsLib), keccak256(toBytes('abx.lib.params.v1')));
+});
+
+test('raw CREATE2 salt helpers are exact twins of the string helpers', () => {
+  const bytecode = '0x60006000f3';
+  const salt = 'abx.test.raw-create2';
+  const raw = saltHash(salt);
+  assert.equal(predictCreate2AddressFromSalt(raw, bytecode), predictCreate2Address(salt, bytecode));
+  assert.equal(create2CalldataFromSalt(raw, bytecode), create2Calldata(salt, bytecode));
+  assert.throws(() => create2CalldataFromSalt('0xab' as `0x${string}`, bytecode), /exactly 32 bytes/);
 });
 
 // Every anchor and singleton the SDK deploys must go through the keyless proxy, never a bare

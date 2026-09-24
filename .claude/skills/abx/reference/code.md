@@ -148,8 +148,9 @@ effects runner.
 
 Start with `abx scaffold-renderer`, then build and test the Solidity project using Foundry. Deploy
 with Foundry or send the exact compiled initcode through `abx deploy-contract`; ABX does not compile,
-link, audit, or infer constructor types. A real collection deploy refuses a renderer address with no
-code.
+link, audit, or infer constructor types. With `--sponsor`, use explicit constructor arguments for
+ownership because the keyless CREATE2 proxy—not the creator wallet—is the constructor caller. A real
+collection deploy refuses a renderer address with no code.
 
 Enforce these invariants in renderer tests:
 

@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {assertSponsorConfigured, assertSponsoredPreparedTx, creatorApiUrl, sponsoredGasLimit, sponsoredPreviewAddress} from '../src/creator-signer.js';
+import {
+  assertSponsorConfigured,
+  assertSponsoredPreparedTx,
+  creatorApiUrl,
+  sponsoredGasLimit,
+  sponsoredPreviewAddress,
+  sponsoredWalletAddress,
+} from '../src/creator-signer.js';
 import {warnUnfunded} from '../src/commands/deploy.js';
 
 const json = (value: unknown, status = 200) =>
@@ -94,12 +101,13 @@ test('sponsored transactions preserve large network gas estimates without an ABX
   assert.throws(() => sponsoredGasLimit(BigInt(Number.MAX_SAFE_INTEGER) + 1n), /cannot be represented safely/);
 });
 
-test('sponsored transaction boundary permits direct CREATE but still pins chain and zero value', () => {
+test('sponsored transaction boundary requires a target and still pins chain and zero value', () => {
   const creation = {
     op: 'deploy-contract', to: null, data: '0x60006000f3', value: '0x0', chainId: 84532,
     summary: 'Deploy exact initcode', fields: {},
   } as const;
-  assert.doesNotThrow(() => assertSponsoredPreparedTx(creation, 84532));
+  assert.throws(() => assertSponsoredPreparedTx(creation, 84532), /requires a call target/);
+  assert.doesNotThrow(() => assertSponsoredPreparedTx({...creation, to: '0x4e59b44847b379578588920cA78FbF26c0B4956C'}, 84532));
   assert.throws(() => assertSponsoredPreparedTx({...creation, chainId: 8453}, 84532), /expected 84532/);
   assert.throws(() => assertSponsoredPreparedTx({...creation, value: '0x1'}, 84532), /never covers/);
 });
@@ -163,6 +171,39 @@ test('sponsored preview refuses to provision missing account state', async () =>
     /has not provisioned one yet/,
   );
   assert.deepEqual(requests, ['https://api.example/v1/account']);
+});
+
+test('a real sponsored plan provisions the stable wallet once, then resolves it', async () => {
+  const address = '0xadCaecC6539F91646293ea058A9f398dCC2271A6' as Address;
+  const requests: Array<{url: string; method: string}> = [];
+  let provisioned = false;
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const method = init?.method ?? 'GET';
+    requests.push({url: String(input), method});
+    if (String(input).endsWith('/v1/wallet')) {
+      provisioned = true;
+      return json({address, provider: 'privy', providerAppId: 'app_test', created: true}, 201);
+    }
+    return json({
+      accountId: 'acct_test',
+      emailVerified: true,
+      wallet: provisioned ? {address, provider: 'privy', providerAppId: 'app_test'} : null,
+      capabilities: {wallet: provisioned, sponsorship: true, sponsoredChains: [84532]},
+    });
+  };
+  assert.equal(
+    await sponsoredWalletAddress('base-sepolia', {
+      env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+      fetchImpl,
+      provision: true,
+    }),
+    address,
+  );
+  assert.deepEqual(requests, [
+    {url: 'https://api.example/v1/account', method: 'GET'},
+    {url: 'https://api.example/v1/wallet', method: 'POST'},
+    {url: 'https://api.example/v1/account', method: 'GET'},
+  ]);
 });
 
 test('sponsored preview enforces live per-chain entitlement', async () => {

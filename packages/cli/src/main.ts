@@ -470,9 +470,11 @@ const COMMAND_HELP: Record<string, string> = {
     ${g('--initcode <path>')}    exact complete creation bytecode as a 0x-prefixed hex file
     ${g('--constructor-args <hex>')} or ${g('--constructor-args-file <path>')}   already ABI-encoded args appended to artifact bytecode
     --label "My hook"      human review label only
+    --salt 0x..<64hex>      optional raw CREATE2 salt for --sponsor (preview prints the generated default)
     signing: ${g('--send')} hot/env key · ${g('--sign')} wallet page · ${g('--sponsor')} eligible ABX creator wallet · ${g('--unsigned')} print tx
     ${g('--dry-run')} [--for 0x..]   estimate and simulate without sending
     ${g('--confirm')}                optional interactive final gate
+    ${dim('--sponsor uses the keyless CREATE2 proxy, so constructor msg.sender is the proxy; pass ownership explicitly.')}
     ${dim('ABX does not compile, link, audit, or infer constructor types. Build and test with Foundry;')}
     ${dim('deploy to the paired testnet first, verify source, then wire the address with the relevant ABX command.')}`,
   skill: `

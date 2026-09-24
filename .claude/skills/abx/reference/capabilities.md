@@ -65,8 +65,10 @@ One external contract may implement several hook/minter roles. Test it against a
 not a mock that approximates ABX callbacks.
 
 ABX scaffolds a Foundry renderer project but does not compile, link, or audit custom Solidity.
-`abx deploy-contract` can send exact compiled creation bytecode through any signing lane. The creator
-or their contract engineer owns code review, verification, upgrade policy, and audits.
+`abx deploy-contract` can send exact compiled creation bytecode through any signing lane. The
+sponsored lane calls the keyless CREATE2 proxy, so the constructor caller is that proxy; use explicit
+constructor arguments for ownership. Hot, wallet, and unsigned lanes retain direct CREATE. The
+creator or their contract engineer owns code review, verification, upgrade policy, and audits.
 
 ### Custom minter
 
