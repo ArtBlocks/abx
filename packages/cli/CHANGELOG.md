@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.65
+
+### Patch Changes
+
+- 66cf489: Mark the qualified creator-wallet sponsorship lane as supported while preserving Base mainnet's protocol-beta warnings.
+
 ## 0.1.0-alpha.64
 
 ### Patch Changes
