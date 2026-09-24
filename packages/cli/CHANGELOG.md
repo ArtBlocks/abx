@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.64
+
+### Patch Changes
+
+- 90bde50: Document the supported creator-wallet sponsorship lane in hook, mint, and transfer command help.
+
 ## 0.1.0-alpha.63
 
 ### Patch Changes
