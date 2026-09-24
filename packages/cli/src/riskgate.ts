@@ -201,13 +201,13 @@ async function simulateDryRun(
   expectedSigner?: Address,
   narrate = true,
   clientOverride?: PublicClient,
+  sponsored = false,
 ): Promise<DryRunSimulation> {
   const label = 'simulation'.padEnd(12);
   const unknown = (why: string): DryRunSimulation => {
     if (narrate) console.log(`    ${dim(label)} ${dim(`unknown — ${why}`)}`);
     return {status: 'unknown', reason: why};
   };
-  if (!prepared.to) return unknown('this creates a contract; there is nothing to call yet');
   if (!expectedSigner || expectedSigner === zeroAddress) {
     return unknown(
       'no signer known to simulate as the caller — set a signing key, or use --sign; some commands ' +
@@ -224,11 +224,13 @@ async function simulateDryRun(
   } catch (err) {
     return unknown(`could not run the simulation (${revertReason(err)})`);
   }
-  try {
-    const code = await client.getCode({address: prepared.to});
-    if (!code || code === '0x') return unknown(`${prepared.to} has no code yet on this chain`);
-  } catch (err) {
-    return unknown(`could not run the simulation (${revertReason(err)})`);
+  if (prepared.to) {
+    try {
+      const code = await client.getCode({address: prepared.to});
+      if (!code || code === '0x') return unknown(`${prepared.to} has no code yet on this chain`);
+    } catch (err) {
+      return unknown(`could not run the simulation (${revertReason(err)})`);
+    }
   }
 
   // Reuse the REAL send's own gas selection (`pinGas`, execute.ts — the exact function
@@ -266,9 +268,24 @@ async function simulateDryRun(
     return {status: 'would-revert', reason};
   }
 
-  // The call is provably executable at `gas` — what's left is whether the signer can actually PAY
-  // for it. This is the check that was missing entirely: a preview that never compares cost against
-  // balance is asserting an outcome it has not earned.
+  // The call is provably executable at `gas`. A sponsored wallet is not the gas payer: price the
+  // request for review, but leave provider-policy acceptance pending until the live send.
+  if (sponsored) {
+    try {
+      const gasPrice = await client.getGasPrice();
+      const value = prepared.value && prepared.value !== '0x0' ? BigInt(prepared.value) : 0n;
+      const cost = gas * gasPrice + value;
+      const reason = 'the transaction executes in simulation; live sponsorship policy is checked only when it is sent';
+      if (narrate) console.log(`    ${dim(label)} ${dim(`provider check pending — ${reason}`)}`);
+      return {status: 'unknown', reason, estimatedGas: gas.toString(), estimatedCostWei: cost.toString()};
+    } catch (err) {
+      return unknown(`the transaction executes in simulation, but its sponsored cost could not be priced (${revertReason(err)})`);
+    }
+  }
+
+  // On every user-paid lane, what's left is whether the signer can actually PAY for it. This is the
+  // check that was missing entirely: a preview that never compares cost against balance is asserting
+  // an outcome it has not earned.
   let gasPrice: bigint;
   let balance: bigint;
   try {
@@ -338,14 +355,15 @@ export function previewSigner(
  */
 export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedSendOptions): Promise<SignResult | null> {
   const expectedSigner = previewSigner(flags, opts.expectedSigner);
+  const lane = laneFromFlags(flags);
   if (isDryRun(flags)) {
     const prepared = await resolveProvider(provider, expectedSigner ?? zeroAddress);
     if (flags.json !== undefined) {
-      const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, false, opts.client);
+      const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, false, opts.client, lane === 'sponsor');
       console.log(JSON.stringify({
         dryRun: true,
         sent: false,
-        lane: laneFromFlags(flags),
+        lane,
         expectedSigner: expectedSigner ?? null,
         transaction: prepared,
         // `transaction.gasFloor` (when present) is a PROVEN MINIMUM used to detect an implausible
@@ -355,8 +373,8 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
       }, null, 2));
     } else {
       printDryRunPreview(prepared, expectedSigner);
-      await simulateDryRun(prepared, opts.chainKey, expectedSigner, true, opts.client);
-      console.log(dim(`\n  Re-run without --dry-run to send (lane: ${laneFromFlags(flags)}).\n`));
+      await simulateDryRun(prepared, opts.chainKey, expectedSigner, true, opts.client, lane === 'sponsor');
+      console.log(dim(`\n  Re-run without --dry-run to send (lane: ${lane}).\n`));
     }
     return null;
   }
@@ -364,7 +382,7 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
   const preview = await resolveProvider(provider, expectedSigner ?? zeroAddress);
   await confirmSend(preview.summary, flags);
   return signTx(provider, {
-    lane: laneFromFlags(flags),
+    lane,
     chainKey: opts.chainKey,
     expectedSigner,
     yes: !!flags.yes,

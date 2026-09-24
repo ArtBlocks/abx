@@ -122,9 +122,11 @@ Important boundaries:
   renderers, `--image-base` (a deterministic per-id off-chain still, mutually exclusive with
   `--image-renderer`), and `--resume` (a per-id mint diff — pass the same content flags plus
   `--mint-amount` if the original deploy premint ids).
-- `--onchain-image` works for static 721s and editions in hot or wallet-signing lanes. It cannot be
-  prepared as one cold `--unsigned` bundle because staged transactions depend on prior receipts;
-  the `--sponsor` beta also excludes this staged-content lane.
+- `--onchain-image` works for static 721s and editions in hot, wallet, or sponsored lanes. It cannot
+  be prepared as one cold `--unsigned` bundle because staged transactions depend on prior receipts.
+- Deploy tested custom hooks/renderers from exact compiled initcode with `abx deploy-contract`.
+  ABX sends the bytes; it does not compile, link, audit, or infer constructor types. Test on the
+  paired testnet and source-verify before wiring a production address.
 - A code project may need no public host when its image/traits are computed by Solidity renderers.
   A JavaScript program still needs a deliberate marketplace-image plan even when its animation is
   chain-complete.
@@ -180,8 +182,9 @@ Classify an unusual request as exactly one of:
 4. **Unknown** — no route has been proven. Inspect code/help/contracts and report uncertainty; do not
    turn absence from a no-list into a promise.
 
-Custom Solidity is built and deployed outside `abx`; `abx scaffold-renderer` supplies a Foundry
-starting point. Read [capabilities.md](reference/capabilities.md) before designing a custom mechanic.
+Custom Solidity is built and tested outside `abx`; `abx scaffold-renderer` supplies a Foundry
+starting point, and `abx deploy-contract` can send its exact compiled initcode through any signing
+lane. Read [capabilities.md](reference/capabilities.md) before designing a custom mechanic.
 
 ## Load only the reference needed
 

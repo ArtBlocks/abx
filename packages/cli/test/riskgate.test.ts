@@ -316,6 +316,22 @@ async function dryRunSimulation(tx: PreparedTx, client: PublicClient): Promise<R
   return JSON.parse(lines[0]!).simulation;
 }
 
+async function sponsoredDryRunSimulation(tx: PreparedTx, client: PublicClient): Promise<Record<string, unknown>> {
+  const lines: string[] = [];
+  const prior = console.log;
+  console.log = (...args: unknown[]) => lines.push(args.map(String).join(' '));
+  try {
+    await gatedSend(tx, {'dry-run': 'true', sponsor: 'true', json: 'true'} as Flags, {
+      chainKey: 'base-sepolia',
+      expectedSigner: SIGNER,
+      client,
+    });
+  } finally {
+    console.log = prior;
+  }
+  return JSON.parse(lines[0]!).simulation;
+}
+
 test('dry run: sufficient balance → would-succeed, carrying the REAL gas/cost (not gasFloor) so the send it previews can be trusted', async () => {
   const simulation = await dryRunSimulation(preparedTx(), fakeClient({}));
   assert.equal(simulation.status, 'would-succeed');
@@ -332,6 +348,25 @@ test('dry run: insufficient balance → would-revert, naming "insufficient funds
   assert.match(simulation.reason as string, /short by/i);
   assert.equal(simulation.balanceWei, '1');
   assert.ok(BigInt(simulation.estimatedCostWei as string) > 1n);
+});
+
+test('dry run: sponsored direct CREATE estimates exact initcode without treating the zero-balance creator wallet as the gas payer', async () => {
+  let sawTarget: Address | undefined = SIGNER;
+  const simulation = await sponsoredDryRunSimulation(
+    preparedTx({to: null, data: '0x60006000f3'}),
+    fakeClient({
+      estimateGas: async (request) => {
+        sawTarget = request.to;
+        return 140_000n;
+      },
+      getBalance: async () => 0n,
+    }),
+  );
+  assert.equal(sawTarget, undefined);
+  assert.equal(simulation.status, 'unknown');
+  assert.match(simulation.reason as string, /live sponsorship policy/i);
+  assert.equal(simulation.estimatedGas, String((140_000n * 125n) / 100n));
+  assert.equal(simulation.balanceWei, undefined);
 });
 
 test('dry run: an estimate that never clears the transaction\'s own provable floor is "unknown", never collapsed into would-succeed or would-revert', async () => {

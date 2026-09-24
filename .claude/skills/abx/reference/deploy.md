@@ -38,7 +38,7 @@ Treat custody, resolution, and mutability as separate decisions.
 
 Use `--onchain-image [--compress fastlz]` for static media bytes behind the on-chain metadata
 renderer. It implies on-chain resolution and requires no host or storage provider. It works for 721
-static projects and their editions in hot or wallet lanes. It stages bytes before deployment, so the
+static projects and their editions in hot, wallet, or sponsored lanes. It stages bytes before deployment, so the
 plan has at least two transactions (more when content needs multiple chunks). Cold `--unsigned`
 staging is refused.
 
@@ -149,8 +149,8 @@ a substitute for confirming the actual sale configuration.
 For any edition, say “N ids × M copies per id” and the maximum aggregate supply before spending.
 
 Static edition custody is symmetric with the 721 lanes: on-chain bytes, on-chain JSON with external
-media, inline SVG, and hosted resolution are available. `--onchain-image` uses hot or wallet signing,
-not cold unsigned staging.
+media, inline SVG, and hosted resolution are available. `--onchain-image` uses hot, wallet, or
+sponsored signing, not cold unsigned staging.
 
 Do not import code-edition limits into static editions or vice versa. Use the capability output.
 

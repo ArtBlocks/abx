@@ -19,6 +19,7 @@ test('capabilities --json emits the typed capability contract exactly', () => {
   assert.deepEqual(JSON.parse(run(['capabilities', '--json'])), ABX_CAPABILITIES);
   assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.chainIds, [8_453, 84_532]);
   assert.equal(ABX_CAPABILITIES.signingLanes.sponsor.supportLevel, 'beta');
+  assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.limits, ['zero value', 'network and provider gas policy']);
 });
 
 test('EditionCode supported capability flags reach its exhaustive allowlist', () => {
@@ -33,6 +34,15 @@ test('static editions expose on-chain image staging in code and help', () => {
   const help = run(['help', 'deploy-series']);
   assert.match(help, /--onchain-image/);
   assert.doesNotMatch(help, /--onchain-image is refused/);
+  assert.match(help, /hot, wallet, or sponsored signing/);
+});
+
+test('custom contract deployment is discoverable without claiming ABX compiles Solidity', () => {
+  assert.equal(ABX_CAPABILITIES.customContractDeployment.command, 'abx deploy-contract');
+  const help = run(['help', 'deploy-contract']);
+  assert.match(help, /Foundry JSON artifact/);
+  assert.match(help, /does not compile, link, audit, or infer constructor types/);
+  assert.match(run(['help']), /abx deploy-contract/);
 });
 
 test('summary help lists set-param-hooks — the only command that wires a custom hook', () => {

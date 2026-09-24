@@ -23,6 +23,7 @@
  *                            or --code-dir <dir> (build directory → ipfs/arweave `code` field)
  *                            --resume <addr>: finish one whose setup tx failed (sends only what's missing)
  *                            --copies <n|open> makes it an EditionCode (a generative drop, minted as copies)
+ *   abx deploy-contract      deploy exact compiled EVM initcode (custom hooks/renderers; ABX does not compile)
  *   abx add <address>        register + index a project (--remote <name|url>: on a remote resolver, not this machine)
  *   abx auth login|logout    authorize in a browser, or revoke and remove the current API key
  *   abx remote [<name|url>]  inspect a remote service (descriptor · chains · managed rendering · your projects there)
@@ -64,7 +65,7 @@
  *
  * Every write picks a signing lane: default hot (env key signs), `--sign` (a human
  * approves in their own wallet via a one-shot localhost page), `--sponsor` (an eligible
- * eligible Base-network creator wallet), or `--unsigned` (print for a multisig / offline signer).
+ * Base-network creator wallet), or `--unsigned` (print for a multisig / offline signer).
  *
  * Command bodies live in `commands/*.ts`, grouped by domain (deploy / project / reads / storage /
  * service / scaffold) — see `.claude/skills` and `contracts/README.md` conventions aside, this file
@@ -90,6 +91,7 @@ import {
   cmdVerify,
 } from './commands/project.js';
 import {cmdDeploy, cmdDeployCode, cmdDeploySeries} from './commands/deploy.js';
+import {cmdDeployContract} from './commands/contract.js';
 import {
   cmdArtifacts,
   cmdContractUri,
@@ -334,6 +336,7 @@ async function main() {
     case 'deploy': return cmdDeploy(flags, false);
     case 'deploy-series': return cmdDeploySeries(flags);
     case 'deploy-code': return cmdDeployCode(flags);
+    case 'deploy-contract': return cmdDeployContract(flags);
     case 'capabilities': return cmdCapabilities(flags);
     case 'inspect': return cmdInspect(rest[0], flags);
     case 'preview': return cmdPreview(flags);
@@ -461,6 +464,17 @@ const COMMAND_HELP: Record<string, string> = {
     ${g('abx capabilities')}          concise human summary
     ${g('abx capabilities --json')}   machine-readable deployment lanes, extension seams, irreversible choices, and unsupported cases
     ${dim('Use command help for syntax and a deploy command with --dry-run --json for a concrete transaction plan.')}`,
+  'deploy-contract': `
+  ${bold('abx deploy-contract')} ${dim('— deploy already-compiled EVM initcode with any signing lane')}
+    ${g('--artifact <path>')}    Foundry JSON artifact; ABX reads ${bold('bytecode.object')}
+    ${g('--initcode <path>')}    exact complete creation bytecode as a 0x-prefixed hex file
+    ${g('--constructor-args <hex>')} or ${g('--constructor-args-file <path>')}   already ABI-encoded args appended to artifact bytecode
+    --label "My hook"      human review label only
+    signing: ${g('--send')} hot/env key · ${g('--sign')} wallet page · ${g('--sponsor')} eligible ABX creator wallet · ${g('--unsigned')} print tx
+    ${g('--dry-run')} [--for 0x..]   estimate and simulate without sending
+    ${g('--confirm')}                optional interactive final gate
+    ${dim('ABX does not compile, link, audit, or infer constructor types. Build and test with Foundry;')}
+    ${dim('deploy to the paired testnet first, verify source, then wire the address with the relevant ABX command.')}`,
   skill: `
   ${bold('abx skill')} ${dim('— install the version-locked abx agent skill so your coding agent can drive abx')}
     ${g('abx skill install')}     copy the bundled skill (version-locked to this CLI) into your agent(s)
@@ -526,7 +540,7 @@ const COMMAND_HELP: Record<string, string> = {
                             ${g('--minter 0x..')} · ${g('--primary-payee 0x..')} · ${g('--unpaused')} ${dim('(the sale stack — OPTIONAL, and available only on an edition. Omit them and the')}
                             ${dim('edition deploys paused with no sale, which is the common case: price + allocation are set AFTER deploy with')} ${g('abx minter configure')}${dim(' either way.)')}
                             ${g('--721c')} enrolls ERC-1155C instead of 721C — same flag, same UX, same validator grammar.
-                            ${dim('--onchain-image works on the hot AND wallet (--sign) lanes; the cold lane (--unsigned) is refused everywhere,')}
+                            ${dim('--onchain-image works on hot, wallet (--sign), and sponsored lanes; the cold lane (--unsigned) is refused everywhere,')}
                             ${dim('721 and edition alike — each chunk tx feeds the next, so staging cannot be signed offline in one run.')}`,
   'deploy-series': `
   ${bold('abx deploy-series')} --dir <folder> ${dim('— deploy a MULTI-TOKEN collection (one contract, N tokens) from a folder of media. Sends a tx.')}
@@ -570,7 +584,7 @@ const COMMAND_HELP: Record<string, string> = {
     ${bold(g('--copies <n|open>'))}     ${dim('routes to EditionImage — N ids from the folder, each × --copies copies (open = uncapped per id).')}
                           --mint-all/--mint-count keep their meaning (how many DISTINCT ids premint); new ${g('--mint-amount <n>')}
                           sets copies of EACH premint id (default 1). --721c enrolls ERC-1155C instead of 721C.
-                          ${dim(ABX_CAPABILITIES.deploymentCommands.deploySeries.edition.summary + '. --onchain-image uses hot or wallet signing; --unsigned is refused.')}`,
+                          ${dim(ABX_CAPABILITIES.deploymentCommands.deploySeries.edition.summary + '. --onchain-image uses hot, wallet, or sponsored signing; --unsigned is refused.')}`,
   preview: `
   ${bold('abx preview')} (--script <file.js> | --code-dir <dir>) ${dim('— run the program on localhost, live. No chain, no key, no deploy.')}
     ${g('--schema key:Type:Auth')}[,…]  declare PostParams so the studio gives you real inputs for them (e.g. palette:HexColor:TokenOwner)
@@ -1312,6 +1326,7 @@ function help() {
                             drive your PostParams, watch it animate. Same document the generator serves. ${g('--shoot <dir>')} for headless frames. No chain.
     ${g('abx inspect')} <script.js>   ${bold('before you pick a lane')} — static analysis (traits + on-chain reproducibility, deps, doc size → RPC viability) + a lane recommendation
     ${g('abx scaffold solidity')} [<dir>]   one buildable Foundry workspace for ${bold('renderers + configure/transfer/augment hooks')} (canonical minters/interfaces via abx-contracts)
+    ${g('abx deploy-contract')} --artifact <Foundry.json>   deploy exact compiled initcode through any signing lane (ABX does not compile or audit it)
     ${g('abx deploy-code')} (--script <file> | --code-dir <dir> | ${g('--image-renderer 0x..')})   deploy a ${bold('generative / code project')} (on-chain script, a build directory, or a Solidity SVG renderer — in-chain rendering)
                             ${bold('--public-base-url <url>')} OR ${bold('--onchain-uri')} · --schema key:Type:Auth · ${g('--dep')} name@version|0x.. (ordered; index 0 = the runtime) ·
                             --dep-registry 0x.. · --description "<s>" · --external-url <url> · ${g('--image-base <url>')} (off-chain thumbnails at a deterministic /{id} URL) ·

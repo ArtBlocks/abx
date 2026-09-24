@@ -146,8 +146,9 @@ exclusive on both lanes.
 metadata renderer calls them on-chain. A renderer-only project needs no JavaScript program and no
 effects runner.
 
-Start with `abx scaffold-renderer`, then build, test, and deploy the Solidity project using Foundry.
-ABX does not compile or deploy custom Solidity. A real deploy refuses a renderer address with no
+Start with `abx scaffold-renderer`, then build and test the Solidity project using Foundry. Deploy
+with Foundry or send the exact compiled initcode through `abx deploy-contract`; ABX does not compile,
+link, audit, or infer constructor types. A real collection deploy refuses a renderer address with no
 code.
 
 Enforce these invariants in renderer tests:

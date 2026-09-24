@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {assertSponsorConfigured, creatorApiUrl, sponsoredGasLimit, sponsoredPreviewAddress} from '../src/creator-signer.js';
+import {assertSponsorConfigured, assertSponsoredPreparedTx, creatorApiUrl, sponsoredGasLimit, sponsoredPreviewAddress} from '../src/creator-signer.js';
 import {warnUnfunded} from '../src/commands/deploy.js';
 
 const json = (value: unknown, status = 200) =>
@@ -92,6 +92,16 @@ test('sponsored transactions preserve large network gas estimates without an ABX
   assert.equal(sponsoredGasLimit(4_933_890n), 4_933_890);
   assert.equal(sponsoredGasLimit(30_000_000n), 30_000_000);
   assert.throws(() => sponsoredGasLimit(BigInt(Number.MAX_SAFE_INTEGER) + 1n), /cannot be represented safely/);
+});
+
+test('sponsored transaction boundary permits direct CREATE but still pins chain and zero value', () => {
+  const creation = {
+    op: 'deploy-contract', to: null, data: '0x60006000f3', value: '0x0', chainId: 84532,
+    summary: 'Deploy exact initcode', fields: {},
+  } as const;
+  assert.doesNotThrow(() => assertSponsoredPreparedTx(creation, 84532));
+  assert.throws(() => assertSponsoredPreparedTx({...creation, chainId: 8453}, 84532), /expected 84532/);
+  assert.throws(() => assertSponsoredPreparedTx({...creation, value: '0x1'}, 84532), /never covers/);
 });
 
 test('the explicit creator API override is a bounded development escape hatch', async () => {

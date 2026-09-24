@@ -1056,10 +1056,10 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     if (!flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
     // On-chain staging is a SEQUENCE (chunk write(s) → the deploy that references the manifest)
     // where each tx's receipt feeds the next, so it can't be signed offline in one run.
-    if (lane === 'unsigned' || lane === 'sponsor') {
+    if (lane === 'unsigned') {
       throw new Error(
         'Staging an on-chain image (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-          "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
+          'the next. Use the hot lane (a funded key), --sign (browser wallet), or --sponsor; --unsigned cannot stage content.',
       );
     }
     step('Stage on-chain image');
@@ -1333,6 +1333,30 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     blockNumber = r.blockNumber;
     ok(`deployed ${clone}`);
     info(`tx ${explorerBase()}/tx/${r.txHash}  (block ${blockNumber})`);
+  } else if (lane === 'sponsor' && onchainImage) {
+    info(`your ABX creator wallet will stage ${approvals - 1} image transaction(s), then deploy the collection in one authorization session.`);
+    const session = await openSponsoredSession(CHAIN);
+    let r: {txHash: Hex; blockNumber: bigint};
+    try {
+      if (flags.for && flags.for.toLowerCase() !== session.address.toLowerCase()) {
+        throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
+      }
+      deployerAddr = session.address;
+      const {field, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
+      bakedImage = field;
+      info(note);
+      const {clone: predicted, params, salt, contentNote} = await buildForDeployer(session.address);
+      info(contentNote);
+      info(noMint ? 'mint: deferred — mint later with `abx mint`' : `mint: token #0 → ${session.address} at deploy`);
+      const sent = await session.send(prepareDeployOneOfOne({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
+      r = {txHash: sent.txHash, blockNumber: sent.receipt.blockNumber};
+      clone = predicted;
+    } finally {
+      session.close();
+    }
+    blockNumber = r.blockNumber;
+    ok(`deployed ${clone}`);
+    info(`tx ${explorerBase()}/tx/${r.txHash}  (block ${blockNumber})`);
   } else if (lane === 'sign' && remoteEthUpload) {
     // wallet lane + Arweave uploads paid by the CONNECTING wallet's Turbo credits (--storage-signer
     // eth + --sign). ONE session signs each upload's data-item (personal_sign, no gas) AND the deploy
@@ -1536,7 +1560,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
 // own function rather than threaded into `cmdDeployBody` with `if (copies)` branches throughout —
 // so the 721 lane, above, stays provably byte-identical whether or not editions exist.
 //
-// `--onchain-image` (chunk-store staging) works in the hot and wallet lanes. The cold/unsigned lane
+// `--onchain-image` (chunk-store staging) works in the hot, wallet, and sponsored lanes. The cold/unsigned lane
 // is refused because each staged chunk transaction feeds the next; it cannot produce one independent
 // offline bundle. Every other custody/signing combination the 1/1 lane supports works identically.
 // (`DEPLOY_EDITION_FLAGS` — the allowlist this function's `refuseStrayFlags` checks against — is
@@ -1598,10 +1622,10 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   // every lineage, 721 and edition alike. The wallet lane CAN do it (one session signs the chunk
   // writes and the deploy); this edition path was hot-lane-only purely because it lacked that
   // session branch, which it now has.
-  if (onchainImage && (lane === 'unsigned' || lane === 'sponsor')) {
+  if (onchainImage && lane === 'unsigned') {
     throw new Error(
       'Staging an on-chain image (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-        "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
+        'the next. Use the hot lane (a funded key), --sign (browser wallet), or --sponsor; --unsigned cannot stage content.',
     );
   }
   const previewDeployer = dryRun ? await resolvePreviewDeployer(flags, lane) : null;
@@ -1890,6 +1914,28 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     blockNumber = r.blockNumber;
     ok(`deployed ${clone}`);
     info(`tx ${explorerBase()}/tx/${r.txHash}  (block ${blockNumber})`);
+  } else if (lane === 'sponsor' && onchainImage) {
+    info(`your ABX creator wallet will stage ${approvals - 1} image transaction(s), then deploy the edition in one authorization session.`);
+    const session = await openSponsoredSession(CHAIN);
+    let r: {txHash: Hex; blockNumber: bigint};
+    try {
+      if (flags.for && flags.for.toLowerCase() !== session.address.toLowerCase()) {
+        throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
+      }
+      deployerAddr = session.address;
+      await stageOnChainImage(sessionStagingSender(session));
+      const {clone: predicted, params, salt, contentNote} = await buildForDeployer(session.address);
+      info(contentNote);
+      info(mintAmount > 0n ? `mint: ${mintAmount} cop${mintAmount === 1n ? 'y' : 'ies'} of #0 → ${session.address} at deploy` : 'mint: deferred — mint later with `abx mint`');
+      const sent = await session.send(prepareDeployOneOfOneEdition({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
+      r = {txHash: sent.txHash, blockNumber: sent.receipt.blockNumber};
+      clone = predicted;
+    } finally {
+      session.close();
+    }
+    blockNumber = r.blockNumber;
+    ok(`deployed ${clone}`);
+    info(`tx ${explorerBase()}/tx/${r.txHash}  (block ${blockNumber})`);
   } else {
     // wallet lane without staging, or the cold lane: a single deploy tx.
     info(onChainUri ? 'a wallet will become the owner; the token resolves from chain — no URI base is baked in.' : `a wallet will become the owner; URIs point at ${baseUrl}`);
@@ -1991,7 +2037,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
 // Mint timing: `--mint-all` / `--mint-count N` / default deferred (deploy → warm → mint).
 // `--minter` delegates minting; `--primary-payee` declares sale proceeds. Content is
 // deployer-independent (hashes / inline bytes / chunk manifests don't depend on the clone
-// address), so it's prepared once; --onchain-image staging runs on the hot or wallet lane
+// address), so it's prepared once; --onchain-image staging runs on the hot, wallet, or sponsored lane
 // (the cold lane can't stage interactively — same as the 1/1).
 export const tokenFieldOf = (tokenId: number, f: OnChainFieldInput): SeriesTokenFieldInput => ({
   tokenId,
@@ -2073,10 +2119,10 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   // Staging is a SEQUENCE (chunk write(s) → the deploy that references each manifest) where each
   // receipt feeds the next, so it can't be signed offline in one pass — reject the cold lane
   // up front (same rule as the 1/1's --onchain-image).
-  if (onchainImage && (lane === 'unsigned' || lane === 'sponsor')) {
+  if (onchainImage && lane === 'unsigned') {
     throw new Error(
       'Staging on-chain images (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-        "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
+        'the next. Use the hot lane (a funded key), --sign (browser wallet), or --sponsor; --unsigned cannot stage content.',
     );
   }
   // Whole-collection WRITE-cost guard: a set of many small files can still sum to an expensive
@@ -2491,6 +2537,23 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
       session.close();
     }
     ok(`deployed ${clone}`);
+  } else if (lane === 'sponsor' && onchainImage) {
+    info(`your ABX creator wallet will stage ${approvals - 1} image transaction(s), then deploy the series in one authorization session.`);
+    const session = await openSponsoredSession(CHAIN);
+    try {
+      if (flags.for && flags.for.toLowerCase() !== session.address.toLowerCase()) {
+        throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
+      }
+      deployerAddr = session.address;
+      await buildFields(sessionStagingSender(session));
+      const {clone: predicted, params, salt} = await buildForDeployer(session.address);
+      const sent = await session.send(prepareDeploySeries({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
+      clone = predicted;
+      blockNumber = sent.receipt.blockNumber;
+    } finally {
+      session.close();
+    }
+    ok(`deployed ${clone}`);
   } else if (lane === 'sign' && remoteEthUpload) {
     // wallet lane + Arweave uploads paid by the CONNECTING wallet's Turbo credits: ONE session signs
     // each token's upload data-item (personal_sign, no gas) AND the deploy tx. Uploads are deferred to
@@ -2647,7 +2710,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
 //
 // Custody matches the 721 Series lane: off-chain per-file uploads, O(1) uniform-extension directory
 // templates under `--onchain-uri`, inline SVG, hosted resolution, and `--onchain-image` chunk staging.
-// The last uses hot or wallet signing; cold/unsigned staging is refused because each chunk feeds the
+// The last uses hot, wallet, or sponsored signing; cold/unsigned staging is refused because each chunk feeds the
 // next transaction.
 // (`DEPLOY_SERIES_EDITION_FLAGS` is declared further down, beside `DEPLOY_EDITION_FLAGS` — see that
 // const's own note on why.)
@@ -2709,11 +2772,11 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   const compress = parseCompress(flags.compress);
   // Staging is a SEQUENCE (chunk writes → the deploy that references each manifest) where every tx's
   // receipt feeds the next, so it can't be signed offline in one run. Refused on the cold lane for the
-  // same reason on every lineage, 721 and edition alike; hot + wallet both work.
-  if (onchainImage && (lane === 'unsigned' || lane === 'sponsor')) {
+  // same reason on every lineage, 721 and edition alike; hot + wallet + sponsor all work.
+  if (onchainImage && lane === 'unsigned') {
     throw new Error(
       'Staging on-chain images (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-        "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
+        'the next. Use the hot lane (a funded key), --sign (browser wallet), or --sponsor; --unsigned cannot stage content.',
     );
   }
   const publicClient = makePublicClient({chainKey: CHAIN});
@@ -3085,6 +3148,27 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
       await buildFields(sessionStagingSender(session));
       const {clone: predicted, params, salt} = await buildForDeployer(signer);
       info(`mint: ${effectiveMintCount > 0 ? `${effectiveMintCount} id(s) × ${mintAmount} cop${mintAmount === 1n ? 'y' : 'ies'} → ${signer} at deploy` : 'deferred'}`);
+      const sent = await session.send(prepareDeployEditionImage({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
+      r = {txHash: sent.txHash, blockNumber: sent.receipt.blockNumber};
+      clone = predicted;
+    } finally {
+      session.close();
+    }
+    blockNumber = r.blockNumber;
+    ok(`deployed ${clone}`);
+    info(`tx ${explorerBase()}/tx/${r.txHash}  (block ${blockNumber})`);
+  } else if (lane === 'sponsor' && onchainImage) {
+    info(`your ABX creator wallet will stage ${approvals - 1} image transaction(s), then deploy the edition series in one authorization session.`);
+    const session = await openSponsoredSession(CHAIN);
+    let r: {txHash: Hex; blockNumber: bigint};
+    try {
+      if (flags.for && flags.for.toLowerCase() !== session.address.toLowerCase()) {
+        throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
+      }
+      deployerAddr = session.address;
+      await buildFields(sessionStagingSender(session));
+      const {clone: predicted, params, salt} = await buildForDeployer(session.address);
+      info(`mint: ${effectiveMintCount > 0 ? `${effectiveMintCount} id(s) × ${mintAmount} cop${mintAmount === 1n ? 'y' : 'ies'} → ${session.address} at deploy` : 'deferred'}`);
       const sent = await session.send(prepareDeployEditionImage({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
       r = {txHash: sent.txHash, blockNumber: sent.receipt.blockNumber};
       clone = predicted;

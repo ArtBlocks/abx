@@ -616,7 +616,7 @@ export function cmdScaffoldSolidity(rest: string[], flags: Flags) {
   ok(`ABX Solidity workspace → ${dir}`);
   step('One workspace, separate deployable roles — use only the extension surfaces your project needs');
   info(`${bold('src/MyRenderer.sol')} + ${bold('MyTraits.sol')} cover on-chain rendering; ${bold('src/MyHooks.sol')} covers configure, transfer, and augment hooks as separate contracts. Canonical 721/1155 fixed-price minters and interfaces come from the pinned ${bold('abx-contracts')} package.`);
-  info('build + test + deploy it yourself with Foundry (abx does not compile/deploy Solidity):');
+  info('build + test with Foundry, then deploy with Foundry or `abx deploy-contract` (abx does not compile Solidity):');
   console.log(`    ${g('cd')} ${basename(dir)}`);
   console.log(`    ${g('forge soldeer install')}   ${dim('# fetch abx-contracts + solady + forge-std (exact-pinned)')}`);
   console.log(`    ${g('forge test')}              ${dim('# MUST pass — the never-revert cases')}`);

@@ -159,7 +159,8 @@ export class CreatorApiClient {
   async prepare(input: {
     operationId: string;
     chainId: number;
-    to: Address;
+    /** Null for direct EVM contract creation. */
+    to: Address | null;
     value: Hex;
     data: Hex;
     gasLimit: number;

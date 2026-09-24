@@ -91,6 +91,17 @@ export interface SponsoredSession {
   close(): void;
 }
 
+/** Pure boundary check shared by every sponsored operation. Direct CREATE (`to: null`) is valid;
+ * the service still binds exact initcode, zero value, chain, wallet, gas, and idempotency. */
+export function assertSponsoredPreparedTx(tx: PreparedTx, chainId: number): void {
+  if (tx.chainId !== chainId) {
+    throw new Error(`Refusing sponsored transaction for chain ${tx.chainId}; expected ${chainId}.`);
+  }
+  if (BigInt(tx.value) !== 0n) {
+    throw new Error('ABX sponsorship never covers a transaction that transfers ETH.');
+  }
+}
+
 function checkedCreatorApiUrl(raw: string): string {
   const parsed = new URL(raw);
   const local = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]';
@@ -181,10 +192,8 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
       address: wallet.address,
       async send(tx: PreparedTx): Promise<SponsoredReceipt> {
         if (closed) throw new Error('The creator authorization session is closed.');
-        if (tx.chainId !== chain.id) throw new Error(`Refusing sponsored transaction for chain ${tx.chainId}; expected ${chain.id}.`);
-        if (!tx.to) throw new Error('Direct contract creation is not sponsored; deploy through an ABX factory.');
-        if (BigInt(tx.value) !== 0n) throw new Error('ABX sponsorship never covers a transaction that transfers ETH.');
-        if (tx.gasFloor) await waitForCodeAt(publicClient, tx.to);
+        assertSponsoredPreparedTx(tx, chain.id);
+        if (tx.gasFloor && tx.to) await waitForCodeAt(publicClient, tx.to);
         const gas = await pinGas(publicClient, {
           from: wallet.address,
           to: tx.to,

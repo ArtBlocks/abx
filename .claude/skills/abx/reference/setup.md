@@ -124,8 +124,8 @@ human the locally generated signing page; never request or handle their key. On 
 chain, sender, target, calldata, value, and ordering before handing transactions over.
 
 `--onchain-image` staging cannot use the cold lane because each chunk transaction depends on the
-receipt of the preceding transaction. Use hot or wallet signing. Do not split staging into a homemade
-offline sequence.
+receipt of the preceding transaction. Use hot, wallet, or sponsored signing. Do not split staging
+into a homemade offline sequence.
 
 `ABX_DEPLOYER_PK` may be written with or without a `0x` prefix — the CLI and SDK normalize it. Foundry's
 `vm.envUint` does not: a custom forge script that reads the same `.env` needs the `0x` form.

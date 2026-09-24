@@ -138,6 +138,10 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   // ── hosting artifacts ──
   'deploy-resolver': set(['provider', 'domain', 'app', 'dir', 'from-source']),
   'deploy-effects': set(['provider', 'resolver-url', 'app', 'dir', 'interval-ms', 'env-id']),
+  'deploy-contract': set(
+    ['artifact', 'initcode', 'constructor-args', 'constructor-args-file', 'label', 'for'],
+    SHARED_WRITE,
+  ),
 
   // ── storage ──
   // `show` honors the full override set now (it previews what a given set of flags WOULD resolve to);

@@ -64,8 +64,9 @@ A custom mechanic normally lives beside a canonical token rather than replacing 
 One external contract may implement several hook/minter roles. Test it against a real deployed clone,
 not a mock that approximates ABX callbacks.
 
-ABX scaffolds a Foundry renderer project but does not compile or deploy custom Solidity. The creator
-or their contract engineer owns code review, deployment, verification, upgrade policy, and audits.
+ABX scaffolds a Foundry renderer project but does not compile, link, or audit custom Solidity.
+`abx deploy-contract` can send exact compiled creation bytecode through any signing lane. The creator
+or their contract engineer owns code review, verification, upgrade policy, and audits.
 
 ### Custom minter
 
@@ -167,8 +168,7 @@ The toolkit currently does not provide:
 
 - operation on a chain whose capability entry is `disabled`;
 - a secondary-market listing/order-book feature;
-- Solidity compilation/deployment through `abx`;
-- CLI replacement of a deployed code project's script;
+- Solidity compilation through `abx`;
 - retrofitting a deploy-time contract type, burnability, token standard, or creator-token enrollment.
 
 Do not recommend another protocol automatically when one of these applies. State the boundary and
@@ -176,7 +176,7 @@ stop unless the creator asks for alternatives.
 
 Also distinguish unsupported tooling from possible external engineering. For example, ABX does not
 compile a custom hook, but a hook is an intentional supported seam once independently built and
-deployed. Conversely, “arbitrary Solidity exists” is not proof that every behavior is safe or
+deployed (including from exact initcode via `abx deploy-contract`). Conversely, “arbitrary Solidity exists” is not proof that every behavior is safe or
 compatible: analyze callback timing, authority, reverts, reentrancy, shared edition state, gas, and
 upgradeability.
 

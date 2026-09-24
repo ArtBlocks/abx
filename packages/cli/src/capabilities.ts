@@ -11,7 +11,7 @@ import type {Flags} from './flags.js';
  * matrices in prose.
  */
 export const ABX_CAPABILITIES = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   defaultChain: DEFAULT_CHAIN_KEY,
   chains: CHAIN_SUPPORT,
   /** Compatibility field for consumers that only need selectable chain keys. */
@@ -24,7 +24,7 @@ export const ABX_CAPABILITIES = {
       summary: 'account-bound ABX creator wallet; ABX Services pays eligible gas',
       supportLevel: 'beta',
       chainIds: [8_453, 84_532],
-      limits: ['zero value', 'network and provider gas policy', 'no direct CREATE', 'no staged --onchain-image'],
+      limits: ['zero value', 'network and provider gas policy'],
     },
     unsigned: {flag: '--unsigned', summary: 'print for an external signer', supportLevel: 'supported'},
   },
@@ -39,7 +39,7 @@ export const ABX_CAPABILITIES = {
         contract: 'OneOfOneEdition (ERC-1155)',
         selector: '--copies <n|open>',
         summary: 'one work × copies; supports on-chain bytes, on-chain JSON with external media, or a resolver',
-        supported: ['--onchain-image (hot or wallet signing)', '--onchain-uri', '--backend', '--public-base-url'],
+        supported: ['--onchain-image (hot, wallet, or sponsored signing)', '--onchain-uri', '--backend', '--public-base-url'],
         unsupported: ['--onchain-image with --unsigned'],
       },
     },
@@ -53,7 +53,7 @@ export const ABX_CAPABILITIES = {
         contract: 'EditionImage (ERC-1155)',
         selector: '--copies <n|open>',
         summary: 'N folder items × copies per id; supports on-chain bytes, on-chain JSON with external media, or a resolver',
-        supported: ['--onchain-image (hot or wallet signing)', '--onchain-uri', '--backend', '--public-base-url'],
+        supported: ['--onchain-image (hot, wallet, or sponsored signing)', '--onchain-uri', '--backend', '--public-base-url'],
         unsupported: ['--onchain-image with --unsigned'],
       },
     },
@@ -76,6 +76,12 @@ export const ABX_CAPABILITIES = {
       },
     },
   },
+  customContractDeployment: {
+    command: 'abx deploy-contract',
+    input: 'exact EVM creation bytecode or a Foundry artifact plus already ABI-encoded constructor arguments',
+    signingLanes: ['--send', '--sign', '--sponsor', '--unsigned'],
+    boundaries: ['ABX does not compile, link, audit, or infer constructor types', 'zero value under --sponsor'],
+  },
   extensionRoutes: [
     {
       route: 'custom minter',
@@ -85,25 +91,25 @@ export const ABX_CAPABILITIES = {
     },
     {
       route: 'configure hook',
-      command: 'abx set-param-hooks --configure',
+      command: 'abx deploy-contract, then abx set-param-hooks --configure',
       availableOn: 'SeriesCode and EditionCode',
       useFor: ['validated writes', 'monotonic values', 'structured collector input'],
     },
     {
       route: 'transfer hook',
-      command: 'abx set-param-hooks --transfer',
+      command: 'abx deploy-contract, then abx set-param-hooks --transfer',
       availableOn: 'SeriesCode and EditionCode',
       useFor: ['transfer restrictions', 'soulbinding', 'vesting', 'redemption', 'escrow'],
     },
     {
       route: 'augment hook',
-      command: 'abx set-param-hooks --augment',
+      command: 'abx deploy-contract, then abx set-param-hooks --augment',
       availableOn: 'SeriesCode and EditionCode',
       useFor: ['live derived data', 'oracle-fed state', 'read-time metadata'],
     },
     {
       route: 'field renderer',
-      command: 'abx deploy-code --image-renderer/--attributes-renderer',
+      command: 'abx deploy-contract, then abx deploy-code --image-renderer/--attributes-renderer',
       availableOn: 'SeriesCode and EditionCode',
       useFor: ['on-chain SVG images', 'on-chain computed traits'],
     },
@@ -124,7 +130,7 @@ export const ABX_CAPABILITIES = {
     'chains whose support level is disabled',
     'unsupported chains',
     'secondary-market listings or an order book',
-    'compiling or deploying custom Solidity through abx',
+    'compiling, linking, or auditing custom Solidity through abx',
     'retrofitting a deploy-time choice on an existing collection',
   ],
   interpretation: {
@@ -160,6 +166,7 @@ export function cmdCapabilities(flags: Flags): void {
     console.log(`    edition ${lane.edition.contract} — ${lane.edition.summary}`);
     if (lane.edition.unsupported.length) console.log(`    limits  ${lane.edition.unsupported.join(' · ')}`);
   }
+  console.log(`  deploy-contract: ${ABX_CAPABILITIES.customContractDeployment.input}`);
 
   console.log('\nCanonical extension routes:');
   for (const seam of ABX_CAPABILITIES.extensionRoutes) {
