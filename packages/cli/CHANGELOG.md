@@ -1,5 +1,18 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.67
+
+### Patch Changes
+
+- 56973c4: Preserve `maxInvocations` as an exact uint256 value instead of narrowing it through a JavaScript
+  number. Reuse an existing hosted-service credential on login and add self-service API-key listing
+  and revocation for accounts at their active-key limit.
+- Updated dependencies [56973c4]
+  - @artblocks/abx-sdk@0.1.0-alpha.47
+  - @artblocks/abx-indexer@0.1.0-alpha.48
+  - @artblocks/abx-storage@0.1.0-alpha.47
+  - @artblocks/abx-token-api@0.1.0-alpha.50
+
 ## 0.1.0-alpha.66
 
 ### Patch Changes
