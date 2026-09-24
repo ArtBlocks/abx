@@ -1,5 +1,12 @@
 # @artblocks/abx-indexer
 
+## 0.1.0-alpha.45
+
+### Patch Changes
+
+- Updated dependencies [22abce8]
+  - @artblocks/abx-sdk@0.1.0-alpha.44
+
 ## 0.1.0-alpha.44
 
 ### Patch Changes
