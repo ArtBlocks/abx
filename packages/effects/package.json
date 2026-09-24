@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-effects",
-  "version": "0.1.0-alpha.45",
+  "version": "0.1.0-alpha.46",
   "license": "MIT",
   "description": "Reference rendering and effects runner for ABX projects.",
   "type": "module",
