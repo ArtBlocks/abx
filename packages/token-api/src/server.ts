@@ -142,9 +142,8 @@ function withinCap(tokenId: string, maxInvocations: string | null | undefined): 
  *
  * The rule is the contract's, not ours: a burned ERC-721's `tokenURI` reverts `NonexistentToken`
  * (`TokenURI.sol`), so serving a metadata document for that id would put this node in contradiction
- * with the contract it speaks for. `404` would be wrong twice over — it reads as "wrong URL / not
- * indexed yet", inviting a retry that can never succeed, and on `/image` an in-cap unknown id gets
- * the *warming placeholder*, so a destroyed token would say "still loading" forever.
+ * with the contract it speaks for. `404` reads as "not available yet" and invites a retry that can
+ * never succeed.
  *
  * **There is deliberately no `contractType` check here.** An edition must never `410` — its `uri(id)`
  * has no existence gate and a zero-supply id can mint again — and the way that is guaranteed is that
@@ -162,10 +161,25 @@ function goneIfBurned(res: ServerResponse, token: TokenState): boolean {
 }
 
 /**
+ * An unminted token has one public representation: its metadata route returns `{minted: false}`.
+ * Every child content route (image, data, and live view) is absent until the mint exists. Keeping
+ * this gate at the router prevents placeholder images, synthetic live views, or collection-field
+ * fallbacks from making a not-yet-created token look real.
+ *
+ * Returns `true` when it has answered a content request. The metadata route deliberately handles
+ * the same lifecycle separately because its successful, minimal response is part of the public API.
+ */
+function unavailableIfUnminted(res: ServerResponse, token: TokenState): boolean {
+  if (token.lifecycle !== 'unminted') return false;
+  sendError(res, 404, 'not_minted', `token ${token.tokenId} has not been minted`, {minted: false});
+  return true;
+}
+
+/**
  * The view to resolve for a requested tokenId. A token's metadata is its token id (no
  * decoupling), so identity and content both come from that token. Returns a synthesized,
- * unminted view for a not-yet-minted id within the cap (pre-mint warming — the multi-token
- * analogue of the 1/1's seed-token-0, which the SDK's fold seeds unconditionally — see
+ * unminted view for a not-yet-minted id within the cap (the multi-token analogue of the 1/1's
+ * seed-token-0, which the SDK's fold seeds unconditionally — see
  * `reconstruct.ts`'s `assembleState`, so a fresh '1of1'/'1of1-edition' always has an `issued`
  * entry for id 0 despite carrying no `maxInvocations` cap), or `null` when the id is genuinely
  * unknown (→ 404).
@@ -347,6 +361,7 @@ async function route(
     const token = resolveTokenView(state, parts[3]);
     if (!token) return sendError(res, 404, 'not_registered', 'unknown token — not minted, and outside this project\'s supply cap');
     if (goneIfBurned(res, token)) return;
+    if (unavailableIfUnminted(res, token)) return;
     // Both no-code verdicts are answered BEFORE the chain client, since neither needs an RPC (see
     // {liveViewAvailability} for why the two are distinguished at all — collapsing them cost a
     // tester a day). A plain 503 in this route's own `{error}` shape rather than a structured
@@ -493,6 +508,14 @@ async function route(
     // Before the image / data / metadata branches below: all three would otherwise compose an answer
     // for an id the contract disowns (and `/image` would warm a placeholder for it forever).
     if (goneIfBurned(res, token)) return;
+
+    // An in-range token position is a valid metadata URL before mint, but it has no token content.
+    // Return only the lifecycle signal; do not publish image/animation URLs that intentionally 404.
+    if (token.lifecycle === 'unminted') {
+      if (parts.length === 4) return sendJson(res, 200, {minted: false});
+      unavailableIfUnminted(res, token);
+      return;
+    }
 
     if (parts[4] === 'image') {
       // the render-effect seam: no explicit image field + a code project ⇒ serve the

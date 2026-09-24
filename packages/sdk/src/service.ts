@@ -167,6 +167,10 @@ export type ServiceErrorCode =
   | 'unauthorized'
   | 'forbidden'
   | 'not_registered'
+  /** **404** — the project and token position are valid, but this token has not been minted yet.
+   *  Distinct from `not_registered` (unknown project or token outside the project's id range) and
+   *  `burned` (a token that existed and is permanently gone). */
+  | 'not_minted'
   | 'disabled'
   /** The report belongs at a different feedback target; the response carries its canonical URL. */
   | 'feedback_target_moved'
@@ -183,9 +187,7 @@ export type ServiceErrorCode =
    * `410`, not `404`, and the rule generalizes: **a resolver answers what the contract's own URI
    * getter answers.** A burned 721's `tokenURI` reverts `NonexistentToken`, so composing metadata
    * for it would put a node in direct contradiction with the contract it speaks for — while `404`
-   * reads as "wrong URL / not indexed yet" and invites a retry that can never succeed. It is worse
-   * than cosmetic on the image route, which answers an unknown-but-in-cap id with a warming
-   * placeholder: for a destroyed id that says "still loading" forever.
+   * reads as "not available yet" and invites a retry that can never succeed.
    *
    * **ERC-1155 editions never answer this.** `uri(id)` has no existence gate there, a zero-supply id
    * still resolves, and it can mint again — nothing is permanently gone, so `410` would be a lie.
