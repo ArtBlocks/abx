@@ -40,7 +40,7 @@ export function assertSponsorConfigured(chainKey: string): void {
 function assertSponsorConfiguredWithEnv(chainKey: string, env: NodeJS.ProcessEnv): void {
   if (!SPONSORABLE_BASE_CHAINS.has(resolveChain(chainKey).id)) {
     throw new Error(
-      '--sponsor is supported on eligible Base networks and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
+      '--sponsor is supported on eligible Base networks (Base and Base Sepolia only) and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
     );
   }
   if (!env.ABX_SERVICES_API_KEY) {
