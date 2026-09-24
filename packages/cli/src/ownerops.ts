@@ -547,7 +547,7 @@ export function parseHookAddress(role: HookRole, v: string): Address {
  */
 export async function cmdSetParamHooks(address: string | undefined, flags: Flags): Promise<void> {
   const usage =
-    'abx set-param-hooks <address> [--configure 0x|none] [--augment 0x|none] [--transfer 0x|none] [--clear] [--sign|--unsigned] [--dry-run]';
+    'abx set-param-hooks <address> [--configure 0x|none] [--augment 0x|none] [--transfer 0x|none] [--clear] [--send|--sign|--sponsor|--unsigned] [--dry-run]';
   const contract = requireAddress(address, usage);
   const clearAll = flags.clear !== undefined;
   const roleFlags = HOOK_ROLES.filter((r) => flags[r] !== undefined);

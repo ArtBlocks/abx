@@ -71,6 +71,12 @@ test('help exposes chain selection and agrees that param hooks support both code
   assert.doesNotMatch(hooks, /SeriesCode only/);
 });
 
+test('owner-operation help exposes the sponsored creator-wallet lane where it is accepted', () => {
+  for (const command of ['set-param-hooks', 'mint', 'transfer']) {
+    assert.match(run(['help', command]), /--sponsor/, `${command} help must advertise its accepted sponsored lane`);
+  }
+});
+
 // `abx help scaffold solidity` used to answer `No help topic "scaffold"`.
 //
 // Found by a cold-agent sweep, and the reason it matters is that the CLI ITSELF recommends the
