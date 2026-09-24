@@ -99,6 +99,73 @@ test('errors expose only stable service codes and writes are never retried', asy
   assert.equal(calls, 1);
 })
 
+test('an ambiguous submit switches to read-only reconciliation without replaying the write', async () => {
+  let submits = 0;
+  let reads = 0;
+  const op = {
+    operationId: 'operation_001',
+    chainId: 84532,
+    walletId: 'wallet-1',
+    state: 'confirmed',
+    providerTransactionId: 'transaction-1',
+    transactionHash: `0x${'12'.repeat(32)}`,
+    userOperationHash: `0x${'34'.repeat(32)}`,
+    errorCode: null,
+    updatedAt: '2026-09-23T00:00:00.000Z',
+  };
+  const client = new CreatorApiClient({
+    baseUrl: 'https://api.example',
+    token: 'api-key',
+    fetchImpl: async (_url, init) => {
+      if (init?.method === 'POST') {
+        submits++;
+        return Response.json({error: 'provider_response_unknown'}, {status: 503});
+      }
+      reads++;
+      return Response.json({operation: op});
+    },
+  });
+
+  assert.equal(
+    (
+      await client.submit('operation_001', {
+        requestExpiry: '1789776000000',
+        data: '0x1234',
+        signed: {url: 'https://api.privy.io/v1/wallets/wallet-1/rpc', headers: {}},
+      })
+    ).state,
+    'confirmed',
+  );
+  assert.equal(submits, 1);
+  assert.equal(reads, 1);
+})
+
+test('a definitive submit rejection is not reconciled or retried', async () => {
+  for (const [code, status] of [
+    ['provider_rejected_400_invalid_data', 400],
+    ['sponsorship_disabled', 503],
+  ] as const) {
+    let calls = 0;
+    const client = new CreatorApiClient({
+      baseUrl: 'https://api.example',
+      token: 'api-key',
+      fetchImpl: async () => {
+        calls++;
+        return Response.json({error: code}, {status});
+      },
+    });
+    await assert.rejects(
+      client.submit('operation_001', {
+        requestExpiry: '1789776000000',
+        data: '0x1234',
+        signed: {url: 'https://api.privy.io/v1/wallets/wallet-1/rpc', headers: {}},
+      }),
+      (error) => error instanceof CreatorApiError && error.code === code,
+    );
+    assert.equal(calls, 1);
+  }
+})
+
 test('service URL normalization is bounded and strips trailing slashes', async () => {
   let seen = '';
   const client = new CreatorApiClient({
