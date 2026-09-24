@@ -51,6 +51,6 @@
     "@artblocks/abx-sdk": "workspace:*",
     "@artblocks/abx-indexer": "workspace:*",
     "@artblocks/abx-storage": "workspace:*",
-    "viem": "^2.56.5"
+    "viem": "^2.56.8"
   }
 }
