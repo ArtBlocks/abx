@@ -149,7 +149,7 @@ import {openWalletSession, type SignResult, type TxProvider, type WalletSession}
 import {openSponsoredSession} from './creator-signer.js';
 import {gatedSend, laneFromFlags} from './riskgate.js';
 import {withJson} from './jsonout.js';
-import {resolveRemote, serviceClient} from './remote.js';
+import {controlPlaneClient, resolveRemote} from './remote.js';
 import {isDryRun, positionalArgs, unknownFlags, warnStrayFlags} from './flags.js';
 import {parseSchemaSpecs, describeSchema, type ParsedSchema} from './schema.js';
 
@@ -313,7 +313,7 @@ async function reindexIfKnown(address: Address, flags: Flags): Promise<void> {
   }
   try {
     // no fromBlock ⇒ incremental nudge
-    const r = await serviceClient(remote).registerProject({chainId: chainId(), address});
+    const r = await (await controlPlaneClient(remote)).registerProject({chainId: chainId(), address});
     // A deferred nudge (202) is NOT waited on here: the signed tx has already landed, and blocking a
     // completed owner-op behind someone else's backfill would be the wrong trade. Say where it got to.
     if (isAccepted(r)) {

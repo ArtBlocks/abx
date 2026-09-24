@@ -13,6 +13,7 @@ import {
   AbxServiceError,
   ACCOUNT_API_INTERFACE,
   CREATOR_WALLET_INTERFACE,
+  CONTROL_PLANE_INTERFACE,
   resolveServiceInterfaceEndpoint,
   type RegisterProjectAccepted,
   type RegisterProjectSummary,
@@ -105,6 +106,36 @@ test('interface discovery will not forward credentials to an unsafe or contradic
       ),
     /must not contain credentials/,
   );
+});
+
+test('forInterface binds operations to the advertised origin and preserves the bearer token', async () => {
+  const seen: Array<{url: string; authorization?: string}> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    seen.push({url, authorization: new Headers(init?.headers).get('authorization') ?? undefined});
+    if (url === 'https://catalog.example/.well-known/abx-service') {
+      return Response.json({
+        interfaces: [CONTROL_PLANE_INTERFACE],
+        chains: [84532],
+        endpoints: {[CONTROL_PLANE_INTERFACE]: {baseUrl: 'https://control.example', auth: 'bearer'}},
+      });
+    }
+    if (url === 'https://control.example/v1/projects') return Response.json({projects: []});
+    return Response.json({error: 'unexpected'}, {status: 404});
+  };
+  try {
+    const catalog = new AbxServiceClient({baseUrl: 'https://catalog.example', token: 'secret'});
+    const control = await catalog.forInterface(CONTROL_PLANE_INTERFACE);
+    assert.equal(control.baseUrl, 'https://control.example');
+    assert.deepEqual(await control.listProjects(), []);
+    assert.deepEqual(seen, [
+      {url: 'https://catalog.example/.well-known/abx-service', authorization: undefined},
+      {url: 'https://control.example/v1/projects', authorization: 'Bearer secret'},
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('5xx retries with backoff and succeeds when the service recovers (fly cold-start weather)', async () => {

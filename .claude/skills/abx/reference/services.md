@@ -14,7 +14,8 @@ For provider-independent hosting and migration, also read [hosting.md](hosting.m
 The documented endpoints are:
 
 - documentation: `https://docs.abx.io`
-- service: `https://services.abx.io`
+- service catalog, account, and control: `https://services.abx.io`
+- public token data: `https://resolver.abx.io` (discover it from the catalog; do not hardcode it)
 - OAuth discovery: `https://services.abx.io/.well-known/oauth-authorization-server`
 - manual signup fallback: `https://services.abx.io/signup`
 
@@ -73,7 +74,7 @@ contract supports another provider or a creator-operated resolver/effects deploy
 
 Before depending on hosted behavior, inspect the live descriptor with `abx remote abx`; do not infer
 capabilities from this file. A remote is a provider catalog and may advertise different HTTPS
-origins for token resolution, account operations, and creator wallets. Trust the advertised
+origins for token resolution, control, account operations, and creator wallets. Trust the advertised
 interface endpoint, not a guessed hostname. Use `--remote abx` on commands that accept a managed
 resolver and verify the resulting public surfaces as described in [hosting.md](hosting.md).
 

@@ -110,6 +110,54 @@ test('runConformance: a token present but never used still resolves without erro
   }
 });
 
+test('runConformance follows advertised token and control origins', async () => {
+  const tokenSeen: string[] = [];
+  const token = createServer((req, res) => {
+    tokenSeen.push(req.url ?? '');
+    const path = (req.url ?? '/').split('?')[0];
+    const send = (status: number, body: unknown) => {
+      res.writeHead(status, {'content-type': 'application/json'});
+      res.end(JSON.stringify(body));
+    };
+    if (path === '/abx-conformance-no-such-route') return send(404, {error: 'no such route', code: 'unknown_route'});
+    if (/^\/t\/999999999\//.test(path)) return send(400, {error: 'chain not served', code: 'unsupported_chain', chains: [CHAIN_ID]});
+    if (/^\/t\/\d+\/[^/]+$/.test(path)) return send(400, {error: 'see /c/{chainId}/{address}', code: 'invalid_request'});
+    return send(404, {error: 'not registered', code: 'not_registered'});
+  });
+  const tokenPort: number = await new Promise((r) => token.listen(0, '127.0.0.1', () => r((token.address() as {port: number}).port)));
+  const tokenBase = `http://127.0.0.1:${tokenPort}`;
+  const controlSeen: string[] = [];
+  const catalog = createServer((req, res) => {
+    controlSeen.push(`${req.method} ${req.url}`);
+    const send = (status: number, body: unknown) => {
+      res.writeHead(status, {'content-type': 'application/json'});
+      res.end(JSON.stringify(body));
+    };
+    if (req.url === '/.well-known/abx-service') {
+      return send(200, {
+        interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'],
+        chains: [CHAIN_ID],
+        auth: {scheme: 'bearer'},
+        endpoints: {'abx-token-api/v1': {baseUrl: tokenBase}, 'abx-control-plane/v1': {baseUrl: `http://127.0.0.1:${(catalog.address() as {port: number}).port}`}},
+      });
+    }
+    if (req.method === 'POST' && req.url === '/v1/projects') return send(401, {error: 'unauthorized', code: 'unauthorized'});
+    if (req.method === 'GET' && req.url === '/v1/projects') return send(200, {projects: []});
+    if (req.method === 'POST' && req.url === '/v1/effect-artifacts') return send(400, {error: 'invalid', code: 'invalid_request'});
+    return send(404, {error: 'not found', code: 'unknown_route'});
+  });
+  const catalogPort: number = await new Promise((r) => catalog.listen(0, '127.0.0.1', () => r((catalog.address() as {port: number}).port)));
+  try {
+    const report = await runConformance({baseUrl: `http://127.0.0.1:${catalogPort}`, token: 'k'});
+    assert.equal(report.failures, 0, JSON.stringify(report.assertions, null, 2));
+    assert.ok(tokenSeen.some((path) => path.startsWith('/t/')), JSON.stringify(tokenSeen));
+    assert.ok(controlSeen.includes('GET /v1/projects'), JSON.stringify(controlSeen));
+  } finally {
+    token.close();
+    catalog.close();
+  }
+});
+
 function runCli(args: string[], extraEnv: NodeJS.ProcessEnv = {}): Promise<{code: number | null; out: string}> {
   const env: NodeJS.ProcessEnv = {
     ...process.env,

@@ -48,9 +48,9 @@ interface at another HTTPS origin. Interfaces without an entry remain at the cat
 existing and self-hosted services stay compatible. Inspect the catalog with
 `abx remote <name-or-url>` before using a provider.
 
-The first-party catalog remains at `services.abx.io`. Public token and project-control interfaces
-are served there; account and creator-wallet interfaces may resolve to `api.abx.io`. The CLI follows
-the descriptor. It does not infer capabilities from either hostname.
+The first-party catalog, accounts, and project control live at `services.abx.io`. Public token data
+lives at `resolver.abx.io`. The CLI follows the catalog's advertised interface endpoints; it does
+not infer capabilities from hostnames.
 
 The version 1 control plane uses bearer authentication:
 

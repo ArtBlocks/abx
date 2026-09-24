@@ -34,6 +34,12 @@ function mockAsyncService(opts: {pollsUntilLive: number; endStatus?: string; reg
         res.writeHead(status, {'content-type': 'application/json'});
         res.end(JSON.stringify(body));
       };
+      if (req.method === 'GET' && req.url === '/.well-known/abx-service') {
+        return json(200, {
+          interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'],
+          chains: [11155111],
+        });
+      }
       if (req.method === 'POST' && req.url === '/v1/projects') {
         return json(202, {ok: true, accepted: true, project: {address: ADDR, name: null, status: opts.registerStatus ?? 'backfilling'}});
       }
