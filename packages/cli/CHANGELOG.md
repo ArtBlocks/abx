@@ -1,5 +1,19 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.63
+
+### Patch Changes
+
+- d925eb1: Breaking only for SDK callers that directly prepared an unsupported sponsored `to: null` request;
+  drop-in for existing hot, wallet, and unsigned deployments. Route sponsored custom-contract
+  deployments through ABX's existing keyless CREATE2 proxy, expose the exact signer-bound salt and
+  predicted address, verify code after confirmation, and document the proxy constructor-caller boundary.
+- Updated dependencies [d925eb1]
+  - @artblocks/abx-sdk@0.1.0-alpha.45
+  - @artblocks/abx-indexer@0.1.0-alpha.46
+  - @artblocks/abx-storage@0.1.0-alpha.45
+  - @artblocks/abx-token-api@0.1.0-alpha.48
+
 ## 0.1.0-alpha.62
 
 ### Minor Changes
