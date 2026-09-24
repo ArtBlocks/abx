@@ -137,4 +137,6 @@ test('allowlistFor prefers a subcommand row, falling back to the bare command', 
 test('auth subcommands accept only the flags their distinct flows consume', () => {
   assert.deepEqual([...allowlistFor('auth', 'login')!].sort(), ['force', 'no-open', 'remote']);
   assert.deepEqual([...allowlistFor('auth', 'logout')!], ['remote']);
+  assert.deepEqual([...allowlistFor('auth', 'keys')!], ['remote']);
+  assert.deepEqual([...allowlistFor('auth', 'revoke-key')!], ['remote']);
 });

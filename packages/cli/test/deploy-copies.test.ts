@@ -4,7 +4,7 @@
 // covered live against real fixtures in deploy-copies-live.test.ts (they need a real chain read).
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {copiesOneNote, parseCopies, parseNonNegativeIntFlag} from '../src/commands/deploy.js';
+import {copiesOneNote, parseCopies, parseNonNegativeIntFlag, parsePositiveUint256Flag} from '../src/commands/deploy.js';
 
 test('parseCopies: "open" → 0n (uncapped)', () => {
   assert.equal(parseCopies('open'), 0n);
@@ -56,4 +56,13 @@ test('parseNonNegativeIntFlag: accepts 0 and positive integers, rejects everythi
   for (const bad of ['true', '-1', '1.5', 'abc', '']) {
     assert.throws(() => parseNonNegativeIntFlag(bad, 'mint-amount'), /--mint-amount must be a non-negative integer/, `expected "${bad}" to be rejected`);
   }
+});
+
+test('parsePositiveUint256Flag preserves values above JavaScript safe integer range', () => {
+  const high = '900719925474099312345678901234567890';
+  assert.equal(parsePositiveUint256Flag(high, 'max'), BigInt(high));
+  for (const bad of ['', '0', '-1', '1.5', 'nope']) {
+    assert.throws(() => parsePositiveUint256Flag(bad, 'max'), /--max must be a positive integer/);
+  }
+  assert.throws(() => parsePositiveUint256Flag((1n << 256n).toString(), 'max'), /exceeds uint256/);
 });

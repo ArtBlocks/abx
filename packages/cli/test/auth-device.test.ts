@@ -92,6 +92,62 @@ test('device login follows discovery + RFC polling, stores the key privately, an
   assert.match(String(fake.requests[2]?.init?.body), /device_code=device-code-that-must-never-be-printed/);
 });
 
+test('device login preserves actionable access-denied guidance from the provider', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'abx-auth-denied-'));
+  const envPath = join(dir, '.env');
+  let call = 0;
+  const fetchImpl: typeof fetch = async () => {
+    call += 1;
+    if (call === 1) {
+      return response({
+        issuer: BASE,
+        device_authorization_endpoint: `${BASE}/oauth/device_authorization`,
+        token_endpoint: `${BASE}/oauth/token`,
+        grant_types_supported: [GRANT],
+      });
+    }
+    if (call === 2) {
+      return response({
+        device_code: 'private-device-code',
+        user_code: 'ABCD-EFGH',
+        verification_uri: `${BASE}/device`,
+        expires_in: 900,
+        interval: 1,
+      });
+    }
+    return response(
+      {
+        error: 'access_denied',
+        error_description: 'Reuse an existing key or revoke one with abx auth revoke-key.',
+      },
+      400,
+    );
+  };
+  await assert.rejects(
+    deviceLogin(
+      {baseUrl: BASE, envVar: 'ABX_TEST_DEVICE_TOKEN', envPath, noOpen: true},
+      {fetchImpl, sleep: async () => {}, now: () => 0, line: () => {}, warning: () => {}},
+    ),
+    /reuse an existing key or revoke one with abx auth revoke-key/i,
+  );
+});
+
+test('auth login reuses an already loaded first-party key without issuing another', async () => {
+  const prior = process.env.ABX_SERVICES_API_KEY;
+  const originalLog = console.log;
+  const lines: string[] = [];
+  try {
+    process.env.ABX_SERVICES_API_KEY = 'existing-key';
+    console.log = (...values: unknown[]) => lines.push(values.map(String).join(' '));
+    await cmdAuth(['login'], {});
+    assert.match(lines.join('\n'), /reusing the existing ABX_SERVICES_API_KEY credential/);
+  } finally {
+    console.log = originalLog;
+    if (prior === undefined) delete process.env.ABX_SERVICES_API_KEY;
+    else process.env.ABX_SERVICES_API_KEY = prior;
+  }
+});
+
 test('an existing key requires --force and replacement preserves unrelated env lines', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'abx-auth-replace-'));
   const envPath = join(dir, '.env');
@@ -372,6 +428,6 @@ test('logout never deletes a different file credential and is a no-op when none 
 
 test('auth rejects a bare --remote and stray positional arguments before any auth flow starts', async () => {
   await assert.rejects(cmdAuth(['login', '--remote'], {remote: 'true'}), /--remote needs a named remote/);
-  await assert.rejects(cmdAuth(['login', 'abx', 'extra'], {}), /usage: abx auth <login\|logout>/);
-  await assert.rejects(cmdAuth(['logout', 'abx', 'extra'], {}), /usage: abx auth <login\|logout>/);
+  await assert.rejects(cmdAuth(['login', 'abx', 'extra'], {}), /usage: abx auth <login\|logout\|keys>/);
+  await assert.rejects(cmdAuth(['logout', 'abx', 'extra'], {}), /usage: abx auth <login\|logout\|keys>/);
 });

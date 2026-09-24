@@ -43,7 +43,8 @@ tracked or unignored `.env` files.
 
 The issued API key is long-lived and remains valid until it is revoked. Reuse the stored key across
 tasks and agent sessions; do not start a new login merely because a task or conversation ended. If
-`abx remote abx` authenticates successfully, no login is needed.
+`abx remote abx` authenticates successfully, no login is needed. `abx auth login` also detects an
+already loaded credential and reuses it instead of issuing another.
 
 In an agent runner, start `abx auth login --no-open` with a short initial yield or a resumable
 background session. Relay the printed URL and code immediately while that same process keeps polling,
@@ -63,10 +64,14 @@ matching `.env` assignment. If the key came from a shell or another environment 
 revokes it and tells the human where it still needs to be unset. A repeated logout with no active
 local credential is safe.
 
+An account may have up to five active keys. The service stores hashes, so it can list key metadata
+but cannot recover a lost secret. Use `abx auth keys` to inspect active keys and
+`abx auth revoke-key <key-id>` to revoke an unused non-current key. Use `abx auth logout` for the
+current key. Only create another key when a separate environment actually needs its own credential.
+
 Use `/signup` only as the manual recovery path. It shows the raw key once, so the human—not the
 agent—must place it in `.env`. An already verified email reuses its account and may receive another
-key, subject to the service's active-key limit. `abx auth logout` revokes an unused current key and
-frees its active-key slot.
+key, subject to the same limit.
 
 Availability, pricing, and quotas are service policy rather than protocol guarantees. Confirm current
 terms before making a durable hosting choice and keep the exit route explicit: the same remote-service
