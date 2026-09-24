@@ -181,8 +181,34 @@ export class CreatorApiClient {
     operationId: string,
     input: {requestExpiry: string; data: Hex; signed: {url: string; headers: Record<string, string>}},
   ): Promise<CreatorOperation> {
-    const result = object(await this.#request('POST', `/v1/operations/${encodeURIComponent(operationId)}/submit`, input));
-    return operation(result.operation);
+    try {
+      // The service allows up to 30 seconds for Privy. Keep the caller alive beyond that boundary so
+      // it receives the durable operation instead of abandoning a write that may still land.
+      const result = object(
+        await this.#request(
+          'POST',
+          `/v1/operations/${encodeURIComponent(operationId)}/submit`,
+          input,
+          Math.max(this.#timeoutMs, 45_000),
+        ),
+      );
+      return operation(result.operation);
+    } catch (submitError) {
+      if (
+        submitError instanceof CreatorApiError &&
+        (submitError.status < 500 || submitError.code === 'sponsorship_disabled')
+      )
+        throw submitError;
+      // The write may already have reached the provider. Never replay it: reconcile the durable
+      // operation created during prepare through the read-only status endpoint instead.
+      try {
+        return await this.getOperation(operationId);
+      } catch {
+        throw new Error(
+          `Sponsored operation ${operationId} has an unknown submission outcome. Check its status before doing anything else; do not retry it.`,
+        );
+      }
+    }
   }
 
   async getOperation(operationId: string): Promise<CreatorOperation> {
@@ -190,13 +216,13 @@ export class CreatorApiClient {
     return operation(result.operation);
   }
 
-  async #request(method: string, path: string, body?: unknown): Promise<unknown> {
+  async #request(method: string, path: string, body?: unknown, timeoutMs = this.#timeoutMs): Promise<unknown> {
     let response: Response;
     try {
       response = await this.#fetch(`${this.#baseUrl}${path}`, {
         method,
         redirect: 'error',
-        signal: AbortSignal.timeout(this.#timeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           accept: 'application/json',
           authorization: `Bearer ${this.#token}`,

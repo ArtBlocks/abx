@@ -207,15 +207,19 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           signed,
         });
         const deadline = Date.now() + 180_000;
-        while (operation.state === 'prepared' || operation.state === 'submitting' || operation.state === 'pending') {
+        while (
+          operation.state === 'prepared' ||
+          operation.state === 'submitting' ||
+          operation.state === 'pending' ||
+          operation.state === 'unknown'
+        ) {
           if (Date.now() >= deadline) {
-            throw new Error(`Sponsored operation ${operationId} is still pending. Check its status before doing anything else; do not retry it.`);
+            throw new Error(
+              `Sponsored operation ${operationId} could not be reconciled. It may have been submitted; check its status before doing anything else and do not retry it.`,
+            );
           }
           await sleep(1_500);
           operation = await api.getOperation(operationId);
-        }
-        if (operation.state === 'unknown') {
-          throw new Error(`Sponsored operation ${operationId} has an unknown provider outcome. Inspect it before doing anything else; do not retry it.`);
         }
         if (operation.state !== 'confirmed' || !operation.transactionHash) {
           throw new Error(`Sponsored operation ${operationId} failed${operation.errorCode ? ` (${operation.errorCode})` : ''}.`);
