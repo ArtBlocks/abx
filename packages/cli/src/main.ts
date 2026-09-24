@@ -529,7 +529,7 @@ const COMMAND_HELP: Record<string, string> = {
                             ${dim('gateway and seeds the serving one for the backend in use, so passing only it still does what you meant.')}
     ${g('--storage-signer')} arweave|eth   who signs+pays Turbo (arweave) uploads: the CLI-managed key (default) or your ${g('.env')} EVM key
                             ${dim('(eth reuses credits you funded on that wallet; with --sign your browser wallet pays instead)')}
-    signing: ${g('--send')} hot/env key ${dim('(default)')} · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} print tx
+    signing: ${g('--send')} hot/env key ${dim('(default)')} · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks)')} · ${g('--unsigned')} print tx
     ${dim('No key in .env? Deploy from your own wallet: ')}${g('--sign --for <your-addr>')}${dim(' (you approve in the browser; nothing is pasted).')}
     ${g('--dry-run')}             preview (commitment · URIs · mint plan · approvals) WITHOUT sending or storing
                             ${dim('(needs a deployer to compute anything address-dependent — pass --for 0x.. if no signing key is set)')}
@@ -811,7 +811,7 @@ const COMMAND_HELP: Record<string, string> = {
     The contract has ${bold('no per-hook setter')} — it writes all three at once — so this READS the current trio and re-sends
     it with your change applied: ${bold('omit a role to keep it')}, pass an address to set it, or ${g('none')} to clear it. ${g('--clear')} clears all three.
     Run with ${bold('no flags')} to print the current hooks (mutates nothing).
-    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} · ${g('--dry-run')} preview (encodes + shows the tx, sends nothing)`,
+    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks)')} · ${g('--unsigned')} · ${g('--dry-run')} preview (encodes + shows the tx, sends nothing)`,
   'set-dependency': `
   ${bold('abx set-dependency')} <address> <index> <ref> ${dim('— declare/replace a code dependency at an index (owner-only). Sends a tx.')}
     <index>               ordered + dense (index ≤ dependencyCount) — ${bold('index 0 = the runtime')}, by convention
@@ -883,14 +883,14 @@ const COMMAND_HELP: Record<string, string> = {
                           EditionImage/EditionCode (ids are caller-named works — see \`abx tokens <addr>\` for existing ones)
     ${g('--amount <n>')}         copies to mint (default 1)
     ${dim('--token-id/--amount are refused on a 721 target; --count is refused on an edition — pointed either way.')}
-    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} · ${g('--dry-run')} preview`,
+    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks)')} · ${g('--unsigned')} · ${g('--dry-run')} preview`,
   refresh: `
   ${bold('abx refresh')} <address> ${dim('— ask marketplaces to (re)index a token (read-only / external).')}
     --token <id>          default 0. Uses OPENSEA_API_KEY if set, else prints the marketplace links.`,
   transfer: `
   ${bold('abx transfer')} <address> ${dim('— move a token to a new holder (settle a sale/gift). Sends a tx.')}
     --to 0x.. (required)  --token <id> ${dim('(default 0; ')}${g('--token-id')}${dim(' is accepted as an alias — every other id-taking command spells it that way)')}
-    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} · ${g('--dry-run')} preview
+    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks)')} · ${g('--unsigned')} · ${g('--dry-run')} preview
     ${bold('editions')} move COPIES of an id, not the whole token: ${g('--amount <n>')} (default 1) + ${g('--from 0x..')} ${dim('(REQUIRED — an')}
     ${dim('edition id can have many concurrent holders, so there is no single on-chain "the owner" to read the way a 721 ownerOf gives one).')}
     ${dim('--amount is refused on a 721 target (a token transfers as a whole).')}`,
@@ -1292,7 +1292,7 @@ function help() {
                             ${g('--salt')} 0x..  use a fixed/reserved address (see ${g('abx predict')})
                             storage override (else uses config): --backend --endpoint --bucket --region --gateway --upload-url
                             served-gateway preference (ipfs/arweave images): --ipfs-gateway <prefix> --arweave-gateway <prefix>  (floors: ipfs.io · arweave.net)
-                            signing: ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} print tx
+                            signing: ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks)')} · ${g('--unsigned')} print tx
                             ${g('--dry-run')}  preview (commitment · URIs · mint plan · approvals) without sending or storing — address only WITH --salt
                             ${bold(g('--copies <n|open>'))}  copies of this SAME work (ERC-1155 edition) instead of a unique token —
                               ${g('open')} = uncapped OPEN EDITION, the flagship edition product. See ${g('abx help deploy')}.
@@ -1382,7 +1382,7 @@ function help() {
                             ${dim('edition:')} ${g('--token-id <n>')} required on every subcommand · ${g('buy --quantity <n>')} (pays price × quantity)
     ${g('abx mint-page')} <token>   scaffold a self-contained Next.js mint site (fixed-price minter) — deploy to Vercel
                             ${dim('editions get the token-id + quantity purchase shape (no gallery in this v1 page — see the README)')}
-    ${dim('signing lane (all of the above):')} ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} print tx
+    ${dim('signing lane (all of the above):')} ${g('--send')} hot/env key (default) · ${g('--sign')} wallet page · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks)')} · ${g('--unsigned')} print tx
     ${dim('--sign blocks until you approve in the browser; --sign-url-file <path> writes the sign URL there (for backgrounded/agent runs)')}
 
     ${g('abx storage')} show        show the resolved byte custody (fs | cloud | ipfs | arweave)   [--check]

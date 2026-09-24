@@ -86,18 +86,19 @@ and asks the human to match one code before an agent may
 sign the exact transaction group. Tokens and signing material stay in memory for that command and
 are discarded afterward.
 
-This is a beta on Base Sepolia and, when explicitly advertised, Base mainnet. Treat the live
-descriptor and account capabilities as the authority: documentation describes the lane, but does
-not guarantee that sponsorship is active for a particular account, chain, or moment. When the
-creator has not selected another signer, prefer this lane for an eligible Base Sepolia operation.
-On Base mainnet, recommend it only after the exact flow succeeds on Base Sepolia and repeat the
-production-network warning before confirmation. Before using it:
+The sponsored signing lane is supported on Base Sepolia and, when explicitly advertised, Base
+mainnet. Base mainnet protocol support remains beta. Treat the live descriptor and account
+capabilities as the authority: documentation describes the lane, but does not guarantee that
+sponsorship is active for a particular account, chain, or moment. When the creator has not selected
+another signer, prefer this lane for an eligible Base Sepolia operation. On Base mainnet, recommend
+it only after the exact flow succeeds on Base Sepolia and repeat the production-network warning
+before confirmation. Before using it:
 
 1. run `abx auth login` if the account has no API key;
 2. inspect `abx capabilities --json` and the command help;
 3. run the same command with `--dry-run --json`;
 4. summarize the network, creator-wallet address, transaction group, zero value, permanent choices,
-   and beta status;
+   and, on Base mainnet, protocol beta status;
 5. after approval, repeat with `--sponsor`.
 
 The lane accepts zero-value calls and receipt-dependent staged content groups up to the live network
