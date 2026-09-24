@@ -1,5 +1,11 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.48
+
+### Patch Changes
+
+- 4d5e2b1: Return minimal metadata for unminted token positions and keep their image, data, and live-view URLs unavailable until mint.
+
 ## 0.1.0-alpha.47
 
 ### Patch Changes
