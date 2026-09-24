@@ -202,7 +202,7 @@ import {describeSchema, editionSchemaAdvisory, parseSchemaSpecs} from '../schema
 import {parseSeriesTraits} from '../series-traits.js';
 import {decodeOnChainJson} from '../served.js';
 import {openWalletSession, signHotSequence, signTx, type Lane, type SignResult} from '../signer.js';
-import {assertSponsorConfigured, openSponsoredSession} from '../creator-signer.js';
+import {assertSponsorConfigured, openSponsoredSession, sponsoredPreviewAddress} from '../creator-signer.js';
 
 // ── plan-object warning capture ──────────────────────────────────────────────────────────────────
 // The structured `--json` plan object (deploy-plan.ts) reports "the warnings the lane raised"
@@ -278,9 +278,9 @@ export function parseNonNegativeIntFlag(raw: string, flag: string): bigint {
 
 /**
  * A `--dry-run` computes the deterministic deploy address, which is a pure function of
- * (factory, salt, deployer) — so it needs a deployer even though it signs nothing. Resolve it the
- * same way the preview will (`--for`, else an env key) and fail EARLY with the fix if neither
- * exists, rather than after the preview has printed several steps of work.
+ * (factory, salt, deployer) — so it needs a deployer even though it signs nothing. Resolve the
+ * address from the selected lane: the account-bound creator wallet for `--sponsor`, otherwise
+ * `--for` or the env key. Fail EARLY rather than printing a plan for a different eventual signer.
  */
 /**
  * A dry run only checks whether a factory address is CONFIGURED, not whether it has code on this
@@ -322,11 +322,22 @@ export function assertRealIdentity(flags: Flags, o: {name: string; symbol: strin
   );
 }
 
-export function assertPreviewDeployer(flags: Flags): void {
-  if (flags.for) return;
+export async function resolvePreviewDeployer(flags: Flags, lane: Lane, required = true): Promise<Address | null> {
+  if (lane === 'sponsor') {
+    const sponsored = await sponsoredPreviewAddress(CHAIN);
+    if (flags.for && String(flags.for).toLowerCase() !== sponsored.toLowerCase()) {
+      throw new Error(
+        `--for ${String(flags.for)} does not match this account's ABX creator wallet ${sponsored}. ` +
+          'A sponsored preview must use the same owner and CREATE2 salt as the real sponsored send.',
+      );
+    }
+    return sponsored;
+  }
+  if (flags.for) return flags.for as Address;
   try {
-    makeWalletClient({chainKey: CHAIN});
+    return makeWalletClient({chainKey: CHAIN}).account.address;
   } catch {
+    if (!required) return null;
     throw new Error(
       'dry run needs a deployer address to compute the deterministic deploy address — pass --for 0x.. ' +
         '(a preview signs nothing, so no key is needed). For the REAL deploy with no key in .env, use the ' +
@@ -868,7 +879,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // A keyless preview needs `--for` (the address is a pure function of factory+salt+deployer). Check
   // it HERE, before the trust-anchor/content/plan steps print — hitting this after a wall of output
   // reads as "it half-worked", and a first-timer previewing with no key in .env always hits it.
-  if (dryRun) assertPreviewDeployer(flags);
+  const previewDeployer = dryRun ? await resolvePreviewDeployer(flags, lane) : null;
   const publicClient = makePublicClient({chainKey: CHAIN});
   // Verify the RPC really is CHAIN before any send (factory/renderer/staging/deploy). A dry run
   // sends nothing, but it DOES read the chain (predict address, resolve the factory/renderer), so
@@ -1173,19 +1184,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   let deployerAddr: Address | undefined;
 
   if (dryRun) {
-    let deployer: Address;
-    if (flags.for) deployer = flags.for as Address;
-    else {
-      try {
-        deployer = makeWalletClient({chainKey: CHAIN}).account.address;
-      } catch {
-        throw new Error(
-          'dry run needs a deployer address to compute the deterministic deploy address — pass --for 0x.. ' +
-            '(a preview signs nothing, so no key is needed). For the REAL deploy with no key in .env, use the ' +
-            'wallet lane: --sign --for 0x.. (you approve in your own wallet).',
-        );
-      }
-    }
+    const deployer = previewDeployer!;
     const {clone: predicted, params, salt, contentNote} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
     await warnUnfunded(publicClient, deployer, lane); // advisory for self-funded signing lanes
@@ -1605,7 +1604,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
         "the next. Use the hot lane (a funded key) or --sign (browser wallet); --unsigned and the initial --sponsor beta do not stage content.",
     );
   }
-  if (dryRun) assertPreviewDeployer(flags);
+  const previewDeployer = dryRun ? await resolvePreviewDeployer(flags, lane) : null;
   const publicClient = makePublicClient({chainKey: CHAIN});
   await assertChainId(CHAIN, {allowUnreachable: dryRun});
 
@@ -1778,19 +1777,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   let deployerAddr: Address | undefined;
 
   if (dryRun) {
-    let deployer: Address;
-    if (flags.for) deployer = flags.for as Address;
-    else {
-      try {
-        deployer = makeWalletClient({chainKey: CHAIN}).account.address;
-      } catch {
-        throw new Error(
-          'dry run needs a deployer address to compute the deterministic deploy address — pass --for 0x.. ' +
-            '(a preview signs nothing, so no key is needed). For the REAL deploy with no key in .env, use the ' +
-            'wallet lane: --sign --for 0x.. (you approve in your own wallet).',
-        );
-      }
-    }
+    const deployer = previewDeployer!;
     const {clone: predicted, params, salt, contentNote} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
     await warnUnfunded(publicClient, deployer, lane);
@@ -2059,11 +2046,11 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   if (count > files.length) throw new Error(`--count ${count} exceeds the ${files.length} media file(s) in ${dirPath}`);
   const slots = files.slice(0, count);
 
-  const dryRun = isDryRun(flags);
-  if (dryRun) assertPreviewDeployer(flags); // fail fast, before the preview does any work (see cmdDeploy)
-  assertRealIdentity(flags, {name, symbol, dryRun});
   const lane = laneFromFlags(flags);
   if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
+  const dryRun = isDryRun(flags);
+  const previewDeployer = dryRun ? await resolvePreviewDeployer(flags, lane) : null;
+  assertRealIdentity(flags, {name, symbol, dryRun});
   const publicClient = makePublicClient({chainKey: CHAIN});
   // Catch a wrong-network RPC with the clear mismatch message even on dry-run (which still reads
   // the chain to predict the address); tolerate an unreachable RPC so an offline preview still works.
@@ -2369,19 +2356,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
 
   step(`Deploy a ${count}-token Series to ${CHAIN}`);
   if (dryRun) {
-    let deployer: Address;
-    if (flags.for) deployer = flags.for as Address;
-    else {
-      try {
-        deployer = makeWalletClient({chainKey: CHAIN}).account.address;
-      } catch {
-        throw new Error(
-          'dry run needs a deployer address to compute the deterministic deploy address — pass --for 0x.. ' +
-            '(a preview signs nothing, so no key is needed). For the REAL deploy with no key in .env, use the ' +
-            'wallet lane: --sign --for 0x.. (you approve in your own wallet).',
-        );
-      }
-    }
+    const deployer = previewDeployer!;
     const {clone: predicted, params, salt} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
     // Without --salt this salt was just freshly randomly reserved; a plain re-run gets a
@@ -2725,11 +2700,11 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   if (count > files.length) throw new Error(`--count ${count} exceeds the ${files.length} media file(s) in ${dirPath}`);
   const slots = files.slice(0, count);
 
-  const dryRun = isDryRun(flags);
-  if (dryRun) assertPreviewDeployer(flags);
-  assertRealIdentity(flags, {name, symbol, dryRun});
   const lane = laneFromFlags(flags);
   if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
+  const dryRun = isDryRun(flags);
+  const previewDeployer = dryRun ? await resolvePreviewDeployer(flags, lane) : null;
+  assertRealIdentity(flags, {name, symbol, dryRun});
   const onchainImage = !!flags['onchain-image'];
   const compress = parseCompress(flags.compress);
   // Staging is a SEQUENCE (chunk writes → the deploy that references each manifest) where every tx's
@@ -3012,15 +2987,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   let deployerAddr: Address | undefined;
 
   if (dryRun) {
-    let deployer: Address;
-    if (flags.for) deployer = flags.for as Address;
-    else {
-      try {
-        deployer = makeWalletClient({chainKey: CHAIN}).account.address;
-      } catch {
-        throw new Error('dry run needs a deployer address to compute the deterministic deploy address — pass --for 0x.. (a preview signs nothing).');
-      }
-    }
+    const deployer = previewDeployer!;
     const {clone: predicted, params, salt} = await buildForDeployer(deployer);
     info(`deployer ${deployer}`);
     await warnUnfunded(publicClient, deployer, lane);
@@ -3671,6 +3638,8 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     );
   }
 
+  const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const dryRun = isDryRun(flags);
   const name = flags.name ?? 'ABX Code';
   const symbol = flags.symbol ?? 'ABXC';
@@ -4237,12 +4206,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     // expectation, tx count, cost — is deployer-independent, so a wallet-less creator (the common
     // "before I set up a key" preview) still gets the full readout. Missing deployer ⇒ null, and
     // the address-dependent lines degrade to a clear placeholder instead of refusing the preview.
-    let deployer: Address | null = null;
-    if (flags.for) deployer = flags.for as Address;
-    else {
-      try { deployer = makeWalletClient({chainKey: CHAIN}).account.address; }
-      catch { deployer = null; }
-    }
+    const deployer = await resolvePreviewDeployer(flags, lane, false);
     const explicitSalt = parseSaltFlag(flags.salt);
     const salt = deployer ? (explicitSalt ?? saltFor(deployer)) : null;
     if (explicitSalt && deployer) assertSaltGuardForDeployer(explicitSalt, deployer);
@@ -4541,8 +4505,6 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   }
 
   step('Deploy');
-  const lane = laneFromFlags(flags);
-  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   // --onchain-uri with no explicit public URL: leave the off-chain pointer EMPTY rather than
   // baking a misleading localhost (the renderer is authoritative while set) — the same rule as
   // the 1/1's on-chain lane. The renderers themselves are set as setup-multicall legs, so the
@@ -5184,6 +5146,8 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
     );
   }
 
+  const lane = laneFromFlags(flags);
+  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const dryRun = isDryRun(flags);
   const name = flags.name ?? 'ABX Edition Code';
   const symbol = flags.symbol ?? 'ABXEC';
@@ -5452,8 +5416,6 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   const onchainUriLegs = onChainUri ? onchainUriSetupCalls({generator, metadataRenderer}) : [];
 
   step('Deploy');
-  const lane = laneFromFlags(flags);
-  if (lane === 'sponsor') assertSponsorConfigured(CHAIN);
   const minter = (flags.minter as Address) ?? zeroAddress;
   const primaryPayee = (flags['primary-payee'] as Address) ?? zeroAddress;
   const explicitSalt = parseSaltFlag(flags.salt);
@@ -5564,15 +5526,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   }
 
   if (dryRun) {
-    let deployer: Address | null = null;
-    if (flags.for) deployer = flags.for as Address;
-    else {
-      try {
-        deployer = makeWalletClient({chainKey: CHAIN}).account.address;
-      } catch {
-        deployer = null;
-      }
-    }
+    const deployer = await resolvePreviewDeployer(flags, lane, false);
     const salt = deployer ? (explicitSalt ?? saltFor(deployer)) : null;
     if (explicitSalt && deployer) assertSaltGuardForDeployer(explicitSalt, deployer);
     const predicted = salt ? await predictClone(publicClient, {factory, salt}) : null;

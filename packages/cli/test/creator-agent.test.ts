@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {assertSponsorConfigured, creatorApiUrl} from '../src/creator-signer.js';
+import {assertSponsorConfigured, creatorApiUrl, sponsoredPreviewAddress} from '../src/creator-signer.js';
 import {warnUnfunded} from '../src/commands/deploy.js';
 
 const json = (value: unknown, status = 200) =>
@@ -100,5 +100,74 @@ test('the explicit creator API override is a bounded development escape hatch', 
   await assert.rejects(
     () => creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'https://api.example?token=secret'}),
     /must be HTTPS/,
+  );
+});
+
+test('sponsored preview resolves the existing account wallet with a read-only request', async () => {
+  const address = '0xadCaecC6539F91646293ea058A9f398dCC2271A6' as Address;
+  const requests: Array<{url: string; method: string}> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    requests.push({url: String(input), method: init?.method ?? 'GET'});
+    return json({
+      accountId: 'acct_test',
+      emailVerified: true,
+      wallet: {address, provider: 'privy', providerAppId: 'app_test'},
+      capabilities: {wallet: true, sponsorship: true, sponsoredChains: [8453, 84532]},
+    });
+  };
+
+  assert.equal(
+    await sponsoredPreviewAddress('base', {
+      env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+      fetchImpl,
+    }),
+    address,
+  );
+  assert.deepEqual(requests, [{url: 'https://api.example/v1/account', method: 'GET'}]);
+});
+
+test('sponsored preview refuses to provision missing account state', async () => {
+  const requests: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    requests.push(String(input));
+    return json({
+      accountId: 'acct_test',
+      emailVerified: true,
+      wallet: null,
+      capabilities: {wallet: false, sponsorship: true, sponsoredChains: [8453]},
+    });
+  };
+
+  await assert.rejects(
+    () =>
+      sponsoredPreviewAddress('base', {
+        env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+        fetchImpl,
+      }),
+    /has not provisioned one yet/,
+  );
+  assert.deepEqual(requests, ['https://api.example/v1/account']);
+});
+
+test('sponsored preview enforces live per-chain entitlement', async () => {
+  const fetchImpl: typeof fetch = async () =>
+    json({
+      accountId: 'acct_test',
+      emailVerified: true,
+      wallet: {
+        address: '0xadCaecC6539F91646293ea058A9f398dCC2271A6',
+        provider: 'privy',
+        providerAppId: 'app_test',
+      },
+      capabilities: {wallet: true, sponsorship: true, sponsoredChains: [84532]},
+    });
+
+  await assert.rejects(
+    () =>
+      sponsoredPreviewAddress('base', {
+        env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+        fetchImpl,
+      }),
+    /not enabled for Base/,
   );
 });
