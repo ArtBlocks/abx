@@ -6,6 +6,7 @@ test('ABX-hosted URI bases are recognized across the apex and all subdomains', (
   for (const uri of [
     'https://abx.io/t',
     'https://services.abx.io/t',
+    'https://resolver.abx.io/t',
     'https://api.abx.io/c',
     'HTTPS://SERVICES.ABX.IO/t',
     'https://services.abx.io.:443/t',

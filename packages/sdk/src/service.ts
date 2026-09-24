@@ -630,6 +630,26 @@ export class AbxServiceClient {
     })) as ServiceDescriptor;
   }
 
+  /**
+   * Bind a client to one interface advertised by this provider catalog. Older descriptors stay on
+   * the catalog origin; a split provider may send the interface to another HTTPS origin. The
+   * catalog remains the trust root and an unadvertised interface is never guessed.
+   */
+  async forInterface(interfaceId: string, descriptor?: ServiceDescriptor): Promise<AbxServiceClient> {
+    const resolved = resolveServiceInterfaceEndpoint(
+      this.baseUrl,
+      descriptor ?? (await this.descriptor()),
+      interfaceId,
+    );
+    if (!resolved) throw new Error(`ABX service does not advertise ${interfaceId}`);
+    return new AbxServiceClient({
+      baseUrl: resolved.baseUrl,
+      token: this.token,
+      timeoutMs: this.timeoutMs,
+      retryDelayMs: this.retryDelayMs,
+    });
+  }
+
   /** Public, machine-readable provider feedback instructions (`abx-service-feedback/v1`). */
   async feedbackInstructions(): Promise<FeedbackInstructions> {
     return (await this.request('GET', '/feedback', undefined, {

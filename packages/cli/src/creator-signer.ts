@@ -145,7 +145,8 @@ function checkedCreatorApiUrl(raw: string): string {
 }
 
 /** Resolve the first-party wallet API from its public remote catalog. The env override is an
- * explicit local/staging escape hatch; production callers do not need to know `api.abx.io`. */
+ * explicit local/staging escape hatch; production callers discover the interface from the
+ * services catalog and do not need to know a deployment hostname. */
 export async function creatorApiUrl(chainId: number, env: NodeJS.ProcessEnv = process.env): Promise<string> {
   if (env.ABX_CREATORS_API_URL) return checkedCreatorApiUrl(env.ABX_CREATORS_API_URL);
   const descriptor = await new AbxServiceClient({baseUrl: ABX_SERVICES_URL, timeoutMs: 10_000}).descriptor();
