@@ -92,6 +92,11 @@ registry. `abx lock-param-hooks` freezes the three param-lifecycle hook addresse
 augment / transfer) — the one aimed at a buyer rather than at metadata, since an unfrozen transfer
 hook is a standing power to veto transfers and mints. Confirm every served field before locking.
 
+Never lock a token or collection URI to a domain you do not control. A base URI can be changed until
+you lock it; after that, it is permanent. If you use a managed resolver, route a domain you control
+to it and verify that route before locking. ABX Services does not currently support custom-domain
+routing, and the CLI refuses to lock any `abx.io` URI.
+
 `abx lock-field` checks WHICH scope actually serves the value before it locks anything: a token-scope
 value wins over a collection-scope one when both are set (the same fallback `abx tokenuri`'s
 `abx_provenance` line reports), so a field can be visible at a scope other than the one you name.

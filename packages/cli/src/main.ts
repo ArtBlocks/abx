@@ -1026,6 +1026,7 @@ const COMMAND_HELP: Record<string, string> = {
   ${bold('abx lock-uri')} <address> ${dim('— freeze the URI config (pointer + renderer) FOREVER. Sends a tx.')}
     --collection          target the collection scope · else the token URI
     signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--unsigned')} · ${g('--dry-run')}
+    ${dim('Refuses provider-owned abx.io bases. Repoint to a verified domain you control before locking.')}
     ${dim('with the fields also locked (lock-field), the stored metadata can never change again.')}
     ${dim('Locked metadata is NOT a locked OUTPUT: params have no lock, and a locked dependency POINTER can still resolve')}
     ${dim('to bytes someone else controls. Some tokens live-adapt to chain state on purpose — see')} https://docs.abx.io/docs/protocol/owner-powers/`,

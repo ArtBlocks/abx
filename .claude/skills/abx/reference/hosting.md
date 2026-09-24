@@ -87,6 +87,11 @@ Prefer a creator-controlled domain in the on-chain base URI. Provider-specific h
 custom domain makes migration a DNS operation rather than a contract operation. Tunnels and localhost
 are preview-only and must never be baked into a launch.
 
+Never lock URI configuration to a provider-owned domain. The pointer can be changed before
+`lock-uri`, but never after it. Lock only a creator-controlled domain whose production route has
+been verified. ABX Services does not currently support custom-domain routing, so an `abx.io` URI
+must remain unlocked; the CLI refuses that lock.
+
 After provisioning:
 
 1. Run health/conformance checks.
