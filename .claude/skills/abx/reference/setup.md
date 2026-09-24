@@ -173,7 +173,9 @@ human confirmation authorizes execution.
    Let the CLI store `ABX_SERVICES_API_KEY` in ignored `.env` without printing it. Never ask for the
    email OTP or key in chat, start duplicate login sessions, or add standing login instructions to
    `AGENTS.md`/`CLAUDE.md`. The key is long-lived: reuse it across tasks and agent sessions. Run
-   `abx auth logout` only for intentional teardown, compromise, rotation, or an unused-key cleanup.
+   `abx auth keys` before creating a separate credential if the account is at its five-key limit;
+   revoke an unused non-current key with `abx auth revoke-key <key-id>`. Run `abx auth logout` only
+   for intentional teardown, compromise, rotation, or cleanup of the current key.
 5. Run `abx doctor` and resolve every red check relevant to the chosen lane.
 6. Run `abx storage show --check` when bytes will leave the local disk.
 7. Run `abx remote <name>` before relying on a configured managed service.

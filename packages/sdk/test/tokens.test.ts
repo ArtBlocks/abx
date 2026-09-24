@@ -79,7 +79,7 @@ test('listTokens: token-scope params decode per schema; contract-scope listed on
   });
 
   const listing = await listTokens(client, TOKEN);
-  assert.equal(listing.maxInvocations, 3);
+  assert.equal(listing.maxInvocations, '3');
   // HexColor decodes to #rrggbb — the canonical string, not the raw bytes32.
   for (const row of listing.tokens) assert.deepEqual(row.params, {palette: '#ff8800'});
   // Contract scope lives on the parent, NOT copied into all 3 rows.

@@ -276,6 +276,37 @@ export function parseNonNegativeIntFlag(raw: string, flag: string): bigint {
   return BigInt(raw.trim());
 }
 
+/** A positive uint256 flag. Keep protocol-sized integers as bigint from parse through ABI encoding;
+ *  narrowing one through JavaScript's 53-bit `number` range silently changes valid on-chain values. */
+export function parsePositiveUint256Flag(raw: string, flag: string): bigint {
+  const value = raw.trim();
+  if (!/^\d+$/.test(value) || value === '' || value === '0') {
+    throw new Error(`--${flag} must be a positive integer; got '${raw}'.`);
+  }
+  const parsed = BigInt(value);
+  if (parsed > (1n << 256n) - 1n) throw new Error(`--${flag} exceeds uint256`);
+  return parsed;
+}
+
+/** Deploy-time reserve mints become arrays of calls, so their count must be a safe JS array length.
+ *  The collection cap itself has no such restriction and remains a bigint. */
+function codeMintCount(flags: Flags, maxInvocations: bigint): number {
+  if (flags['no-mint'] !== undefined) return 0;
+  const requested =
+    flags['mint-all'] !== undefined
+      ? maxInvocations
+      : parseNonNegativeIntFlag(String(flags['mint-count'] ?? '0'), 'mint-count');
+  if (requested > maxInvocations) {
+    throw new Error(`--mint-count ${requested} exceeds --max ${maxInvocations}`);
+  }
+  if (requested > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(
+      `deploy-time mint count ${requested} exceeds JavaScript's safe iterable range — keep minting deferred or pass a smaller --mint-count; --max may still be ${maxInvocations}`,
+    );
+  }
+  return Number(requested);
+}
+
 /**
  * A `--dry-run` computes the deterministic deploy address, which is a pure function of
  * (factory, salt, deployer) — so it needs a deployer even though it signs nothing. Resolve the
@@ -3729,13 +3760,11 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   const symbol = flags.symbol ?? 'ABXC';
   assertRealIdentity(flags, {name, symbol, dryRun});
   const maxProvided = flags.max !== undefined;
-  const max = Number(flags.max ?? 16);
-  if (!Number.isInteger(max) || max <= 0) throw new Error('--max must be a positive integer');
+  const max = parsePositiveUint256Flag(String(flags.max ?? 16), 'max');
   const royaltyProvided = flags['royalty-bps'] !== undefined;
   // Mint is DEFERRED by default (no reserve mints at deploy). `--no-mint` is the explicit form of
   // that default (the skill + reproduce line reference it) and wins over --mint-all/--mint-count.
-  const mintCount = flags['no-mint'] !== undefined ? 0 : flags['mint-all'] !== undefined ? max : Number(flags['mint-count'] ?? 0);
-  if (mintCount > max) throw new Error(`--mint-count ${mintCount} exceeds --max ${max}`);
+  const mintCount = codeMintCount(flags, max);
   const paused = flags.unpaused === undefined;
   const royaltyBps = flags['royalty-bps'] === undefined ? 500 : parseRoyaltyBps(String(flags['royalty-bps']));
   // Owner-set royalty ceiling (bps, up to 100%), reduce-only after deploy. Defaults to 10%,
@@ -4610,7 +4639,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     maxRoyaltyBps,
     burnable,
     transferValidator,
-    maxInvocations: BigInt(max),
+    maxInvocations: max,
     primaryPayee: (flags['primary-payee'] as Address) ?? zeroAddress,
     minter: (flags.minter as Address) ?? zeroAddress,
     paused,
@@ -5236,13 +5265,11 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   const name = flags.name ?? 'ABX Edition Code';
   const symbol = flags.symbol ?? 'ABXEC';
   assertRealIdentity(flags, {name, symbol, dryRun});
-  const max = Number(flags.max ?? 16);
-  if (!Number.isInteger(max) || max <= 0) throw new Error('--max must be a positive integer');
+  const max = parsePositiveUint256Flag(String(flags.max ?? 16), 'max');
   if (flags['no-mint'] !== undefined && (flags['mint-all'] !== undefined || flags['mint-count'] !== undefined)) {
     throw new Error('--no-mint contradicts --mint-all/--mint-count — drop one.');
   }
-  const mintCount = flags['no-mint'] !== undefined ? 0 : flags['mint-all'] !== undefined ? max : Number(flags['mint-count'] ?? 0);
-  if (mintCount > max) throw new Error(`--mint-count ${mintCount} exceeds --max ${max}`);
+  const mintCount = codeMintCount(flags, max);
   const mintAmount = mintCount > 0 ? (flags['mint-amount'] !== undefined ? parseNonNegativeIntFlag(flags['mint-amount'] as string, 'mint-amount') : 1n) : 0n;
   if (mintCount > 0 && mintAmount === 0n) {
     throw new Error('--mint-amount 0 with ids being pre-minted at deploy makes no sense — pass a positive --mint-amount, or drop --mint-all/--mint-count to defer minting entirely.');
@@ -5522,7 +5549,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
     maxRoyaltyBps,
     burnable,
     transferValidator,
-    maxInvocations: BigInt(max),
+    maxInvocations: max,
     editionSize,
     primaryPayee,
     minter,

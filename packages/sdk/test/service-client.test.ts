@@ -269,6 +269,49 @@ test('feedback methods use the standard provider paths, preserve reports, and en
   );
 });
 
+test('account key methods list metadata and revoke by opaque id without exposing secrets', async () => {
+  const seen: Array<{method?: string; url?: string; authorization?: string}> = [];
+  await withServer(
+    (req, res) => {
+      seen.push({method: req.method, url: req.url, authorization: req.headers.authorization});
+      if (req.method === 'GET') {
+        return json(res, 200, {
+          keys: [
+            {
+              id: 'key-current',
+              label: 'oauth-device',
+              createdAt: '2026-09-24T00:00:00.000Z',
+              current: true,
+            },
+          ],
+          limit: 5,
+        });
+      }
+      return json(res, 200, {revoked: true, keyId: 'key-old'});
+    },
+    async (base) => {
+      const account = client(base, 'account-key');
+      assert.deepEqual(await account.listApiKeys(), {
+        keys: [
+          {
+            id: 'key-current',
+            label: 'oauth-device',
+            createdAt: '2026-09-24T00:00:00.000Z',
+            current: true,
+          },
+        ],
+        limit: 5,
+      });
+      assert.deepEqual(await account.revokeApiKey('key-old'), {revoked: true, keyId: 'key-old'});
+      assert.deepEqual(seen, [
+        {method: 'GET', url: '/v1/account/keys', authorization: 'Bearer account-key'},
+        {method: 'POST', url: '/v1/account/keys/key-old/revoke', authorization: 'Bearer account-key'},
+      ]);
+      await assert.rejects(() => account.revokeApiKey('bad/id'), /path segment/);
+    },
+  );
+});
+
 test('removeProject: not_registered reports {removed:false}; disabled still THROWS', async () => {
   await withServer(
     (req, res) => {

@@ -119,7 +119,8 @@ export interface TokenListing {
    *  keeps (the frontier counts mints and never falls; the total counts live tokens). `null` when
    *  either is absent — a 1/1, or an edition, where burns are per id (each row's `supply`). */
   burnedCount: number | null;
-  maxInvocations: number | null;
+  /** Exact uint256 value as a decimal string. Never narrowed through JavaScript `number`. */
+  maxInvocations: string | null;
   /**
    * Whether the contract exposes the params surface at all. `false` for the image token types
    * (they have no Params extension), in which case every row's `seed` is `null` and `params` is
@@ -277,7 +278,7 @@ export async function listTokens(
     nextTokenId: nextTokenId === null ? null : Number(nextTokenId),
     totalSupply: totalSupply === null ? null : Number(totalSupply),
     burnedCount: nextTokenId === null || totalSupply === null ? null : Number(nextTokenId - totalSupply),
-    maxInvocations: maxInvocations === null ? null : Number(maxInvocations),
+    maxInvocations: maxInvocations === null ? null : maxInvocations.toString(),
     hasParams,
     hasParamEnumeration,
     contractParams,
@@ -341,25 +342,30 @@ async function listEditionTokens(
   // The id space: the id-space cap (`maxInvocations`) when the token has one (EditionImage/
   // EditionCode); `OneOfOneEdition` has no id-space extension at all — its id space is the
   // single work, id 0 alone (mirrors the 1/1 count fallback on the 721 path above).
-  const count = maxInvocations !== null ? Number(maxInvocations) : 1;
+  const count = maxInvocations ?? 1n;
   const from = Math.max(0, opts.from ?? 0);
-  const end = opts.limit === undefined ? count : Math.min(count, from + Math.max(0, opts.limit));
-  const ids = Array.from({length: Math.max(0, end - from)}, (_, i) => from + i);
+  const available = count > BigInt(from) ? count - BigInt(from) : 0n;
+  const requested = opts.limit === undefined ? available : BigInt(Math.max(0, opts.limit));
+  const length = requested < available ? requested : available;
+  if (length > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('token id space is too large to list in one call; pass a finite `limit`');
+  }
+  const ids = Array.from({length: Number(length)}, (_, i) => BigInt(from) + BigInt(i));
 
   let done = 0;
   const tokens = await pool(ids, opts.concurrency ?? DEFAULT_CONCURRENCY, async (id) => {
     const tokenId = String(id);
     const [supply, maxSupply, seedSlot, keys] = await Promise.all([
-      read<bigint>('totalSupply', [BigInt(id)]),
-      read<bigint>('maxSupply', [BigInt(id)]),
-      hasParams ? read<readonly [Hex, boolean, boolean]>('tokenParam', [BigInt(id), encodeTag(SEED_KEY)]) : null,
-      hasParamEnumeration ? read<readonly Hex[]>('tokenParamKeys', [BigInt(id)]) : null,
+      read<bigint>('totalSupply', [id]),
+      read<bigint>('maxSupply', [id]),
+      hasParams ? read<readonly [Hex, boolean, boolean]>('tokenParam', [id, encodeTag(SEED_KEY)]) : null,
+      hasParamEnumeration ? read<readonly Hex[]>('tokenParamKeys', [id]) : null,
     ]);
 
     const params: Record<string, string> = {};
     for (const raw of keys ?? []) {
       const key = decodeTag(raw);
-      const slot = await read<readonly [Hex, boolean, boolean]>('tokenParam', [BigInt(id), raw]);
+      const slot = await read<readonly [Hex, boolean, boolean]>('tokenParam', [id, raw]);
       if (!slot?.[2]) continue;
       const p: ParamValue = {key, value: slot[0], valueIsHash: slot[1], updatedBy: address};
       params[key] = (await decodeParam(client, address, tokenId, p, true, await schemaOf(key))).value;
@@ -386,7 +392,7 @@ async function listEditionTokens(
     nextTokenId: null, // editions have no sequential mint cursor — ids are caller-named
     totalSupply: null, // no unconditional whole-contract total; supply is per id (see each row)
     burnedCount: null, // per id, not per contract — and undecidable at head anyway (see each row)
-    maxInvocations: maxInvocations === null ? null : Number(maxInvocations),
+    maxInvocations: maxInvocations === null ? null : maxInvocations.toString(),
     hasParams,
     hasParamEnumeration,
     contractParams,

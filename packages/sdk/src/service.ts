@@ -597,6 +597,20 @@ export interface ServiceClientOptions {
   retryDelayMs?: number;
 }
 
+/** One active credential on the authenticated service account. The secret itself is never
+ * recoverable from this surface; `current` identifies the credential used for this request. */
+export interface AccountApiKey {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  current: boolean;
+}
+
+export interface AccountApiKeys {
+  keys: AccountApiKey[];
+  limit: number;
+}
+
 /**
  * Retry discipline (shared with the effects runner's read lane): a hosted node can cold-start or
  * briefly 502, so network errors / 5xx / 429 get 4 attempts with linear backoff — but a genuine
@@ -656,6 +670,20 @@ export class AbxServiceClient {
       attempts: DESCRIPTOR_ATTEMPTS,
       authenticated: false,
     })) as FeedbackInstructions;
+  }
+
+  /** List active account credentials without exposing their secret values. */
+  async listApiKeys(): Promise<AccountApiKeys> {
+    return (await this.request('GET', '/v1/account/keys')) as AccountApiKeys;
+  }
+
+  /** Revoke another credential on this account. The current credential uses OAuth logout. */
+  async revokeApiKey(keyId: string): Promise<{revoked: true; keyId: string}> {
+    if (!keyId || keyId.includes('/')) throw new Error('API key id must be a non-empty path segment');
+    return (await this.request('POST', `/v1/account/keys/${encodeURIComponent(keyId)}/revoke`)) as {
+      revoked: true;
+      keyId: string;
+    };
   }
 
   /** File one report. Callers own the human-consent boundary before invoking this write. */

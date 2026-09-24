@@ -15,7 +15,12 @@ abx add 0xYourContract --remote abx
 ```
 
 `abx auth login` opens a verified browser flow. The CLI saves the resulting key as
-`ABX_SERVICES_API_KEY` in ignored `.env`. It does not print the key.
+`ABX_SERVICES_API_KEY` in ignored `.env`. It does not print the key. Reuse that credential across
+projects and agent sessions; login reuses an already loaded key instead of creating another.
+
+An account may have up to five active keys. The service cannot recover lost key values. List active
+key metadata with `abx auth keys`, revoke an unused key with `abx auth revoke-key <key-id>`, and use
+`abx auth logout` to revoke the current key.
 
 The built-in `abx` remote points to `https://services.abx.io`. It is a convenience, not a protocol
 requirement. Check the current service terms before depending on it.
