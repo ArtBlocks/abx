@@ -1,5 +1,21 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.62
+
+### Minor Changes
+
+- 22abce8: Generalize the creator-wallet sponsorship lane to direct zero-value contract creation and
+  receipt-dependent on-chain image staging. Add `abx deploy-contract` for exact Foundry artifact or
+  initcode deployment through any signing lane.
+
+### Patch Changes
+
+- Updated dependencies [22abce8]
+  - @artblocks/abx-sdk@0.1.0-alpha.44
+  - @artblocks/abx-indexer@0.1.0-alpha.45
+  - @artblocks/abx-storage@0.1.0-alpha.44
+  - @artblocks/abx-token-api@0.1.0-alpha.47
+
 ## 0.1.0-alpha.61
 
 ### Patch Changes
