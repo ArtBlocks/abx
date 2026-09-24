@@ -1,5 +1,11 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.43
+
+### Patch Changes
+
+- 2290b0a: Recover ambiguous creator-wallet submissions through the existing operation status instead of replaying them. Sponsored sends now keep polling safely when the provider response is temporarily unknown and surface the operation ID if reconciliation cannot complete.
+
 ## 0.1.0-alpha.42
 
 ### Minor Changes
