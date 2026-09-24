@@ -24,14 +24,50 @@ const MAX_SPONSORED_GAS = 3_000_000n;
 
 /** Synchronous preflight for commands that may upload content before opening the signing lane. */
 export function assertSponsorConfigured(chainKey: string): void {
+  assertSponsorConfiguredWithEnv(chainKey, process.env);
+}
+
+function assertSponsorConfiguredWithEnv(chainKey: string, env: NodeJS.ProcessEnv): void {
   if (!SPONSORABLE_BASE_CHAINS.has(resolveChain(chainKey).id)) {
     throw new Error(
       '--sponsor is a beta for Base and Base Sepolia only, and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
     );
   }
-  if (!process.env.ABX_SERVICES_API_KEY) {
+  if (!env.ABX_SERVICES_API_KEY) {
     throw new Error('--sponsor needs ABX_SERVICES_API_KEY in your ignored .env. Run `abx auth login` first.');
   }
+}
+
+/**
+ * Resolve the existing account-bound creator wallet for a sponsored preview without provisioning
+ * a wallet or opening an authorization grant. A dry run must use the signer that the real send
+ * will use; silently falling back to a local env key changes the CREATE2 salt, owner, royalty
+ * receiver, and mint recipient shown in the preview.
+ */
+export async function sponsoredPreviewAddress(
+  chainKey: string,
+  options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch} = {},
+): Promise<Address> {
+  const env = options.env ?? process.env;
+  const chain = resolveChain(chainKey);
+  assertSponsorConfiguredWithEnv(chainKey, env);
+  const apiKey = env.ABX_SERVICES_API_KEY!;
+  const api = new CreatorApiClient({
+    baseUrl: await creatorApiUrl(chain.id, env),
+    token: apiKey,
+    fetchImpl: options.fetchImpl,
+  });
+  const account = await api.account();
+  if (!account.wallet || !account.capabilities.wallet) {
+    throw new Error(
+      'Sponsored dry run needs an existing ABX creator wallet, but this account has not provisioned one yet. ' +
+        'Provision the wallet through ABX Services first, then rerun; the preview will not create external state.',
+    );
+  }
+  if (!account.capabilities.sponsorship || !account.capabilities.sponsoredChains.includes(chain.id)) {
+    throw new Error(`ABX gas sponsorship is not enabled for ${chain.name} on this account.`);
+  }
+  return account.wallet.address;
 }
 
 export interface SponsoredReceipt {
