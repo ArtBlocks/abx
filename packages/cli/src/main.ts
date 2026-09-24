@@ -811,7 +811,7 @@ const COMMAND_HELP: Record<string, string> = {
     The contract has ${bold('no per-hook setter')} — it writes all three at once — so this READS the current trio and re-sends
     it with your change applied: ${bold('omit a role to keep it')}, pass an address to set it, or ${g('none')} to clear it. ${g('--clear')} clears all three.
     Run with ${bold('no flags')} to print the current hooks (mutates nothing).
-    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--unsigned')} · ${g('--dry-run')} preview (encodes + shows the tx, sends nothing)`,
+    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} · ${g('--dry-run')} preview (encodes + shows the tx, sends nothing)`,
   'set-dependency': `
   ${bold('abx set-dependency')} <address> <index> <ref> ${dim('— declare/replace a code dependency at an index (owner-only). Sends a tx.')}
     <index>               ordered + dense (index ≤ dependencyCount) — ${bold('index 0 = the runtime')}, by convention
@@ -883,14 +883,14 @@ const COMMAND_HELP: Record<string, string> = {
                           EditionImage/EditionCode (ids are caller-named works — see \`abx tokens <addr>\` for existing ones)
     ${g('--amount <n>')}         copies to mint (default 1)
     ${dim('--token-id/--amount are refused on a 721 target; --count is refused on an edition — pointed either way.')}
-    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--unsigned')} · ${g('--dry-run')} preview`,
+    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} · ${g('--dry-run')} preview`,
   refresh: `
   ${bold('abx refresh')} <address> ${dim('— ask marketplaces to (re)index a token (read-only / external).')}
     --token <id>          default 0. Uses OPENSEA_API_KEY if set, else prints the marketplace links.`,
   transfer: `
   ${bold('abx transfer')} <address> ${dim('— move a token to a new holder (settle a sale/gift). Sends a tx.')}
     --to 0x.. (required)  --token <id> ${dim('(default 0; ')}${g('--token-id')}${dim(' is accepted as an alias — every other id-taking command spells it that way)')}
-    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--unsigned')} · ${g('--dry-run')} preview
+    signing: ${g('--send')} (default) · ${g('--sign')} · ${g('--sponsor')} ABX creator wallet ${dim('(eligible Base networks · beta)')} · ${g('--unsigned')} · ${g('--dry-run')} preview
     ${bold('editions')} move COPIES of an id, not the whole token: ${g('--amount <n>')} (default 1) + ${g('--from 0x..')} ${dim('(REQUIRED — an')}
     ${dim('edition id can have many concurrent holders, so there is no single on-chain "the owner" to read the way a 721 ownerOf gives one).')}
     ${dim('--amount is refused on a 721 target (a token transfers as a whole).')}`,
