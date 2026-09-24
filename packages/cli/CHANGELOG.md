@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.59
+
+### Patch Changes
+
+- c324a8f: Make sponsored deployment previews resolve the existing ABX creator wallet without provisioning external state, so the preview and real send use the same owner, mint recipient, and deterministic salt.
+
 ## 0.1.0-alpha.58
 
 ### Patch Changes
