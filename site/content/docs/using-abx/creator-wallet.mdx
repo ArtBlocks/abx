@@ -27,9 +27,11 @@ Current limits:
 - Base Sepolia (`84532`), plus Base (`8453`) only when both the live provider and your account
   advertise it;
 - zero ETH value;
-- gas must be accepted by the network and live sponsorship provider; ABX adds no lower gas ceiling;
-- no direct contract creation—ABX factory deployments are supported;
-- staged `--onchain-image` uploads are not yet supported in this lane.
+- gas must be accepted by the network and live sponsorship provider; ABX adds no lower gas ceiling.
+
+Factory deployments, direct `abx deploy-contract` creation, and staged `--onchain-image` transaction
+groups use the same lane. Each group is serialized under one short-lived authorization; a later
+transaction is not prepared until the receipt it depends on is confirmed.
 
 An ambiguous submission is never retried. Keep the operation ID from the error and check its status
 before taking another action.

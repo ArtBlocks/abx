@@ -98,3 +98,18 @@ someone else could deploy to the published address first. `abx predict` reports 
 
 Start from `abx scaffold solidity`, which writes a Foundry project with the small ABX interfaces and
 tests. Then test against a deployed clone or a chain fork, not a hand-written token mock.
+
+ABX does not compile Solidity. After `forge build` and `forge test`, deploy exact creation bytecode
+through any signing lane:
+
+```bash
+abx deploy-contract \
+  --artifact out/MyHooks.sol/MyTransferHook.json \
+  --label "transfer hook" \
+  --sponsor
+```
+
+Use `cast abi-encode` for constructor arguments, run the command with `--dry-run --json` first, and
+prove the same bytecode on the paired testnet. ABX refuses unresolved library placeholders and never
+guesses argument types. Source-verify the deployed contract, then wire its address with
+`abx set-param-hooks` or the matching renderer flag.

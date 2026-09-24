@@ -72,6 +72,8 @@ export interface SignResult {
   txHash: Hex;
   prepared: PreparedTx;
   blockNumber: bigint;
+  /** Present only for a successful direct EVM contract-creation transaction. */
+  contractAddress: Address | null;
 }
 
 const DEFAULT_SIGN_PORT = 8799;
@@ -173,7 +175,7 @@ async function signSponsored(provider: TxProvider, opts: SignOptions): Promise<S
     const {txHash, receipt} = await session.send(prepared);
     console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${txHash}`);
     console.log(`  ${green('✓')} sponsored and confirmed`);
-    return {txHash, prepared, blockNumber: receipt.blockNumber};
+    return {txHash, prepared, blockNumber: receipt.blockNumber, contractAddress: receipt.contractAddress ?? null};
   } finally {
     session.close();
   }
@@ -205,7 +207,7 @@ async function signHot(provider: TxProvider, opts: SignOptions): Promise<SignRes
   const receipt = await send(prepared);
   console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${receipt.transactionHash}`);
   console.log(`  ${green('✓')} confirmed`);
-  return {txHash: receipt.transactionHash, prepared, blockNumber: receipt.blockNumber};
+  return {txHash: receipt.transactionHash, prepared, blockNumber: receipt.blockNumber, contractAddress: receipt.contractAddress ?? null};
 }
 
 /**
@@ -237,7 +239,12 @@ export async function signHotSequence(txs: PreparedTx[], opts: {chainKey: string
     },
   });
   const receipts = await runPrepared(txs, send);
-  return receipts.map((receipt, i) => ({txHash: receipt.transactionHash, prepared: txs[i], blockNumber: receipt.blockNumber}));
+  return receipts.map((receipt, i) => ({
+    txHash: receipt.transactionHash,
+    prepared: txs[i],
+    blockNumber: receipt.blockNumber,
+    contractAddress: receipt.contractAddress ?? null,
+  }));
 }
 
 // ── cold lane: print the tx for an external signer ───────────────────────────
@@ -303,7 +310,7 @@ async function signWallet(provider: TxProvider, opts: SignOptions): Promise<Sign
     const signer = await session.connect();
     const prepared = await resolveTx(provider, signer);
     const {txHash, receipt} = await session.send(prepared);
-    return {txHash, prepared, blockNumber: receipt.blockNumber};
+    return {txHash, prepared, blockNumber: receipt.blockNumber, contractAddress: receipt.contractAddress ?? null};
   } finally {
     session.close();
   }

@@ -6,8 +6,9 @@ and read-time augmentation. Use only the roles your project needs. There is inte
 "minter hook": minting is an external-minter capability, while the three PostParam hooks are
 configure, transfer and augment.
 
-`abx` does **not** compile or deploy Solidity for you; you build, test, and deploy this project with
-Foundry, then hand the deployed address(es) to `abx deploy-code`, which verifies they have code.
+`abx` does **not** compile Solidity for you. Build and test with Foundry, then either deploy with
+Foundry or pass exact compiled creation bytecode to `abx deploy-contract`. Hand the deployed
+address(es) to `abx deploy-code`, which verifies they have code.
 
 ## What's here
 
