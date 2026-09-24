@@ -182,9 +182,9 @@ human confirmation authorizes execution.
 
 For an eligible first-party account on Base Sepolia, `--sponsor` replaces the local private key and
 faucet balance with an account-bound creator wallet plus one ephemeral Privy authorization per CLI
-transaction group. Base mainnet can use the same beta lane only when the live descriptor and account
-capabilities explicitly advertise chain `8453`; qualify the exact flow on Base Sepolia first, name
-the production risk, and do not infer availability from the CLI flag alone. Read
+transaction group. Base mainnet can use the same sponsored lane only when the live descriptor and
+account capabilities explicitly advertise chain `8453`; qualify the exact flow on Base Sepolia
+first, name the production beta risk, and do not infer availability from the CLI flag alone. Read
 [services.md](services.md) before using it. Sponsorship is zero-value and never a reason to skip the
 dry run or transaction summary. Bring-your-own signing remains available even when sponsorship is
 advertised.
