@@ -58,6 +58,16 @@ export async function sponsoredPreviewAddress(
   chainKey: string,
   options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch} = {},
 ): Promise<Address> {
+  return sponsoredWalletAddress(chainKey, {...options, provision: false});
+}
+
+/** Resolve the account-bound creator wallet for a transaction plan. Real sponsored sends may
+ * provision the stable wallet just as `openSponsoredSession` does; dry runs call the wrapper above
+ * and remain strictly read-only. */
+export async function sponsoredWalletAddress(
+  chainKey: string,
+  options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch; provision?: boolean} = {},
+): Promise<Address> {
   const env = options.env ?? process.env;
   const chain = resolveChain(chainKey);
   assertSponsorConfiguredWithEnv(chainKey, env);
@@ -67,11 +77,17 @@ export async function sponsoredPreviewAddress(
     token: apiKey,
     fetchImpl: options.fetchImpl,
   });
-  const account = await api.account();
+  let account = await api.account();
+  if (!account.wallet && options.provision) {
+    await api.provisionWallet();
+    account = await api.account();
+  }
   if (!account.wallet || !account.capabilities.wallet) {
     throw new Error(
-      'Sponsored dry run needs an existing ABX creator wallet, but this account has not provisioned one yet. ' +
-        'Provision the wallet through ABX Services first, then rerun; the preview will not create external state.',
+      options.provision
+        ? 'ABX Services did not return the creator wallet after provisioning.'
+        : 'Sponsored dry run needs an existing ABX creator wallet, but this account has not provisioned one yet. ' +
+          'Provision the wallet through ABX Services first, then rerun; the preview will not create external state.',
     );
   }
   if (!account.capabilities.sponsorship || !account.capabilities.sponsoredChains.includes(chain.id)) {
@@ -91,14 +107,23 @@ export interface SponsoredSession {
   close(): void;
 }
 
-/** Pure boundary check shared by every sponsored operation. Direct CREATE (`to: null`) is valid;
- * the service still binds exact initcode, zero value, chain, wallet, gas, and idempotency. */
-export function assertSponsoredPreparedTx(tx: PreparedTx, chainId: number): void {
+/** Pure boundary check shared by every sponsored operation. Privy's sponsored relay requires a
+ * call target, so custom-contract deployments must already be expressed as a call to the keyless
+ * CREATE2 proxy before they reach this boundary. */
+export function assertSponsoredPreparedTx(
+  tx: PreparedTx,
+  chainId: number,
+): asserts tx is PreparedTx & {to: Address} {
   if (tx.chainId !== chainId) {
     throw new Error(`Refusing sponsored transaction for chain ${tx.chainId}; expected ${chainId}.`);
   }
   if (BigInt(tx.value) !== 0n) {
     throw new Error('ABX sponsorship never covers a transaction that transfers ETH.');
+  }
+  if (tx.to === null) {
+    throw new Error(
+      'ABX sponsorship requires a call target; use `abx deploy-contract --sponsor` to route exact initcode through CREATE2.',
+    );
   }
 }
 

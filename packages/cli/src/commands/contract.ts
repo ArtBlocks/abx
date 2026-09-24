@@ -1,10 +1,19 @@
 import {readFileSync} from 'node:fs';
 import {resolve as resolvePath} from 'node:path';
 import {keccak256, type Address, type Hex} from 'viem';
-import {resolveChain, type PreparedTx} from '@artblocks/abx-sdk';
+import {
+  CREATE2_PROXY,
+  create2CalldataFromSalt,
+  makePublicClient,
+  predictCreate2AddressFromSalt,
+  resolveChain,
+  saltFor,
+  waitForCodeAt,
+  type PreparedTx,
+} from '@artblocks/abx-sdk';
 import {CHAIN, explorerBase} from '../config.js';
-import {sponsoredPreviewAddress} from '../creator-signer.js';
-import {type Flags, isDryRun} from '../flags.js';
+import {sponsoredWalletAddress} from '../creator-signer.js';
+import {assertSaltGuardForDeployer, type Flags, isDryRun, parseSaltFlag} from '../flags.js';
 import {bold, dim, info, ok} from '../output.js';
 import {gatedSend, laneFromFlags} from '../riskgate.js';
 
@@ -65,21 +74,80 @@ export function contractInitcode(flags: Flags): Hex {
   return combined;
 }
 
+export interface SponsoredContractPlan {
+  address: Address;
+  salt: Hex;
+  transaction: PreparedTx;
+}
+
+/** Build the target call used for a sponsored custom-contract deployment. Privy's sponsored relay
+ * requires a call target, so this lane uses the already-canonical keyless CREATE2 proxy rather than
+ * a raw `to: null` transaction. The initcode is unchanged, but constructors observe the proxy as
+ * `msg.sender`; contracts that care about ownership must take it as an explicit constructor arg. */
+export function sponsoredContractPlan(
+  data: Hex,
+  salt: Hex,
+  chainId: number,
+  label = 'custom contract',
+): SponsoredContractPlan {
+  const address = predictCreate2AddressFromSalt(salt, data);
+  const bytes = (data.length - 2) / 2;
+  return {
+    address,
+    salt,
+    transaction: {
+      op: 'deploy-contract',
+      to: CREATE2_PROXY,
+      data: create2CalldataFromSalt(salt, data),
+      value: '0x0',
+      chainId,
+      summary: `Deploy ${label} from exact EVM initcode through deterministic CREATE2 proxy`,
+      fields: {
+        label,
+        address,
+        salt,
+        initcode: `${bytes} bytes`,
+        hash: keccak256(data),
+        value: '0 ETH',
+        constructorCaller: CREATE2_PROXY,
+      },
+    },
+  };
+}
+
 export async function cmdDeployContract(flags: Flags): Promise<void> {
   const data = contractInitcode(flags);
   const bytes = (data.length - 2) / 2;
   const label = flags.label?.trim() || 'custom contract';
   const lane = laneFromFlags(flags);
   const expectedSigner = flags.for as Address | undefined;
-  const previewSigner = isDryRun(flags) && lane === 'sponsor'
-    ? await sponsoredPreviewAddress(CHAIN)
-    : expectedSigner;
-  const prepared: PreparedTx = {
+  const sponsoredSigner = lane === 'sponsor'
+    ? await sponsoredWalletAddress(CHAIN, {provision: !isDryRun(flags)})
+    : undefined;
+  if (sponsoredSigner && expectedSigner && sponsoredSigner.toLowerCase() !== expectedSigner.toLowerCase()) {
+    throw new Error(`The ABX creator wallet ${sponsoredSigner} is not the required signer ${expectedSigner}.`);
+  }
+  const previewSigner = sponsoredSigner ?? expectedSigner;
+  const chainId = resolveChain(CHAIN).id;
+  const explicitSalt = parseSaltFlag(flags.salt);
+  if (explicitSalt && lane !== 'sponsor') {
+    throw new Error('--salt applies only to --sponsor, whose provider-backed lane deploys through CREATE2.');
+  }
+  if (explicitSalt && sponsoredSigner) assertSaltGuardForDeployer(explicitSalt, sponsoredSigner);
+  const sponsored = lane === 'sponsor'
+    ? sponsoredContractPlan(
+        data,
+        explicitSalt ?? saltFor(sponsoredSigner!),
+        chainId,
+        label,
+      )
+    : undefined;
+  const prepared: PreparedTx = sponsored?.transaction ?? {
     op: 'deploy-contract',
     to: null,
     data,
     value: '0x0',
-    chainId: resolveChain(CHAIN).id,
+    chainId,
     summary: `Deploy ${label} from exact EVM initcode`,
     fields: {
       label,
@@ -89,28 +157,41 @@ export async function cmdDeployContract(flags: Flags): Promise<void> {
     },
   };
 
-  info(`${bold('direct CREATE')} · ${bytes} initcode bytes · ${dim(keccak256(data))}`);
+  info(`${bold(sponsored ? 'sponsored CREATE2' : 'direct CREATE')} · ${bytes} initcode bytes · ${dim(keccak256(data))}`);
   info('ABX sends these exact bytes; it does not compile, link, or infer constructor arguments.');
+  if (sponsored) {
+    info(`predicted address ${sponsored.address}`);
+    info(`salt ${sponsored.salt}`);
+    info(`constructor msg.sender ${CREATE2_PROXY} (keyless CREATE2 proxy, not the creator wallet)`);
+  }
   const result = await gatedSend(prepared, flags, {
     chainKey: CHAIN,
     expectedSigner: previewSigner,
   });
   if (!result) return;
-  if (!result.contractAddress) {
+  let address = result.contractAddress;
+  if (sponsored) {
+    address = sponsored.address;
+    if (!(await waitForCodeAt(makePublicClient({chainKey: CHAIN}), address))) {
+      throw new Error(`Transaction ${result.txHash} confirmed but no code appeared at predicted address ${address}.`);
+    }
+  } else if (!address) {
     throw new Error(`Transaction ${result.txHash} confirmed but its receipt has no contract address.`);
   }
-  ok(`deployed ${label} → ${result.contractAddress}`);
+  ok(`deployed ${label} → ${address}`);
   info(`tx ${explorerBase()}/tx/${result.txHash}`);
   if (flags.json !== undefined) {
     console.log(JSON.stringify({
       command: 'deploy-contract',
       chain: CHAIN,
-      chainId: resolveChain(CHAIN).id,
-      address: result.contractAddress,
+      chainId,
+      address,
       txHash: result.txHash,
       deployBlock: result.blockNumber.toString(),
       initcodeHash: keccak256(data),
       initcodeBytes: bytes,
+      deploymentMode: sponsored ? 'create2-proxy' : 'create',
+      ...(sponsored ? {salt: sponsored.salt, constructorCaller: CREATE2_PROXY} : {}),
     }, null, 2));
   }
 }

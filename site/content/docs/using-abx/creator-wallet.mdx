@@ -29,9 +29,12 @@ Current limits:
 - zero ETH value;
 - gas must be accepted by the network and live sponsorship provider; ABX adds no lower gas ceiling.
 
-Factory deployments, direct `abx deploy-contract` creation, and staged `--onchain-image` transaction
-groups use the same lane. Each group is serialized under one short-lived authorization; a later
-transaction is not prepared until the receipt it depends on is confirmed.
+Factory deployments, `abx deploy-contract`, and staged `--onchain-image` transaction groups use the
+same lane. Sponsored custom contracts deploy through ABX's existing keyless CREATE2 proxy because
+the provider-backed lane requires a call target. The initcode is exact, but its constructor sees the
+proxy—not the creator wallet—as `msg.sender`; pass ownership explicitly when that distinction
+matters. Each group is serialized under one short-lived authorization, and a later transaction is
+not prepared until the receipt it depends on is confirmed.
 
 An ambiguous submission is never retried. Keep the operation ID from the error and check its status
 before taking another action.

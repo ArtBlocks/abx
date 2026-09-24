@@ -139,7 +139,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   'deploy-resolver': set(['provider', 'domain', 'app', 'dir', 'from-source']),
   'deploy-effects': set(['provider', 'resolver-url', 'app', 'dir', 'interval-ms', 'env-id']),
   'deploy-contract': set(
-    ['artifact', 'initcode', 'constructor-args', 'constructor-args-file', 'label', 'for'],
+    ['artifact', 'initcode', 'constructor-args', 'constructor-args-file', 'label', 'for', 'salt'],
     SHARED_WRITE,
   ),
 

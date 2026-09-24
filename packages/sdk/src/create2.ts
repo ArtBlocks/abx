@@ -59,15 +59,32 @@ export const ABX_SALT = {
 /** The 32-byte salt a CREATE2 deploy uses (`keccak256` of the canonical string). */
 export const saltHash = (salt: string): Hex => keccak256(toBytes(salt));
 
+function exactCreate2Salt(salt: Hex): Hex {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(salt)) {
+    throw new Error('CREATE2 salt must be exactly 32 bytes (0x + 64 hex characters).');
+  }
+  return salt.toLowerCase() as Hex;
+}
+
+/** The deterministic address for an already-hashed/raw 32-byte CREATE2 salt. */
+export function predictCreate2AddressFromSalt(salt: Hex, bytecode: Hex): Address {
+  return getContractAddress({opcode: 'CREATE2', from: CREATE2_PROXY, salt: exactCreate2Salt(salt), bytecode});
+}
+
+/** Proxy calldata for an already-hashed/raw 32-byte CREATE2 salt. */
+export function create2CalldataFromSalt(salt: Hex, bytecode: Hex): Hex {
+  return concat([exactCreate2Salt(salt), bytecode]);
+}
+
 /** The deterministic address `bytecode` deploys to under `salt` via the keyless proxy — identical
  *  on every chain. Pure: no chain access. */
 export function predictCreate2Address(salt: string, bytecode: Hex): Address {
-  return getContractAddress({opcode: 'CREATE2', from: CREATE2_PROXY, salt: saltHash(salt), bytecode});
+  return predictCreate2AddressFromSalt(saltHash(salt), bytecode);
 }
 
 /** The calldata a CREATE2-proxy deploy sends: 32-byte salt ++ initcode (the proxy CREATE2-deploys it). */
 export function create2Calldata(salt: string, bytecode: Hex): Hex {
-  return concat([saltHash(salt), bytecode]);
+  return create2CalldataFromSalt(saltHash(salt), bytecode);
 }
 
 /** The canonical (cross-chain-identical) AbxChunkStore address for the current bytecode. */
