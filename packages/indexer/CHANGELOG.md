@@ -1,5 +1,15 @@
 # @artblocks/abx-indexer
 
+## 0.1.0-alpha.50
+
+### Patch Changes
+
+- 719b9fe: Make the bundled skill read network and sponsorship support from CLI capabilities and the live
+  service descriptor instead of a hardcoded network list. Refresh public documentation references in
+  the published packages.
+- Updated dependencies [719b9fe]
+  - @artblocks/abx-sdk@0.1.0-alpha.49
+
 ## 0.1.0-alpha.49
 
 ### Patch Changes
