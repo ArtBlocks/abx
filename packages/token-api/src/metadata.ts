@@ -117,7 +117,7 @@ export interface PlaneArtifactRow {
   outputKey: string;
   contentType: string | null;
   locator: string | null;
-  /** A BOUND output's content (`site/content/docs/protocol/effects.mdx → Bound vs referenced`) — the bytes that
+  /** A BOUND output's content (`site/content/docs/protocol/effects.mdx#metadata-binding`) — the bytes that
    *  stitch into this JSON, held with the row. `null`/absent for every referenced output. */
   bytes?: Uint8Array | null;
   /** The inputsHash this row was rendered at, when the plane reports one. Optional and read-only:

@@ -3,36 +3,24 @@ title: "Self-host"
 description: "Run the ABX resolver and effects worker on your own infrastructure."
 ---
 
-ABX ships two reference services. The resolver serves metadata. The effects worker renders derived
-images and traits for code projects. Neither service holds an onchain signing key.
+ABX ships a resolver and an effects worker. Neither needs an onchain signing key.
 
 ## Local data directory
 
-Every command that reads or writes local state — the SQLite projection, the managed Arweave key,
-the content index — resolves ONE data directory per invocation. Predicting which one a command
-uses comes down to three rules, checked in order:
+ABX stores its SQLite projection, managed Arweave key, and content index together. It chooses one
+directory per command:
 
-1. **`ABX_DATA_DIR`, if set, always wins.** No other rule below runs. Set it to pin a command at
-   a specific node regardless of where you run it from.
-2. **Otherwise, `<current directory>/.abx-self-host`, if it already exists, wins.** Running a
-   command from the same directory you deployed a project from always finds that project.
-3. **Otherwise, a handful of read-only commands** — `abx status`, `abx state`, `abx verify`,
-   `abx doctor`, `abx capabilities`, `abx tokens`, `abx tokenuri`, `abx contracturi`,
-   `abx inspect`, and `abx minter show` — **search upward** for an existing `.abx-self-host`,
-   the way `git` finds a repository root from a subdirectory. The search stops at (but still
-   checks) your home directory, a directory containing `.git`, or the filesystem root — it never
-   wanders into an unrelated directory tree, and it never merges two data directories: the first
-   one it finds wins outright. When one of these commands answers from a directory other than the
-   one you ran it from, it prints which directory that was.
+1. `ABX_DATA_DIR`, when set.
+2. `.abx-self-host` in the current directory, when present.
+3. For read-only commands, the nearest `.abx-self-host` above the current directory.
 
-Every other command — anything that deploys, mints, registers, indexes, or otherwise writes —
-skips step 3 entirely and resolves to `<current directory>/.abx-self-host`, creating it there if it
-doesn't exist yet. A write never lands in a directory you didn't `cd` into.
+Writes use the first two rules only. If neither matches, they create `.abx-self-host` in the current
+directory. Reads print the path when they find state in a parent directory.
 
 ```bash
-cd my-project/contracts/src   # a subdirectory of where you ran `abx deploy`
-abx status                    # finds my-project/.abx-self-host and says so
-abx add 0xSomeOtherContract   # writes to ./.abx-self-host here instead — a NEW, empty node
+cd my-project/contracts/src
+abx status                  # reads my-project/.abx-self-host
+abx add 0xSomeOtherContract # creates ./.abx-self-host here
 ```
 
 ## Resolver
@@ -49,8 +37,7 @@ Deploy it to a supported host:
 abx deploy-resolver --provider <fly|render|vps>
 ```
 
-The resolver replays contract events, stores the reconstructed state, and watches for new blocks. Its
-main public routes are:
+The resolver replays events, stores project state, and watches for new blocks.
 
 | Route | Result |
 | --- | --- |
@@ -60,8 +47,8 @@ main public routes are:
 | `/d/{chainId}/{address}` | Project dashboard |
 | `/health` | Service health |
 
-Set `ABX_RESOLVER_ADMIN_TOKEN` on the host to enable registration and reindexing. That token controls
-the index only. It cannot sign transactions.
+Set `ABX_RESOLVER_ADMIN_TOKEN` on the host to enable registration and reindexing. Keep the same value
+locally as `ABX_REMOTE_SELF_TOKEN`. It controls the index and cannot sign transactions.
 
 Check progress with `abx status`. The five states are `queued`, `backfilling`, `live`, `stale`, and
 `failed`.
@@ -71,37 +58,26 @@ abx status
 abx status 0xYourContract
 ```
 
-The reference resolver assumes one trusted operator. Add tenant isolation, quotas, and rate limits
-before sharing a node with unrelated customers.
+The reference resolver assumes one trusted operator. Do not share it with unrelated customers without
+adding tenant isolation, quotas, and rate limits.
 
 ## SQLite maintenance
 
-The projection lives in one SQLite file (`.abx-self-host/index.db`). A long-running node — one you
-leave `abx serve`ing for weeks, re-registering and dropping projections along the way — accumulates
-pages that a delete frees internally but never returns to the filesystem on its own. `abx vacuum`
-inspects and reclaims that space:
+The projection lives at `.abx-self-host/index.db`. Check and reclaim unused pages with:
 
 ```bash
-abx vacuum                          # status: auto_vacuum mode, page count, freelist size
-abx vacuum convert                  # one-time, EXPLICIT full VACUUM for an older store
-abx vacuum incremental [--pages n]  # one bounded reclaim pass, on demand
+abx vacuum
+abx vacuum convert
+abx vacuum incremental [--pages n]
 ```
 
-`abx serve` already runs a bounded reclaim pass automatically, between chain-watch ticks — never
-inline with a request, and never more than a small number of pages per pass, so it can't add latency
-to metadata being served concurrently. `abx vacuum incremental` runs that same bounded pass by hand,
-for a node not running `abx serve`'s watcher, or right after `convert`.
-
-`abx vacuum convert` is the one part of this that is **never** automatic. A store created before this
-maintenance shipped reports `auto_vacuum: none` — space still frees on delete, but only a full
-`VACUUM` (which rewrites the ENTIRE file, and can briefly need up to ~2x its on-disk size) converts it
-to the mode that lets `incremental` reclaim it in small passes going forward. Run it once, deliberately,
-when `abx vacuum` tells you your store needs it — not on a schedule.
+`abx serve` runs bounded incremental cleanup between watch cycles. `abx vacuum convert` is a manual,
+one-time full rewrite for an older database with `auto_vacuum: none`. It may need twice the database's
+disk size. Run it only when `abx vacuum` recommends it.
 
 ## Effects worker
 
-Code projects can produce still images and traits offchain. The effects worker uses Playwright and
-Chromium to render them.
+The effects worker uses Chromium to render images and traits for code projects.
 
 ```bash
 abx effects
@@ -110,11 +86,11 @@ abx render 0xYourContract
 abx deploy-effects --resolver-url https://metadata.example.com
 ```
 
-Set `ABX_EFFECTS_URL` on the resolver for immediate notifications. A periodic sweep remains the
-fallback.
+Set `ABX_EFFECTS_URL` on the resolver for immediate notifications. The worker also sweeps for missed
+work.
 
-For separate hosted services, use storage both processes can reach, such as S3/R2, IPFS, or Arweave.
-Local filesystem storage works only when the processes share that disk. See [Storage](/docs/using-abx/guides/storage).
+Separate services need shared storage such as S3/R2, IPFS, or Arweave. Filesystem storage works only
+when both processes share the disk. See [Storage](/docs/using-abx/guides/storage).
 
 ## Move hosts
 
@@ -122,5 +98,5 @@ Local filesystem storage works only when the processes share that disk. See [Sto
 abx migrate 0xYourContract --from <old-resolver> --to <new-resolver>
 ```
 
-The migration copies offchain values, verifies content hashes, and compares the two results. It does
-not change DNS or send an onchain transaction.
+The migration copies offchain values, verifies hashes, and compares results. It does not change DNS
+or send a transaction.

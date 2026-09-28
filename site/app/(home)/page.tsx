@@ -17,8 +17,7 @@ export default function HomePage() {
           <p className={styles.eyebrow}>ABX / OPEN PROTOCOL</p>
           <h1>Put it onchain.</h1>
           <p className={styles.lede}>
-            ABX helps builders document digital objects on the blockchain. Agent-forward,
-            empowering human builders. Open protocol, owned by you.
+            Create, operate, and serve digital work from one open protocol.
           </p>
 
           <PromptCard prompt={QUICKSTART_PROMPT} />
@@ -35,8 +34,8 @@ export default function HomePage() {
       </section>
 
       <footer className={styles.facts}>
-        <span>Base mainnet</span>
-        <span>Base Sepolia</span>
+        <span>Open source</span>
+        <span>EVM</span>
         <span>Built by the team at Art Blocks</span>
       </footer>
     </main>

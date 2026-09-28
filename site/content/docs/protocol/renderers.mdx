@@ -88,10 +88,9 @@ abx scaffold renderer --out ./my-renderer
 
 ## Local preview
 
-`forge test` proves the renderer behaves — it never lets you look at what it actually drew. The
-scaffold's `script/Preview.s.sol` runs the same `IAbxFieldRenderer.render` call the deployed contract
-serves, against a mock params contract, and writes the raw output to `preview-out/` so you can open
-it:
+`forge test` checks behavior but does not display the output. The scaffold's
+`script/Preview.s.sol` calls `IAbxFieldRenderer.render` against mock parameters and writes the result
+to `preview-out/`:
 
 ```bash
 cd my-renderer
@@ -99,16 +98,14 @@ forge script script/Preview.s.sol
 open preview-out/image.svg
 ```
 
-Every input — token id, seed, and any PostParam you set — has a representative default and is
-overridable through env vars, so you can preview a specific token without editing the script:
+Each input has a default and an environment variable override:
 
 ```bash
 PREVIEW_TOKEN_ID=42 PREVIEW_SEED=0x00...abc PREVIEW_PALETTE=0x00...ff3366 forge script script/Preview.s.sol
 ```
 
-The script surfaces reverts instead of swallowing them, and its gas output is a local-EVM sanity
-check, not a production gas measurement — deploy and read `tokenURI` on your target chain for real
-numbers.
+The script reports reverts. Its gas output comes from a local EVM, not the production network. Deploy
+and read `tokenURI` on the target chain for a production measurement.
 
 ## Wiring and locks
 

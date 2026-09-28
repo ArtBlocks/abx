@@ -21,7 +21,7 @@ import {
 import type {StorageBackend} from '@artblocks/abx-storage';
 
 /**
- * The reference effect runner (`site/content/docs/protocol/effects.mdx → The reference runner`).
+ * The reference effect runner (`site/content/docs/protocol/effects.mdx`).
  *
  * An effect is a spine subscriber, so its natural form is a deployed, long-running
  * service. This harness is effect-agnostic: an effect registers `{key, outputs, run}`;
@@ -51,15 +51,15 @@ export interface EffectContext {
 }
 
 /** One declared output: the key naming the artifact + its MIME type, declared where the effect is
- *  declared (`site/content/docs/protocol/data-plane.mdx → Declared type, never sniffed`). The declared type is
+ *  declared (`site/content/docs/protocol/data-plane.mdx`). The declared type is
  *  what the manifest and the serving surface speak; the per-run `EffectOutput.contentType` still
  *  travels with the bytes (a mismatch is logged, the declaration wins). */
 export interface EffectOutputDecl {
   key: string;
   mimeType: string;
   /**
-   * This output's content stitches into the metadata JSON (`site/content/docs/protocol/effects.mdx → Bound vs
-   * referenced`) — `traits` today. Bound output is published as capped inline **bytes**, because a
+   * This output's content stitches into the metadata JSON
+   * (`site/content/docs/protocol/effects.mdx#metadata-binding`) — `traits` today. Bound output is published as capped inline **bytes**, because a
    * locator can't work: the resolver assembles the content into `tokenURI`, so a pointer there would
    * put a third-party fetch on its hottest read.
    *
@@ -108,7 +108,7 @@ export interface RunnerOptions {
   /** When set, register each artifact with the resolver's control plane
    *  (POST /v1/effect-artifacts) so a resolver that does NOT share this backend's disk can serve it
    *  — a locator for referenced output, capped content for bound output
-   *  (`site/content/docs/protocol/effects.mdx → Bound vs referenced`). Requires a backend that exposes a locator;
+   *  (`site/content/docs/protocol/effects.mdx#metadata-binding`). Requires a backend that exposes a locator;
    *  the constructor refuses otherwise. Bearer only; never signs on-chain. Omit for the co-located
    *  topology (runner + resolver share one backend). */
   adminToken?: string;
@@ -500,7 +500,7 @@ export class EffectRunner {
   /**
    * Register one stored output with the resolver's control plane so a node that doesn't share this
    * backend's disk can serve it. The form follows the output's DECLARED class
-   * (`site/content/docs/protocol/effects.mdx → Bound vs referenced`), and the resolver enforces the same rule
+   * (`site/content/docs/protocol/effects.mdx#metadata-binding`), and the resolver enforces the same rule
    * from its side — this is one contract, not a preference on either end:
    *
    *  - **bound** (`traits`) → the content, capped. The resolver stitches it into the token JSON.

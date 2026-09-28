@@ -246,7 +246,7 @@ export async function checkRegistryDeps(
 }
 
 // ── the resolver's registry-aware serving lane (on-chain bytes → CDN → built-in map) ──────────
-// The resolver's leg of the site/content/docs/protocol/code-projects.mdx "Consumers" table:
+// The resolver's dependency path from site/content/docs/protocol/code-projects.mdx:
 //
 //   the collection's registry pointer: `availableOnChain` → serve the bytes
 //   → else `preferredCDN` → else the built-in CDN map (last resort, warns)

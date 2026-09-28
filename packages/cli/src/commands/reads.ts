@@ -237,7 +237,7 @@ export async function cmdInspect(path: string | undefined, flags: Flags) {
 
 /**
  * `abx render <address> [tokenId…]` — the ops/repair lane of the effect runner
- * (`site/content/docs/protocol/effects.mdx → The reference runner`). Same code path as the deployed
+ * (`site/content/docs/protocol/effects.mdx`). Same code path as the deployed
  * service, so a hand-fix and the daemon can't diverge: with a runner up
  * (ABX_EFFECTS_URL / --effects-url) this enqueues via its `POST /run`; otherwise it
  * runs the sweep inline (which needs Playwright installed locally — the error says how).

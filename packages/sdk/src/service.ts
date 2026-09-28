@@ -91,7 +91,7 @@ export function locatorRejectionReason(locator: string): string | null {
 
 /**
  * The indexing lifecycle a registration moves through, closed and provider-neutral
- * (site/content/docs/using-abx/remote-services.mdx → The indexing lifecycle). One vocabulary for a
+ * (site/content/docs/using-abx/remote-services.mdx). One vocabulary for a
  * managed provider and for your own node — the reference resolver stamps these too.
  *
  *   queued       registered + accepted; catch-up hasn't started

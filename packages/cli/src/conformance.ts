@@ -279,7 +279,7 @@ export async function runConformance(opts: ConformanceOptions): Promise<Conforma
   }
 
   // ── tier 1: the artifact registry is a POINTER registry ─────────────────────
-  // `site/content/docs/protocol/effects.mdx → Bound vs referenced`. Which form is legal is fixed by the output's
+  // `site/content/docs/protocol/effects.mdx#metadata-binding`. Which form is legal is fixed by the output's
   // binding, and BOTH mismatches must be refused: silently accepting media bytes makes every
   // conforming resolver an object store, and silently accepting a locator for `traits` records
   // something that can never stitch — a wrong answer served confidently. These probes are all

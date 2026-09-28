@@ -78,7 +78,8 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
     }
   });
   assert.match(out, /is not a recognized chain/);
-  assert.match(out, /Base and Robinhood Chain are available as beta/, 'a mainnet-ish alias gets the current production explanation');
+  assert.match(out, /Selectable production networks: Base \(base, beta\), Robinhood Chain \(robinhood, beta\)/);
+  assert.match(out, /Disabled: Ethereum/);
 });
 
 test('Base is selectable but every substantive invocation prints the production-beta warning', () => {

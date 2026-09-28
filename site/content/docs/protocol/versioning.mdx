@@ -3,8 +3,7 @@ title: "Contract versions"
 description: "How ABX identifies and supports deployed contract generations."
 ---
 
-ABX contracts are immutable. A new contract generation is published only when the contract runtime
-must change—not on a schedule.
+ABX contracts are immutable. ABX publishes a new generation only when the runtime must change.
 
 Every collection reports a core version through `abxVersion()`. The SDK maps that version and its six
 factory addresses to a stable generation ID, such as `abx-core-v3`, in

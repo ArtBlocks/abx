@@ -1,6 +1,6 @@
 /**
- * The canonical on-chain generator — `AbxGenerator` (site/content/docs/protocol/code-projects.mdx →
- * "The canonical generator"). One field renderer for the `animation_url` field serving both
+ * The canonical on-chain generator, `AbxGenerator`
+ * (`site/content/docs/protocol/code-projects.mdx#rendering`). One field renderer for the `animation_url` field serving both
  * code custody modes: **template** (script chunks → the full HTML document, chain-complete
  * when every dependency resolves to on-chain bytes) and **directory** (`code` field → a
  * parameterized gateway URL, `text/uri-list` → landed verbatim by the metadata renderer).

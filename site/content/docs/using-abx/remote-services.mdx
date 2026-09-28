@@ -3,8 +3,7 @@ title: "Hosted services"
 description: "Connect ABX to a compatible hosted resolver."
 ---
 
-A resolver indexes ABX events and serves metadata. You can run one yourself or use a compatible
-provider. The same CLI commands work with either.
+A resolver indexes ABX events and serves metadata. Run your own or use a compatible provider.
 
 ## First-party service
 
@@ -14,16 +13,19 @@ abx remote abx
 abx add 0xYourContract --remote abx
 ```
 
-`abx auth login` opens a verified browser flow. The CLI saves the resulting key as
-`ABX_SERVICES_API_KEY` in ignored `.env`. It does not print the key. Reuse that credential across
-projects and agent sessions; login reuses an already loaded key instead of creating another.
+`abx auth login` opens a browser flow and saves `ABX_SERVICES_API_KEY` to an ignored `.env`. It does
+not print the key. A later login reuses the loaded key.
 
-An account may have up to five active keys. The service cannot recover lost key values. List active
-key metadata with `abx auth keys`, revoke an unused key with `abx auth revoke-key <key-id>`, and use
-`abx auth logout` to revoke the current key.
+An account may have five active keys. The service cannot recover a lost key value.
 
-The built-in `abx` remote points to `https://services.abx.io`. It is a convenience, not a protocol
-requirement. Check the current service terms before depending on it.
+```bash
+abx auth keys
+abx auth revoke-key <key-id>
+abx auth logout
+```
+
+The built-in `abx` remote points to `https://services.abx.io`. Other providers can implement the
+same interfaces.
 
 ## Another provider
 
@@ -42,20 +44,21 @@ abx add 0xYourContract --remote myprovider
 abx status 0xYourContract --remote myprovider --watch
 ```
 
-A named remote reads only its matching token. It never falls back to your self-hosted admin token.
+A named remote uses only its matching token. It never falls back to another credential.
 
 ## What a compatible service exposes
 
-`GET /.well-known/abx-service` returns the supported chains, interface versions, authentication
-method, rendering support, and the contract generations the implementation understands. A remote is
-a provider profile, not necessarily one server: its optional `endpoints` map can place an advertised
-interface at another HTTPS origin. Interfaces without an entry remain at the catalog origin, so
-existing and self-hosted services stay compatible. Inspect the catalog with
-`abx remote <name-or-url>` before using a provider.
+`GET /.well-known/abx-service` returns the provider's chains, interfaces, authentication, rendering,
+and contract generations. Its `endpoints` map may place interfaces on different HTTPS origins.
+Inspect the descriptor before using a provider:
+
+```bash
+abx remote <name-or-url>
+```
 
 The first-party catalog, accounts, and project control live at `services.abx.io`. Public token data
-lives at `resolver.abx.io`. The CLI follows the catalog's advertised interface endpoints; it does
-not infer capabilities from hostnames.
+lives at `resolver.abx.io`. The CLI follows the descriptor instead of inferring behavior from a
+hostname.
 
 The version 1 control plane uses bearer authentication:
 
@@ -67,17 +70,14 @@ The version 1 control plane uses bearer authentication:
 | `POST /v1/projects/{chainId}/{address}/reindex` | Request a fresh index. |
 | `GET /v1/projects/{chainId}/{address}/status` | Read progress and freshness. |
 
-Registration may return `202` while a cold replay continues. `abx add` waits by default. Pass
-`--no-wait` if another process will watch the status. Add `--json` for the target, chain/address,
-scan floor, lifecycle status, and whether catch-up completed or remains backfilling.
+Registration may return `202` while indexing continues. `abx add` waits by default. Use `--no-wait`
+when another process will watch status. Use `--json` for structured output.
 
 The status words are `queued`, `backfilling`, `live`, `stale`, and `failed`. A stale service keeps
 serving its last indexed state.
 
-Once indexing verifies both the factory and the on-chain core version, project list and status
-responses include `contractGeneration` with its stable ID, lifecycle, and operation support. A
-missing field means the service has not established official generation provenance; it is not
-permission to guess from `abxVersion()` alone.
+After the service verifies the factory and core version, project responses include
+`contractGeneration`. A missing value means provenance is not established.
 
 ## Public reads
 
@@ -88,8 +88,8 @@ abx tokenuri 0xYourContract --token 0
 abx contracturi 0xYourContract --json
 ```
 
-The public API distinguishes a bad route, an unsupported chain, an unregistered project, and a burned
-ERC-721. Those cases return different HTTP status and machine-readable error codes.
+The public API returns distinct status codes for bad routes, unsupported chains, unregistered
+projects, unminted tokens, and burned ERC-721 tokens.
 
 ## Leave cleanly
 
@@ -99,5 +99,5 @@ The chain remains the source of truth. Move to another provider or your own reso
 abx migrate 0xYourContract --from <source> --to <destination>
 ```
 
-The command copies offchain values, checks content hashes, and compares both resolvers. You choose
-when to update DNS or the onchain base URI.
+The command copies offchain values, checks hashes, and compares both resolvers. It does not update DNS
+or the onchain base URI.

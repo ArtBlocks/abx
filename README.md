@@ -4,9 +4,8 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX tooling is prerelease software. Base Sepolia and Sepolia are supported, Robinhood Chain Testnet
-is experimental, and production deployments on Base and Robinhood Chain are beta. Ethereum comes
-later.
+ABX tooling is prerelease software. ABX is adding EVM networks. See the current
+[network table](https://docs.abx.io/docs/reference/deployments) before deploying.
 
 ## Quickstart
 
@@ -24,21 +23,6 @@ abx doctor
 The complete user guide, protocol reference, deployment addresses, and API documentation are at
 [docs.abx.io](https://docs.abx.io).
 
-## Networks
-
-| Environment | Available | Next |
-| --- | --- | --- |
-| Testnet | Base Sepolia (default), Sepolia, Robinhood Chain Testnet (experimental) | — |
-| Production | Base, Robinhood Chain (beta) | Ethereum |
-
-Production beta transactions use real funds and create irreversible state; prove the same flow on the
-paired testnet first. Experimental networks are for deliberate qualification. For live support
-status, risks, and canonical contract addresses, see
-[Networks and deployments](https://docs.abx.io/docs/reference/deployments).
-The machine-readable sources of truth are
-[`chain-support.json`](packages/sdk/src/chain-support.json) and
-[`deployments.ts`](packages/sdk/src/deployments.ts).
-
 ## Repository
 
 | Path | Contents |
@@ -49,7 +33,7 @@ The machine-readable sources of truth are
 | [`packages/indexer/`](packages/indexer) | Event-based reference indexer |
 | [`packages/token-api/`](packages/token-api) | Reference metadata and control-plane service |
 | [`packages/storage/`](packages/storage) | Filesystem, S3-compatible, and IPFS storage adapters, plus the Arweave backend's config/identity logic |
-| [`packages/storage-arweave/`](packages/storage-arweave) | Optional ArDrive Turbo (Arweave) uploader — installed explicitly, never a default install's dependency |
+| [`packages/storage-arweave/`](packages/storage-arweave) | Optional ArDrive Turbo uploader for Arweave |
 | [`packages/effects/`](packages/effects) | Reference rendering/effects runner |
 | [`site/`](site) | Source for the public documentation site |
 | [`contributor/`](contributor) | Contributor-only distribution tests and cold-agent regression suite |

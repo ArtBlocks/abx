@@ -108,14 +108,10 @@ and token rows.
 For a watcher, use `reconstructIncremental()` with the previous state or `reconstructFromLogs()` with
 logs fetched by a shared process. `getLogsAdaptive()` handles RPC range limits.
 
-By default both `reconstructProject()` and `reconstructIncremental()` scan through the chain's
-current head (`toBlock: 'latest'`, the default — existing callers are unaffected). Pass
-`toBlock: 'safe'` or `toBlock: 'finalized'` instead to stop at that tag, which the SDK resolves to a
-concrete block number *before* scanning and stores as that number — never the tag itself — in the
-returned `ProjectState.toBlock`. Not every RPC serves these tags (pre-merge chains have no
-post-merge finality; some non-archive or indexer-backed endpoints answer neither); when the RPC
-can't resolve one, the call throws `BlockTagUnavailableError` rather than silently falling back to
-`latest`.
+Both reconstruction functions scan through `latest` by default. Pass `toBlock: 'safe'` or
+`toBlock: 'finalized'` to stop there. The SDK resolves the tag to a block number before scanning and
+stores that number in `ProjectState.toBlock`. If the RPC does not support the tag, the call throws
+`BlockTagUnavailableError`.
 
 Other common reads:
 
@@ -160,10 +156,8 @@ The client also lists, removes, and reindexes projects and publishes effect stat
 ## Storage package
 
 Byte storage lives in `@artblocks/abx-storage`. Its `StorageBackend` interface covers filesystem,
-S3/R2, IPFS, and Arweave. The Arweave (Turbo) uploader is a separate, optional package —
-`npm install @artblocks/abx-storage-arweave` — so a default `@artblocks/abx-storage` install stays
-free of Turbo's dependency tree. `ArweaveBackend` lazily resolves it only on an actual
-upload/balance/top-up.
+S3/R2, IPFS, and Arweave. Install `@artblocks/abx-storage-arweave` to use the optional ArDrive Turbo
+uploader.
 
 Use `locatorStatus()` or `awaitLocatorReady()` before placing a new locator in token metadata. An
 accepted upload may not be available through every gateway yet.

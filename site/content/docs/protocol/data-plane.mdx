@@ -35,9 +35,8 @@ Every entry includes provenance. A value may be merely labeled, anchored by a ha
 or reproducible from public code and onchain inputs. See [Metadata](/docs/protocol/metadata#provenance)
 and [Effects](/docs/protocol/effects).
 
-Nothing in this list is onchain data itself — every entry is a resolver-published projection, whether
-the bytes it names are anchored onchain or produced offchain by an effect. Read `abx tokenuri` for the
-onchain commitment; read this list for where the bytes actually are.
+The artifact list is a resolver projection. Its entries may point to onchain bytes or offchain effect
+output. Use `abx tokenuri` for the onchain commitment and the artifact list for served locations.
 
 ## Reading it directly
 
@@ -45,5 +44,4 @@ onchain commitment; read this list for where the bytes actually are.
 document, and adds what the served document deliberately omits: every registered effect output,
 current *and* stale, each labeled against the token's active `inputsHash` (see
 [Effects → Checking currency directly](/docs/protocol/effects#checking-currency-directly)).
-`--remote <name|url>` asks a hosted resolver what it actually reports — the surface that owns a hosted
-project's real artifact set — instead of this node's own local projection.
+`--remote <name|url>` reads the hosted resolver instead of this node's local projection.

@@ -58,16 +58,13 @@ output bug without repeating the secret.
 
 ## Select the chain explicitly through the environment
 
-Read the full `chains` array from `abx capabilities --json`. Base Sepolia is the default; Sepolia is
-also supported. Robinhood Chain Testnet is experimental, production deployments on Base and
-Robinhood Chain are beta, and Ethereum is disabled. There is deliberately no
-`--chain` flag because silently ignoring a wrong-chain request could spend on the wrong network.
+Read the full `chains` array from `abx capabilities --json`. Do not rely on a remembered network
+list. ABX is adding networks, and status may change between releases. There is no `--chain` flag
+because ignoring a wrong-chain request could spend on the wrong network.
 
-Choose a production chain by intended collector base, then measured cost. Base fits projects aimed at
-Base users; Robinhood Chain fits projects intentionally aimed at that network. Run the exact flow on
-the paired testnet and compare the CLI dry-run gas report before deciding. Large onchain payloads
-amplify transaction cost on either network, so weigh onchain permanence against Arweave, IPFS, or
-cloud custody rather than assuming one chain makes storage cheap.
+Choose a production chain by intended users, then measured cost. Use the `pairedChain` reported by
+capabilities for the test run. Large onchain payloads cost more on every network, so compare the dry
+run with Arweave, IPFS, or cloud custody.
 
 Before any transaction on an `experimental` or `beta` network, name the network and support level,
 explain what the transaction or transaction group will do, and state the relevant contract,
@@ -164,7 +161,7 @@ human confirmation authorizes execution.
 
 1. Install Node 22.13+ and the desired CLI version.
 2. Install the co-versioned skill with `abx skill install`, then restart the agent.
-3. Select the testnet using `ABX_CHAIN` if not using Base Sepolia.
+3. Select the testnet with `ABX_CHAIN` when the default is not appropriate.
 4. Add RPC and storage configuration outside the transcript. If the live first-party remote
    advertises sponsorship for the chosen chain and command, recommend it before asking the creator
    to configure a signer. Otherwise configure one of the bring-your-own lanes. For first-party hosted
@@ -182,11 +179,8 @@ human confirmation authorizes execution.
 8. Run command help, then a JSON dry run.
 9. Confirm the plan and only then execute.
 
-For an eligible first-party account on Base Sepolia, `--sponsor` replaces the local private key and
-faucet balance with an account-bound creator wallet plus one ephemeral Privy authorization per CLI
-transaction group. Base mainnet can use the same sponsored lane only when the live descriptor and
-account capabilities explicitly advertise chain `8453`; qualify the exact flow on Base Sepolia
-first, name the production beta risk, and do not infer availability from the CLI flag alone. Read
-[services.md](services.md) before using it. Sponsorship is zero-value and never a reason to skip the
-dry run or transaction summary. Bring-your-own signing remains available even when sponsorship is
-advertised.
+For an eligible first-party account, `--sponsor` replaces local key and faucet setup with an
+account-bound creator wallet and one short-lived authorization per transaction group. Use it only
+when the live descriptor and account capabilities advertise the active chain. Test the exact flow on
+the reported paired testnet before production. Read [services.md](services.md) before using it.
+Sponsorship is zero-value and never a reason to skip the dry run or transaction summary.

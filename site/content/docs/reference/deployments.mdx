@@ -3,35 +3,30 @@ title: "Networks and deployments"
 description: "ABX network support and canonical contract addresses."
 ---
 
-Base mainnet (`8453`) is the primary production network. Base Sepolia (`84532`) is the CLI default
-for development. Sepolia is another supported testnet. Robinhood Chain Testnet is experimental;
-Robinhood mainnet is in experimental beta.
+ABX is adding EVM networks. This table is the central human-readable list.
 
-Production transactions use real funds and create irreversible state. Software is pre-1.0 and has not
-had an independent third-party audit. Review the network, signer, transaction group, value, and locks
-before sending.
+| Network | Chain ID | Environment | Status | Contracts | Sponsorship |
+| --- | ---: | --- | --- | --- | --- |
+| Base Sepolia | `84532` | Testnet | Supported, default | Deployed | Available |
+| Sepolia | `11155111` | Testnet | Supported | Deployed | No |
+| Robinhood Chain Testnet | `46630` | Testnet | Experimental | Deployed | No |
+| Base | `8453` | Production | Beta | Deployed | Available |
+| Robinhood Chain | `4663` | Production | Beta | Deployed | No |
+| Ethereum | `1` | Production | Disabled | Not deployed | No |
 
-Use Base for Base users and Robinhood Chain for Robinhood users. Dry run on the paired testnet before
-mainnet when you can.
+`Supported` networks are ready for their stated environment. `Experimental` networks are under
+qualification. `Beta` networks use real funds and irreversible state while ABX remains pre-1.0.
+The CLI refuses disabled networks.
 
-| Network | Chain ID | Support | Canonical contracts |
-| --- | ---: | --- | --- |
-| Base Sepolia | `84532` | supported · default | deployed |
-| Sepolia | `11155111` | supported | deployed |
-| Robinhood Chain Testnet | `46630` | experimental | deployed |
-| Base | `8453` | beta | deployed |
-| Robinhood Chain | `4663` | beta | deployed |
-| Ethereum | `1` | disabled | not deployed |
-
-Supported: ready testnets (Base Sepolia, Sepolia). Experimental: qualifying testnets (Robinhood Chain
-Testnet). Beta: production networks the CLI allows with warnings (Base, Robinhood Chain). Disabled:
-the CLI refuses the network.
+Before a production transaction, run the same flow on the paired testnet. Review the network, signer,
+transaction group, value, and locks. ABX has not had an independent third-party audit.
 
 The machine-readable sources of truth are
 [`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)
-for network status and
+for network status and paired networks, and
 [`deployments.ts`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/deployments.ts) for
-addresses. If this page differs, the SDK data wins.
+addresses. The live service descriptor decides sponsorship availability. Machine-readable data wins
+if this page differs.
 
 ## Shared addresses
 
@@ -51,10 +46,10 @@ canonical generation is deployed, these addresses are identical.
 | `AbxSeedSource` | `ABX_SEED_SOURCE` | <CopyAddress>0xD01d4eDc17F8b4493A43A5e70DCD9813FB1b9A0A</CopyAddress> |
 | `AbxFixedPriceMinter` | `ABX_FIXED_PRICE_MINTER` | <CopyAddress>0xfb5C61274a3A7dA83CcDD88DdEC914438244E2c9</CopyAddress> |
 | `AbxFixedPriceMinter1155` | `ABX_FIXED_PRICE_MINTER_1155` | <CopyAddress>0x2af9f0c477c34a23cBeC646a3b6BC0cA4Df5d37f</CopyAddress> |
-| `AbxMetadataLib` | — | <CopyAddress>0x404B48AA9784FCC042B317c64bE917390Ec4b55F</CopyAddress> |
-| `AbxParamsLib` | — | <CopyAddress>0x7200fAb33E5CbDAAb00d0b5ED3b27174F11bCf90</CopyAddress> |
-| `AbxCodeLib` | — | <CopyAddress>0xD6b9cbC480D172B7Ba3f475f73bB197Dd20B047C</CopyAddress> |
-| `AbxEditionLib` | — | <CopyAddress>0x277FE8B9302FC8d015EE5DE7c98E669F8cC19E2c</CopyAddress> |
+| `AbxMetadataLib` | None | <CopyAddress>0x404B48AA9784FCC042B317c64bE917390Ec4b55F</CopyAddress> |
+| `AbxParamsLib` | None | <CopyAddress>0x7200fAb33E5CbDAAb00d0b5ED3b27174F11bCf90</CopyAddress> |
+| `AbxCodeLib` | None | <CopyAddress>0xD6b9cbC480D172B7Ba3f475f73bB197Dd20B047C</CopyAddress> |
+| `AbxEditionLib` | None | <CopyAddress>0x277FE8B9302FC8d015EE5DE7c98E669F8cC19E2c</CopyAddress> |
 
 Address resolution follows this order: explicit option, environment override, SDK manifest.
 
@@ -74,18 +69,12 @@ Sepolia also has the Art Blocks `DependencyRegistryV0` at
 <CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, Robinhood Chain
 Testnet, and Robinhood Chain have no canonical dependency registry.
 
-A dependency registry is an independent contract behind a soft pointer, not part of an ABX token or
-factory deployment. Each collection's pointer wins over the generator fallback and may be changed
-until that collection locks its dependencies. A future Base registry can therefore be used by new
-collections—and set on existing unlocked collections—without redeploying ABX. Only changing this
-generator's zero fallback would require a new generator singleton; it would not require a new token
-or factory generation.
+A dependency registry is separate from the token and factories. A collection may set its own registry
+until it locks dependencies. Adding a registry later does not require a new token deployment.
 
 ## Contract generations
 
-`abx-core-v3` is current for new deployments. It is the first release candidate built from an
-exactly synchronized public source and generated-bytecode set. Its token runtime behavior matches
-the final v2 generation apart from reporting core version 3.
+`abx-core-v3` is current for new deployments.
 
 `abx-core-v2` remains supported for existing collections: reads, writes, indexing, and serving stay
 enabled. New deployments use v3. The append-only generation registry in the SDK contains the six v2
@@ -101,19 +90,9 @@ abx state 0xYourContract
 Canonical status comes from a factory's `isAbxClone` record. The SDK also reports older known factory
 generations as provenance without treating them as current trust anchors.
 
-`abx verify` separately compares an already-deployed collection's ACTUAL singleton pointers — its
-`tokenURIRenderer` and its `animation_url` generator — against the addresses on this page, and
-reports each as current or not-current. Unlike the factory ladder above, this manifest keeps **no
-history** of a superseded renderer or generator address (see `deployments.ts`'s file docstring): a
-prior deployment and a fully custom implementation both read as "not current", because there is
-nothing recorded here to tell them apart. That is a deliberate scope limit, not an oversight — a
-history registry for these two singletons is a future tranche, not this one.
-
-Because existing collections read these addresses dynamically off this manifest (never storing a
-resolved value on their own for the un-pinned lane), **any change to a canonical shared singleton
-address in this file must be called out explicitly in that package's release notes** — a
-changeset that bumps `@artblocks/abx-sdk` silently is not enough for an address every deployed
-project's `abx verify` compares itself against.
+`abx verify` also compares the collection's metadata renderer and generator with the current
+addresses. A prior or custom singleton reports `not current`; the manifest does not classify it as
+broken.
 
 All listed Solidity contracts have public exact-match source verification. A canonical address
 without an exact source match is a release bug.

@@ -57,7 +57,7 @@ export interface EffectArtifactRow {
   contentType: string | null;
   locator: string | null;
   /**
-   * A **bound** output's content (`site/content/docs/protocol/effects.mdx → Bound vs referenced`): the bytes that
+   * A **bound** output's content (`site/content/docs/protocol/effects.mdx#metadata-binding`): the bytes that
    * stitch into the metadata JSON — `render/traits` today. Capped at
    * {@link BOUND_ARTIFACT_MAX_BYTES}; `null` for every **referenced** output, whose bytes stay with
    * the producer and reach us only as `locator`.
@@ -72,13 +72,13 @@ export interface EffectArtifactRow {
 }
 
 /** The cap a serving node MUST accept per bound output, and MUST refuse above
- *  (`site/content/docs/using-abx/remote-services.mdx → The mode is decided by the binding`). ~100× a real
+ *  (`site/content/docs/protocol/effects.mdx#metadata-binding`). ~100× a real
  *  traits payload: generous for what it is for, far too small to become blob storage. */
 export const BOUND_ARTIFACT_MAX_BYTES = 64 * 1024;
 
 /**
- * Where one project sits in the indexing lifecycle (`site/content/docs/using-abx/remote-services.mdx` →
- * The indexing lifecycle) — what the control plane's `status`/list routes report and what
+ * Where one project sits in the indexing lifecycle (`site/content/docs/using-abx/remote-services.mdx`) —
+ * what the control plane's `status`/list routes report and what
  * `abx status` prints, for a managed provider and for your own node in the same words.
  *
  * Deliberately its OWN table, not columns on `registrations`: `register()` is a full-column upsert,
@@ -164,7 +164,7 @@ export interface Store {
    * Drop the **bound** content of every superseded row for (project, token, effectKey, outputKey) —
    * everything whose `inputs_hash` isn't `currentHash`.
    *
-   * The spec makes this a **MAY**, not a MUST (`site/content/docs/protocol/effects.mdx → Bound vs referenced`):
+   * The spec makes this a **MAY**, not a MUST (`site/content/docs/protocol/effects.mdx#metadata-binding`):
    * what's normative is that superseded content is never *served* or stitched, which leaves it with
    * no legal reader. Dropping it is therefore free of consequence, and this node drops eagerly — on
    * each bound registration — because that is what turns "held bytes" into

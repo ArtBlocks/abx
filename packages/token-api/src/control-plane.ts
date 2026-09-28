@@ -56,7 +56,7 @@ export function sendJson(res: ServerResponse, status: number, body: unknown): vo
 }
 
 /** Every non-2xx control-plane response: `{error: <human>, code: <machine>}` — clients key off
- *  `code`, never off prose (site/content/docs/using-abx/remote-services.mdx → Errors). */
+ *  `code`, never off prose (site/content/docs/using-abx/remote-services.mdx). */
 export function sendError(res: ServerResponse, status: number, code: ServiceErrorCode, message: string, extra?: Record<string, unknown>): void {
   sendJson(res, status, {error: message, code, ...extra});
 }
@@ -693,7 +693,7 @@ async function cachedHead(ctx: ControlPlaneContext, chainKey: string): Promise<s
  *    bytes_base64?, contentType?}` — a conforming producer REGISTERS one render output so a resolver
  *  that does NOT share the producer's storage disk can serve it. A pointer registry, not an upload
  *  endpoint: which form is legal is decided by the output's BINDING, never by the producer
- *  (`site/content/docs/protocol/effects.mdx → Bound vs referenced`):
+ *  (`site/content/docs/protocol/effects.mdx#metadata-binding`):
  *    - **referenced** (`render/image`, a video, a model, any output this node can't stitch) → `locator`
  *      (ipfs://<cid> | ar://<txid> | https://…), stored as a pointer; the read plane 302-redirects to
  *      it and never proxies. `bytes_base64` here is a 400: this node would gain no capability from the

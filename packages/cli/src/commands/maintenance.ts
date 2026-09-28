@@ -122,4 +122,4 @@ export const VACUUM_HELP = `
     ${g('abx vacuum incremental')} [--pages <n>]  one bounded PRAGMA incremental_vacuum pass (default ${DEFAULT_INCREMENTAL_VACUUM_PAGES}
                           pages) — the same bounded reclaim \`abx serve\` already runs automatically BETWEEN watch
                           ticks; use this on demand (after \`convert\`, or on a node not running \`abx serve\`).
-    ${dim('c.f. site/content/docs/using-abx/self-hosting.mdx → SQLite maintenance.')}`;
+    ${dim('See https://docs.abx.io/docs/using-abx/self-hosting#sqlite-maintenance.')}`;

@@ -1,12 +1,12 @@
 {
-  "title": "Guides",
+  "title": "Build and operate",
   "icon": "Rocket",
   "pages": [
     "deploy-a-digital-asset",
     "storage",
     "sales",
+    "operate",
     "custom-mechanics",
-    "royalty-enforcement",
-    "operate"
+    "royalty-enforcement"
   ]
 }
