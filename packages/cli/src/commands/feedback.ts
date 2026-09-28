@@ -102,15 +102,22 @@ async function targetFor(flags: Flags, env: NodeJS.ProcessEnv = process.env): Pr
 
   const remote = resolveRemote(String(flags.remote), tokenFlag, env);
   if (!remote) throw new Error('--remote needs a provider name or URL');
-  const client = serviceClient(remote);
-  const descriptor = await client.descriptor();
+  const catalog = serviceClient(remote);
+  const descriptor = await catalog.descriptor();
   if (!descriptor.interfaces?.includes(SERVICE_FEEDBACK_INTERFACE)) {
     throw new Error(
       `${remote.url} does not declare ${SERVICE_FEEDBACK_INTERFACE}; provider feedback is not supported there. ` +
         `Core ABX feedback is the default: run abx feedback without --remote.`,
     );
   }
-  return {kind: 'service', label: `provider ${remote.name?.toLowerCase() ?? remote.url}`, endpoint: `${remote.url}/feedback`, remote, client};
+  const client = await catalog.forInterface(SERVICE_FEEDBACK_INTERFACE, descriptor);
+  return {
+    kind: 'service',
+    label: `provider ${remote.name?.toLowerCase() ?? remote.url}`,
+    endpoint: `${client.baseUrl}/feedback`,
+    remote,
+    client,
+  };
 }
 
 /** Core ABX by default; `--remote <provider>` switches to that provider's standard feedback path. */

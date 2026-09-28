@@ -64,6 +64,10 @@ The lookup order is:
 An onchain renderer can resolve `inline`, `reader`, `renderer`, `url`, `url-template`, `ipfs`, and
 `arweave`. Hash commitments and gzipped values need an offchain resolver.
 
+For an in-range token that has not been minted, an offchain resolver returns `{ "minted": false }`
+instead of full metadata. Its image, data, and live-view routes return `404` until the mint exists.
+Token IDs outside the project's range also return `404`.
+
 ## Gateways
 
 Store an IPFS CID or Arweave transaction ID as the field value. Keep the HTTP gateway separate so it

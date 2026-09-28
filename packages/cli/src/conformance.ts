@@ -26,7 +26,15 @@
  * A 403 anywhere in the loop reports as legitimate provider scoping (the token isn't authorized for
  * that contract), never a conformance failure.
  */
-import {AbxServiceClient, AbxServiceError, CONTROL_PLANE_INTERFACE, TOKEN_API_INTERFACE, type IndexStatus, type ServiceDescriptor} from '@artblocks/abx-sdk';
+import {
+  AbxServiceClient,
+  AbxServiceError,
+  CONTROL_PLANE_INTERFACE,
+  TOKEN_API_INTERFACE,
+  resolveServiceInterfaceEndpoint,
+  type IndexStatus,
+  type ServiceDescriptor,
+} from '@artblocks/abx-sdk';
 
 export type AssertionStatus = 'pass' | 'fail' | 'note';
 
@@ -86,10 +94,12 @@ export async function runConformance(opts: ConformanceOptions): Promise<Conforma
   const note = (message: string) => assertions.push({status: 'note', message});
   const scoped = (err: unknown) => err instanceof AbxServiceError && err.status === 403;
   const probeAddr = opts.address ?? ZERO_ADDRESS;
+  let tokenBase = base;
+  let controlBase = base;
 
   const readJson = async (path: string): Promise<ProbeResult> => {
     try {
-      const res = await fetch(base + path);
+      const res = await fetch(tokenBase + path);
       return {status: res.status, body: (await res.json().catch(() => ({}))) as ProbeResult['body']};
     } catch (err) {
       return {networkError: err as Error};
@@ -129,12 +139,19 @@ export async function runConformance(opts: ConformanceOptions): Promise<Conforma
     if (descriptor.render?.attached) {
       note(`rendering is managed behind this service (effects: ${descriptor.render.effects ? descriptor.render.effects.map((e) => e.key).join(', ') : 'unverified'})`);
     }
+    try {
+      tokenBase = resolveServiceInterfaceEndpoint(base, descriptor, TOKEN_API_INTERFACE)?.baseUrl ?? base;
+      controlBase = resolveServiceInterfaceEndpoint(base, descriptor, CONTROL_PLANE_INTERFACE)?.baseUrl ?? base;
+    } catch (err) {
+      failed(`invalid interface endpoint: ${(err as Error).message}`);
+    }
   }
 
   // ── tier 0: unauthenticated writes must be refused ────────────────────────────
   const chainForProbe = opts.chainId ?? descriptor?.chains?.[0] ?? 1;
+  const anonymousControl = new AbxServiceClient({baseUrl: controlBase});
   try {
-    await anon.registerProject({chainId: chainForProbe, address: probeAddr});
+    await anonymousControl.registerProject({chainId: chainForProbe, address: probeAddr});
     failed('unauthenticated POST /v1/projects was ACCEPTED — the control plane must require a bearer token');
   } catch (err) {
     if (err instanceof AbxServiceError && err.status === 401) pass('unauthenticated register → 401');
@@ -233,7 +250,7 @@ export async function runConformance(opts: ConformanceOptions): Promise<Conforma
     return {baseUrl: base, assertions, failures: assertions.filter((a) => a.status === 'fail').length};
   }
 
-  const authed = new AbxServiceClient({baseUrl: base, token: opts.token});
+  const authed = new AbxServiceClient({baseUrl: controlBase, token: opts.token});
   // A rejected credential makes the authed tiers UNASSESSABLE — it does not make the service
   // non-conformant. Before this was tracked, one stale key produced four confident "this service
   // accepts bytes it must refuse / is becoming an object store" failures, because every probe below
@@ -270,7 +287,7 @@ export async function runConformance(opts: ConformanceOptions): Promise<Conforma
   if (descriptor?.interfaces?.includes(CONTROL_PLANE_INTERFACE)) {
     const publish = async (body: Record<string, unknown>): Promise<ProbeResult> => {
       try {
-        const res = await fetch(base + '/v1/effect-artifacts', {
+        const res = await fetch(controlBase + '/v1/effect-artifacts', {
           method: 'POST',
           headers: {authorization: `Bearer ${opts.token}`, 'content-type': 'application/json'},
           body: JSON.stringify({chainId: chainForProbe, address: probeAddr, tokenId: '0', inputsHash: '0x' + 'ab'.repeat(32), ...body}),
@@ -378,7 +395,7 @@ export async function runConformance(opts: ConformanceOptions): Promise<Conforma
         ).key;
         pass(`artifact registry accepted a referenced locator (key ${String(key).slice(0, 10)}…)`);
         try {
-          const served = await fetch(`${base}/t/${chainId}/${address}/0/data/render/image`, {redirect: 'manual'});
+          const served = await fetch(`${tokenBase}/t/${chainId}/${address}/0/data/render/image`, {redirect: 'manual'});
           if (served.status === 302 || served.status === 301) pass('  …and the read plane 302-redirects to it (no proxying)');
           else if (served.status === 404) note("  the artifact route 404s — the row addresses a different inputsHash than this token's current one (self-invalidation working as designed)");
           else failed(`  the artifact route answered ${served.status} — a registered locator MUST be served by redirect, never proxied`);

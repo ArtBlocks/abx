@@ -25,6 +25,11 @@ function mockResolver(sink: Captured[]): Promise<{server: Server; port: number}>
     let raw = '';
     req.on('data', (c) => (raw += c));
     req.on('end', () => {
+      if (req.method === 'GET' && req.url === '/.well-known/abx-service') {
+        res.writeHead(200, {'content-type': 'application/json'});
+        res.end(JSON.stringify({interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [SEPOLIA_CHAIN_ID]}));
+        return;
+      }
       sink.push({url: req.url ?? '', auth: req.headers.authorization, body: JSON.parse(raw || '{}')});
       res.writeHead(200, {'content-type': 'application/json'});
       res.end(JSON.stringify({ok: true, mode: 'full', elapsedMs: 1, project: {address: ADDR, name: 'X', eventCount: 0, tokenCount: 0, mintedCount: 0}}));

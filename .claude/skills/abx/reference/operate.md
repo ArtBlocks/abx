@@ -181,6 +181,11 @@ separate. Changing one does not update the other.
 
 Lock last, after production-path verification. Every lock freezes a different surface:
 
+**Never lock a token or collection URI to a domain the creator does not own.** A managed remote's
+URL is not creator custody. Route a creator-controlled domain only when the provider supports it,
+verify the route, then lock that domain. ABX Services does not currently support custom-domain
+routing, so never lock an `abx.io` URI. The CLI refuses to do so.
+
 | Lock | Freezes | Does not necessarily freeze |
 |---|---|---|
 | `lock-field` | one token/collection field representation | other fields, URI pointer, program, params |

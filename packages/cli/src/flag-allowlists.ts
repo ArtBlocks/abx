@@ -127,6 +127,8 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   ]),
   'auth login': set(['remote', 'no-open', 'force']),
   'auth logout': set(['remote']),
+  'auth keys': set(['remote']),
+  'auth revoke-key': set(['remote']),
 
   // ── rendering / effects ──
   render: set(['force', 'effects-url'], REMOTE, STORAGE_OVERRIDE),

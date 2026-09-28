@@ -1,5 +1,27 @@
 # @artblocks/abx-storage
 
+## 0.1.0-alpha.48
+
+### Patch Changes
+
+- Updated dependencies [4d5e2b1]
+  - @artblocks/abx-sdk@0.1.0-alpha.48
+
+## 0.1.0-alpha.47
+
+### Patch Changes
+
+- Updated dependencies [56973c4]
+  - @artblocks/abx-sdk@0.1.0-alpha.47
+
+## 0.1.0-alpha.46
+
+### Patch Changes
+
+- Updated dependencies [ddb2e0b]
+- Updated dependencies [76cfc6a]
+  - @artblocks/abx-sdk@0.1.0-alpha.46
+
 ## 0.1.0-alpha.45
 
 ### Patch Changes

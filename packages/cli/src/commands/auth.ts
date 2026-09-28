@@ -9,11 +9,14 @@ import {
 } from 'node:fs'
 import { basename, dirname, resolve as resolvePath } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { ACCOUNT_API_INTERFACE } from '@artblocks/abx-sdk'
 import { parseEnvContent } from '@artblocks/abx-sdk/node'
 import { type Flags, positionalArgs } from '../flags.js'
 import {
   ABX_SERVICES_API_KEY_VAR,
+  requireRemoteToken,
   resolveRemote,
+  serviceInterfaceClient,
   type RemoteTarget
 } from '../remote.js'
 import { bold, dim, g, info, ok } from '../output.js'
@@ -407,7 +410,7 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
       warning(`The provider asked the CLI to wait; retrying in ${pollSeconds}s.`)
       continue
     }
-    if (code === 'access_denied') throw new Error('device authorization was denied')
+    if (code === 'access_denied') throw oauthFailure('device authorization failed', response, body)
     if (code === 'expired_token') throw new Error('device authorization expired; run login again')
     throw oauthFailure('OAuth token exchange failed', response, body, [grant.device_code])
   }
@@ -453,7 +456,7 @@ export async function oauthLogout(
   return { status: 'revoked', local }
 }
 
-function targetForAuth(spec: string, action: 'login' | 'logout'): RemoteTarget {
+function targetForAuth(spec: string, action: 'login' | 'logout' | 'keys' | 'revoke-key'): RemoteTarget {
   const target = resolveRemote(spec)
   if (!target) throw new Error(`auth ${action} needs a remote`)
   if (target.source === 'url' || target.source === 'default') {
@@ -467,16 +470,41 @@ function targetForAuth(spec: string, action: 'login' | 'logout'): RemoteTarget {
 export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
   const positions = positionalArgs(args)
   const subcommand = positions[0]
-  if ((subcommand !== 'login' && subcommand !== 'logout') || positions.length > 2) {
-    throw new Error('usage: abx auth <login|logout> [<remote-name>]')
+  if (!['login', 'logout', 'keys', 'revoke-key'].includes(subcommand ?? '')) {
+    throw new Error('usage: abx auth <login|logout|keys|revoke-key> ...')
+  }
+  if (subcommand === 'revoke-key' && (positions.length < 2 || positions.length > 3)) {
+    throw new Error('usage: abx auth revoke-key <key-id> [<remote-name>]')
+  }
+  if (subcommand !== 'revoke-key' && positions.length > 2) {
+    throw new Error('usage: abx auth <login|logout|keys> [<remote-name>]')
   }
   if (flags.remote === 'true') throw new Error('--remote needs a named remote, for example `--remote abx`')
-  const positionalTarget = positions[1]
+  const keyId = subcommand === 'revoke-key' ? positions[1] : undefined
+  const positionalTarget = subcommand === 'revoke-key' ? positions[2] : positions[1]
   const flagTarget = typeof flags.remote === 'string' && flags.remote !== 'true' ? flags.remote : undefined
   if (positionalTarget && flagTarget) throw new Error('choose a positional remote name or --remote, not both')
   const spec = positionalTarget ?? flagTarget ?? 'abx'
-  const target = targetForAuth(spec, subcommand)
+  const target = targetForAuth(spec, subcommand as 'login' | 'logout' | 'keys' | 'revoke-key')
   const envPath = resolvePath(process.cwd(), '.env')
+
+  if (subcommand === 'keys' || subcommand === 'revoke-key') {
+    requireRemoteToken(target)
+    const account = await serviceInterfaceClient(target, ACCOUNT_API_INTERFACE)
+    if (subcommand === 'revoke-key') {
+      const result = await account.revokeApiKey(keyId!)
+      ok(`revoked API key ${result.keyId}`)
+      return
+    }
+    const result = await account.listApiKeys()
+    console.log(`\n  ${bold('ABX API keys')} ${dim(`→ ${target.url}`)}`)
+    for (const key of result.keys) {
+      const current = key.current ? ` ${g('(current)')}` : ''
+      console.log(`  ${key.id}${current}  ${dim(`${key.label ?? 'unlabeled'} · ${key.createdAt}`)}`)
+    }
+    info(`${result.keys.length} of ${result.limit} active keys`)
+    return
+  }
 
   if (subcommand === 'logout') {
     console.log(`\n  ${bold('ABX logout')} ${dim(`→ ${target.url}`)}`)
@@ -500,6 +528,12 @@ export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
           `Unset the shadowing environment value, then run logout again to revoke the file credential too.`
       )
     }
+    return
+  }
+
+  if (target.token && flags.force === undefined) {
+    ok(`reusing the existing ${target.tokenVar} credential`)
+    info(`verify it with ${g(`abx remote ${target.name?.toLowerCase() ?? spec}`)}`)
     return
   }
 
@@ -531,4 +565,10 @@ export const AUTH_HELP = `
     ${g('abx auth logout')}            first-party ABX Services (default)
     ${g('abx auth logout <name>')}     another named remote with OAuth revocation discovery
     ${g('--remote <name>')}            equivalent target spelling for agent workflows
-    ${dim('Use for teardown, compromise, rotation, or cleanup—not after each task. Remote revocation happens before local removal.')}`
+    ${dim('Use for teardown, compromise, rotation, or cleanup—not after each task. Remote revocation happens before local removal.')}
+
+  ${bold('abx auth keys')} [<remote-name>] ${dim('— list active key metadata for this account')}
+    ${g('abx auth keys')}              show key ids, labels, creation times, and the current key
+
+  ${bold('abx auth revoke-key')} <key-id> [<remote-name>] ${dim('— revoke another active key')}
+    ${g('abx auth revoke-key <id>')}   free an unused key slot; use ${g('abx auth logout')} for the current key`

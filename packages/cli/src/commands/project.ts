@@ -16,6 +16,7 @@ import {
   PARAM_TYPES,
   type RegisterProjectBody,
   type RemoteProjectStatus,
+  TOKEN_API_INTERFACE,
   hasOnChainUriLane,
   isCodeProject,
   isCurrentFactory,
@@ -79,7 +80,8 @@ import {
   reportRemoteIndexing,
   requireRemoteToken,
   rollUp,
-  serviceClient,
+  controlPlaneClient,
+  serviceInterfaceClient,
   statusLabel,
   statusLine,
   statusRow,
@@ -286,14 +288,17 @@ export async function cmdAdd(address: Address | undefined, flags: Flags) {
       };
       info(`${bold('REMOTE')} → ${remote.url}  ${dim('(registering with the remote resolver — NOT this machine)')}`);
       if (body.contentLocators) info(`bridging image locator → ${Object.values(body.contentLocators)[0]} ${dim('(so the resolver points at IPFS, not its own localhost)')}`);
-      let r;
-      try {
-        r = await serviceClient(remote).registerProject(body);
-      } catch (err) {
-        throw describeRemoteError(err, remote, 'remote add');
-      }
-      const outcome = await reportRemoteIndexing(remote, body.chainId, address, r, flags, 'indexed');
-      info(`it now serves ${remote.url}/t/${body.chainId}/${address.toLowerCase()}/0`);
+      const [control, r] = await (async () => {
+        try {
+          const client = await controlPlaneClient(remote);
+          return [client, await client.registerProject(body)] as const;
+        } catch (err) {
+          throw describeRemoteError(err, remote, 'remote add');
+        }
+      })();
+      const outcome = await reportRemoteIndexing(remote, body.chainId, address, r, flags, 'indexed', control);
+      const tokenApi = await serviceInterfaceClient(remote, TOKEN_API_INTERFACE);
+      info(`it now serves ${tokenApi.baseUrl}/t/${body.chainId}/${address.toLowerCase()}/0`);
       // "Indexed" is not "correct". This line proves the service replayed the chain and will answer at
       // that URL; it says nothing about whether the bytes it serves match the on-chain commitment.
       // Name the step that checks.
@@ -352,13 +357,15 @@ export async function cmdIndex(address: Address | undefined, flags: Flags) {
     requireRemoteToken(remote);
     info(`${bold('REMOTE')} → ${remote.url}  ${dim('(re-indexing on the remote resolver — the post-deploy nudge)')}`);
     const chainId = resolveChain(CHAIN).id;
-    let r;
-    try {
-      r = await serviceClient(remote).registerProject({chainId, address, full: flags.full ? true : undefined});
-    } catch (err) {
-      throw describeRemoteError(err, remote, 'remote index');
-    }
-    await reportRemoteIndexing(remote, chainId, address, r, flags, 're-indexed');
+    const [control, r] = await (async () => {
+      try {
+        const client = await controlPlaneClient(remote);
+        return [client, await client.registerProject({chainId, address, full: flags.full ? true : undefined})] as const;
+      } catch (err) {
+        throw describeRemoteError(err, remote, 'remote index');
+      }
+    })();
+    await reportRemoteIndexing(remote, chainId, address, r, flags, 're-indexed', control);
     return;
   }
   allowLargeScan(flags);
@@ -901,7 +908,7 @@ export async function cmdVerifyRemote(
   remote: RemoteTarget,
   emit: (p: Record<string, unknown>) => void,
 ): Promise<void> {
-  const base = remote.url.replace(/\/$/, '');
+  const base = (await serviceInterfaceClient(remote, TOKEN_API_INTERFACE)).baseUrl;
   const chainId = resolveChain(CHAIN).id;
   // Same shape, same field names as the local lane's `verifyReport` (cmdVerifyBody) wherever the
   // two lanes answer the same question, so a caller doesn't need a second parser for `--remote`.
@@ -1967,7 +1974,7 @@ export async function cmdStatus(address: Address | undefined, flags: Flags) {
  *  can see. `--watch` tails until everything reaches a terminal state. */
 export async function cmdStatusRemote(address: Address | undefined, remote: RemoteTarget, flags: Flags) {
   requireRemoteToken(remote);
-  const client = serviceClient(remote);
+  const client = await controlPlaneClient(remote);
   const chainId = resolveChain(CHAIN).id;
   const watch = flags.watch !== undefined;
   const spec = remote.name ? remote.name.toLowerCase() : remote.source === 'default' ? '' : remote.url;
@@ -2046,7 +2053,7 @@ export async function cmdForget(address: Address | undefined, flags: Flags) {
     info(`${bold('REMOTE')} → ${remote.url}  ${dim('(deregistering on the remote resolver — NOT this machine)')}`);
     let removed: boolean;
     try {
-      ({removed} = await serviceClient(remote).removeProject(resolveChain(CHAIN).id, address));
+      ({removed} = await (await controlPlaneClient(remote)).removeProject(resolveChain(CHAIN).id, address));
     } catch (err) {
       throw describeRemoteError(err, remote, 'remote forget');
     }

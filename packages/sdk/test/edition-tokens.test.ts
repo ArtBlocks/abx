@@ -52,7 +52,7 @@ test('listTokens: a multi-id edition (EditionImage) reads totalSupply(id)/maxSup
     maxSupply: (args) => (args[0] === 2n ? 10n : 0n),
   });
   const listing = await listTokens(client, TOKEN);
-  assert.equal(listing.maxInvocations, 3);
+  assert.equal(listing.maxInvocations, '3');
   assert.deepEqual(listing.tokens.map((t) => t.tokenId), ['0', '1', '2']);
   assert.deepEqual(listing.tokens.map((t) => t.owner), [null, null, null]); // never chain-enumerable
   assert.deepEqual(listing.tokens.map((t) => t.supply), ['5', '0', '5']);
@@ -95,6 +95,19 @@ test('listTokens: --from/--limit windows an edition id range the same way as the
   const listing = await listTokens(client, TOKEN, {from: 10, limit: 3});
   assert.deepEqual(listing.tokens.map((t) => t.tokenId), ['10', '11', '12']);
   assert.deepEqual([...read].sort((a, b) => Number(a - b)), [10n, 11n, 12n]);
+});
+
+test('listTokens: a uint256-sized maxInvocations stays exact and a finite window remains usable', async () => {
+  const high = 900719925474099312345678901234567890n;
+  const {client} = fakeEditionClient({
+    maxInvocations: () => high,
+    totalSupply: () => 0n,
+    maxSupply: () => 0n,
+  });
+  const listing = await listTokens(client, TOKEN, {limit: 2});
+  assert.equal(listing.maxInvocations, high.toString());
+  assert.deepEqual(listing.tokens.map((t) => t.tokenId), ['0', '1']);
+  await assert.rejects(() => listTokens(client, TOKEN), /pass a finite `limit`/);
 });
 
 // ── the 721 path stays untouched: the probe answers false, so listTokens falls through as before

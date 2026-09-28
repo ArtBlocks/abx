@@ -9,7 +9,7 @@ description: >-
   change an ABX collection, or to determine whether ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
-  version: "0.1.0-alpha.65"
+  version: "0.1.0-alpha.68"
 ---
 
 # ABX
@@ -41,6 +41,11 @@ typed errors outrank remembered prose.
   the CLI exposes the operation. One EOA must have one serialized write sequence.
 - Never send, mint, transfer, lower a cap, change authority, or apply a lock until the human confirms
   the exact action. Locks, ownership transfers, and several deploy choices are irreversible.
+- **Never lock a token or collection URI to a domain the creator does not own.** The base URI remains
+  updatable only until it is locked. Do not point at a managed remote and then lock that provider's
+  domain. If the provider supports custom domains, route a creator-controlled domain to it, verify
+  the production path, and lock only that domain. ABX Services does not currently support
+  custom-domain routing, so never lock an `abx.io` URI.
 - Never submit feedback, project data, logs, or agent/session context to ABX or a remote provider
   until the human reviews the preview and approves that specific report. Redact credentials and
   unrelated personal or project information. `abx feedback` previews by default; `--yes` sends.

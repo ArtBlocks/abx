@@ -1,5 +1,34 @@
 # @artblocks/abx-token-api
 
+## 0.1.0-alpha.51
+
+### Patch Changes
+
+- 4d5e2b1: Return minimal metadata for unminted token positions and keep their image, data, and live-view URLs unavailable until mint.
+- Updated dependencies [4d5e2b1]
+  - @artblocks/abx-sdk@0.1.0-alpha.48
+  - @artblocks/abx-indexer@0.1.0-alpha.49
+  - @artblocks/abx-storage@0.1.0-alpha.48
+
+## 0.1.0-alpha.50
+
+### Patch Changes
+
+- Updated dependencies [56973c4]
+  - @artblocks/abx-sdk@0.1.0-alpha.47
+  - @artblocks/abx-indexer@0.1.0-alpha.48
+  - @artblocks/abx-storage@0.1.0-alpha.47
+
+## 0.1.0-alpha.49
+
+### Patch Changes
+
+- Updated dependencies [ddb2e0b]
+- Updated dependencies [76cfc6a]
+  - @artblocks/abx-sdk@0.1.0-alpha.46
+  - @artblocks/abx-indexer@0.1.0-alpha.47
+  - @artblocks/abx-storage@0.1.0-alpha.46
+
 ## 0.1.0-alpha.48
 
 ### Patch Changes

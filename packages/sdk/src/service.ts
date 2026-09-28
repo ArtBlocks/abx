@@ -167,6 +167,10 @@ export type ServiceErrorCode =
   | 'unauthorized'
   | 'forbidden'
   | 'not_registered'
+  /** **404** — the project and token position are valid, but this token has not been minted yet.
+   *  Distinct from `not_registered` (unknown project or token outside the project's id range) and
+   *  `burned` (a token that existed and is permanently gone). */
+  | 'not_minted'
   | 'disabled'
   /** The report belongs at a different feedback target; the response carries its canonical URL. */
   | 'feedback_target_moved'
@@ -183,9 +187,7 @@ export type ServiceErrorCode =
    * `410`, not `404`, and the rule generalizes: **a resolver answers what the contract's own URI
    * getter answers.** A burned 721's `tokenURI` reverts `NonexistentToken`, so composing metadata
    * for it would put a node in direct contradiction with the contract it speaks for — while `404`
-   * reads as "wrong URL / not indexed yet" and invites a retry that can never succeed. It is worse
-   * than cosmetic on the image route, which answers an unknown-but-in-cap id with a warming
-   * placeholder: for a destroyed id that says "still loading" forever.
+   * reads as "not available yet" and invites a retry that can never succeed.
    *
    * **ERC-1155 editions never answer this.** `uri(id)` has no existence gate there, a zero-supply id
    * still resolves, and it can mint again — nothing is permanently gone, so `410` would be a lie.
@@ -597,6 +599,20 @@ export interface ServiceClientOptions {
   retryDelayMs?: number;
 }
 
+/** One active credential on the authenticated service account. The secret itself is never
+ * recoverable from this surface; `current` identifies the credential used for this request. */
+export interface AccountApiKey {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  current: boolean;
+}
+
+export interface AccountApiKeys {
+  keys: AccountApiKey[];
+  limit: number;
+}
+
 /**
  * Retry discipline (shared with the effects runner's read lane): a hosted node can cold-start or
  * briefly 502, so network errors / 5xx / 429 get 4 attempts with linear backoff — but a genuine
@@ -630,12 +646,46 @@ export class AbxServiceClient {
     })) as ServiceDescriptor;
   }
 
+  /**
+   * Bind a client to one interface advertised by this provider catalog. Older descriptors stay on
+   * the catalog origin; a split provider may send the interface to another HTTPS origin. The
+   * catalog remains the trust root and an unadvertised interface is never guessed.
+   */
+  async forInterface(interfaceId: string, descriptor?: ServiceDescriptor): Promise<AbxServiceClient> {
+    const resolved = resolveServiceInterfaceEndpoint(
+      this.baseUrl,
+      descriptor ?? (await this.descriptor()),
+      interfaceId,
+    );
+    if (!resolved) throw new Error(`ABX service does not advertise ${interfaceId}`);
+    return new AbxServiceClient({
+      baseUrl: resolved.baseUrl,
+      token: this.token,
+      timeoutMs: this.timeoutMs,
+      retryDelayMs: this.retryDelayMs,
+    });
+  }
+
   /** Public, machine-readable provider feedback instructions (`abx-service-feedback/v1`). */
   async feedbackInstructions(): Promise<FeedbackInstructions> {
     return (await this.request('GET', '/feedback', undefined, {
       attempts: DESCRIPTOR_ATTEMPTS,
       authenticated: false,
     })) as FeedbackInstructions;
+  }
+
+  /** List active account credentials without exposing their secret values. */
+  async listApiKeys(): Promise<AccountApiKeys> {
+    return (await this.request('GET', '/v1/account/keys')) as AccountApiKeys;
+  }
+
+  /** Revoke another credential on this account. The current credential uses OAuth logout. */
+  async revokeApiKey(keyId: string): Promise<{revoked: true; keyId: string}> {
+    if (!keyId || keyId.includes('/')) throw new Error('API key id must be a non-empty path segment');
+    return (await this.request('POST', `/v1/account/keys/${encodeURIComponent(keyId)}/revoke`)) as {
+      revoked: true;
+      keyId: string;
+    };
   }
 
   /** File one report. Callers own the human-consent boundary before invoking this write. */

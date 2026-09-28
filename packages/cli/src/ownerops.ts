@@ -99,6 +99,7 @@ import {
   type Compress,
   type ContentPlan,
   type StagingEvent,
+  assertUriBaseLockable,
 } from '@artblocks/abx-sdk';
 import {
   encodeScalarParam,
@@ -148,7 +149,7 @@ import {openWalletSession, type SignResult, type TxProvider, type WalletSession}
 import {openSponsoredSession} from './creator-signer.js';
 import {gatedSend, laneFromFlags} from './riskgate.js';
 import {withJson} from './jsonout.js';
-import {resolveRemote, serviceClient} from './remote.js';
+import {controlPlaneClient, resolveRemote} from './remote.js';
 import {isDryRun, positionalArgs, unknownFlags, warnStrayFlags} from './flags.js';
 import {parseSchemaSpecs, describeSchema, type ParsedSchema} from './schema.js';
 
@@ -312,7 +313,7 @@ async function reindexIfKnown(address: Address, flags: Flags): Promise<void> {
   }
   try {
     // no fromBlock ⇒ incremental nudge
-    const r = await serviceClient(remote).registerProject({chainId: chainId(), address});
+    const r = await (await controlPlaneClient(remote)).registerProject({chainId: chainId(), address});
     // A deferred nudge (202) is NOT waited on here: the signed tx has already landed, and blocking a
     // completed owner-op behind someone else's backfill would be the wrong trade. Say where it got to.
     if (isAccepted(r)) {
@@ -3013,6 +3014,8 @@ export async function cmdSetRenderer(address: string | undefined, flags: Flags):
 export async function cmdLockUri(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(address, 'abx lock-uri <address> [--collection] [--sign|--unsigned]');
   const collection = !!flags.collection;
+  const uriBase = await read<string>(contract, collection ? 'contractURIBase' : 'tokenURIBase');
+  assertUriBaseLockable(uriBase);
   const owner = await read<Address>(contract, 'owner');
   console.log(
     dim(

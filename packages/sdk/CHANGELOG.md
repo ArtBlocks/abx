@@ -1,5 +1,27 @@
 # @artblocks/abx-sdk
 
+## 0.1.0-alpha.48
+
+### Patch Changes
+
+- 4d5e2b1: Return minimal metadata for unminted token positions and keep their image, data, and live-view URLs unavailable until mint.
+
+## 0.1.0-alpha.47
+
+### Patch Changes
+
+- 56973c4: Preserve `maxInvocations` as an exact uint256 value instead of narrowing it through a JavaScript
+  number. Reuse an existing hosted-service credential on login and add self-service API-key listing
+  and revocation for accounts at their active-key limit.
+
+## 0.1.0-alpha.46
+
+### Patch Changes
+
+- ddb2e0b: Refuse irreversible URI locks when the current token or collection base uses `abx.io`. Clarify that
+  managed resolver URLs must remain mutable unless a creator-controlled domain is routed and verified.
+- 76cfc6a: Follow each remote service interface's advertised origin so provider catalogs can separate token data from account and control APIs.
+
 ## 0.1.0-alpha.45
 
 ### Patch Changes

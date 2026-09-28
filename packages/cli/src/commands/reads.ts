@@ -852,13 +852,13 @@ export async function cmdTokens(address: Address | undefined, flags: Flags) {
 
   if (kind.isEdition) {
     const totalCopies = listing.tokens.reduce((n, t) => n + (t.supply !== undefined ? Number(t.supply) : 0), 0);
-    const idSpace = listing.maxInvocations !== null && listing.maxInvocations > 0 ? ` of ${listing.maxInvocations} id(s)` : '';
+    const idSpace = listing.maxInvocations !== null && BigInt(listing.maxInvocations) > 0n ? ` of ${listing.maxInvocations} id(s)` : '';
     console.log(
       `\n  ${bold(`${describeKind(kind)} ${address}`)} ${dim(`— ${listing.tokens.length} id(s) read${idSpace}, ${totalCopies} total cop${totalCopies === 1 ? 'y' : 'ies'} on ${CHAIN}`)}`,
     );
   } else {
     const supply = listing.totalSupply ?? listing.tokens.length;
-    const cap = listing.maxInvocations !== null && listing.maxInvocations > 0 ? ` of ${listing.maxInvocations} max` : '';
+    const cap = listing.maxInvocations !== null && BigInt(listing.maxInvocations) > 0n ? ` of ${listing.maxInvocations} max` : '';
     console.log(`\n  ${bold(`tokens ${address}`)} ${dim(`— ${supply} minted${cap} on ${CHAIN}`)}`);
   }
   info('read straight from the contract — no indexer, no resolver, no server in the loop');

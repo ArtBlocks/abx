@@ -31,6 +31,7 @@ import {
   AbxIndexTimeoutError,
   AbxServiceClient,
   AbxServiceError,
+  CONTROL_PLANE_INTERFACE,
   envSuffix,
   indexProgress,
   isAccepted,
@@ -41,6 +42,7 @@ import {
   type ProvenanceResult,
   type RegisterProjectResult,
   type RemoteProjectStatus,
+  type ServiceDescriptor,
 } from '@artblocks/abx-sdk';
 import {CHAIN} from './config.js';
 import {type Flags} from './flags.js';
@@ -222,6 +224,32 @@ export function serviceClient(t: RemoteTarget): AbxServiceClient {
   return new AbxServiceClient({baseUrl: t.url, token: t.token});
 }
 
+/** Resolve one provider interface from the catalog selected by `--remote`. */
+export async function serviceInterfaceClient(
+  t: RemoteTarget,
+  interfaceId: string,
+  descriptor?: ServiceDescriptor,
+): Promise<AbxServiceClient> {
+  const catalog = serviceClient(t);
+  try {
+    return await catalog.forInterface(interfaceId, descriptor);
+  } catch (err) {
+    // Pre-descriptor self-hosted resolvers served every route from the supplied origin. Preserve
+    // that compatibility only when discovery itself is absent; a catalog that answers and omits an
+    // interface is an intentional capability boundary and must not be guessed around.
+    if (!descriptor && err instanceof AbxServiceError && err.status === 404) return catalog;
+    throw err;
+  }
+}
+
+/** The provider-neutral control-plane client used by registration, status and artifact writes. */
+export async function controlPlaneClient(
+  t: RemoteTarget,
+  descriptor?: ServiceDescriptor,
+): Promise<AbxServiceClient> {
+  return serviceInterfaceClient(t, CONTROL_PLANE_INTERFACE, descriptor);
+}
+
 /**
  * Is this named remote's stored credential actually accepted? One cheap authed read, so `doctor` can
  * report capability instead of mere presence.
@@ -244,7 +272,14 @@ export async function probeRemoteCredential(
   try {
     // retryDelayMs 0: a 401 is definitive and never retries anyway, but an unreachable provider
     // would otherwise back off across four attempts and stall the one command that must stay quick.
-    const client = new AbxServiceClient({baseUrl: target.url, token: target.token, timeoutMs, retryDelayMs: 0});
+    const catalog = new AbxServiceClient({baseUrl: target.url, token: target.token, timeoutMs, retryDelayMs: 0});
+    let client: AbxServiceClient;
+    try {
+      client = await catalog.forInterface(CONTROL_PLANE_INTERFACE);
+    } catch (err) {
+      if (!(err instanceof AbxServiceError && err.status === 404)) throw err;
+      client = catalog;
+    }
     const projects = await client.listProjects();
     return {ok: true, fatal: false, detail: `· ${projects.length} project(s) visible`};
   } catch (err) {
@@ -436,7 +471,9 @@ export async function reportRemoteIndexing(
   r: RegisterProjectResult,
   flags: Flags,
   verb: string,
+  client?: AbxServiceClient,
 ): Promise<RemoteIndexingOutcome> {
+  const control = client ?? (await controlPlaneClient(remote));
   // A real ABX clone ALWAYS emits a spine (its extension registrations at minimum), so a caught-up
   // projection with zero events means the service scanned the wrong chain/floor or its RPC hasn't
   // served the logs — not that the project is empty. A ✓ there is the lie that produces an empty
@@ -480,13 +517,13 @@ export async function reportRemoteIndexing(
   if (r.project.status === 'failed') {
     // Fetch the class the register response may not have carried, so the "whose problem" line is
     // never missing on the path that reports the failure soonest.
-    const st = await serviceClient(remote).projectStatus(chainId, address).catch(() => undefined);
+    const st = await control.projectStatus(chainId, address).catch(() => undefined);
     throw new Error(`${label}: ${failedCatchUpMessage(address, remote, st?.error ?? undefined, check)}`);
   }
   let shown = -100;
   let lastStatus: IndexStatus | undefined;
   try {
-    const final = await serviceClient(remote).awaitIndexed(chainId, address, {
+    const final = await control.awaitIndexed(chainId, address, {
       onProgress: (s) => {
         const p = indexProgress(s);
         // Print on a state change or a meaningful step — a poll line every 3s is noise in a log an

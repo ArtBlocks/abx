@@ -21,6 +21,7 @@ import {SqliteStore} from '@artblocks/abx-indexer';
 import {
   AbxServiceError,
   SERVICE_FEEDBACK_INTERFACE,
+  TOKEN_API_INTERFACE,
   type Address,
   type RegisterProjectBody,
   type ServiceDescriptor,
@@ -62,6 +63,7 @@ import {
 import {type ResolverProvider, effectsArtifact, resolverArtifact} from '../provision.js';
 import {
   describeRemoteError,
+  controlPlaneClient,
   listConfiguredRemotes,
   misnamedRemoteVars,
   remoteFlag,
@@ -70,6 +72,7 @@ import {
   resolveRemote,
   rollUp,
   serviceClient,
+  serviceInterfaceClient,
   statusLabel,
 } from '../remote.js';
 
@@ -433,7 +436,7 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
     return;
   }
   try {
-    const projects = await client.listProjects();
+    const projects = await (await controlPlaneClient(target, d)).listProjects();
     ok(`token accepted — ${projects.length} project(s) visible to it`);
     for (const p of projects.slice(0, 10)) {
       console.log(
@@ -520,8 +523,9 @@ export async function cmdMigrate(address: Address | undefined, flags: Flags) {
     return;
   }
   requireRemoteToken(toTarget);
-  const from = fromTarget.url;
-  const to = toTarget.url;
+  const from = (await serviceInterfaceClient(fromTarget, TOKEN_API_INTERFACE)).baseUrl;
+  const toControl = await controlPlaneClient(toTarget);
+  const to = (await serviceInterfaceClient(toTarget, TOKEN_API_INTERFACE)).baseUrl;
   const chainId = resolveChain(CHAIN).id;
   allowLargeScan(flags);
 
@@ -600,14 +604,14 @@ export async function cmdMigrate(address: Address | undefined, flags: Flags) {
   info(`${bold('REMOTE')} → ${to} ${dim('(control plane — chain replay + off-chain enrichment)')}`);
   let r;
   try {
-    r = await serviceClient(toTarget).registerProject(body);
+    r = await toControl.registerProject(body);
   } catch (err) {
     throw describeRemoteError(err, toTarget, 'migrate destination');
   }
   // Always wait here, even if the caller passed --no-wait: the parity check below reads the
   // destination's served metadata, and comparing a half-indexed projection would report a false
   // mismatch — worse than a slow migrate.
-  await reportRemoteIndexing(toTarget, chainId, address, r, {}, 'indexed');
+  await reportRemoteIndexing(toTarget, chainId, address, r, {}, 'indexed', toControl);
 
   // 5) Parity check — does the destination now serve the same metadata as the source? Sample a
   //    token we did NOT re-pin (a re-pinned image is durable-locator-on-dest vs old-host-on-source

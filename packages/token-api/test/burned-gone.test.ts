@@ -3,11 +3,10 @@
 //
 // The rule under test is the contract's, not a preference: a burned ERC-721's `tokenURI` reverts
 // `NonexistentToken` (`TokenURI.sol`), so a resolver that composed a document for that id would be in
-// direct contradiction with the contract it speaks for. `404` would be wrong twice — it reads as
-// "wrong URL / not indexed yet" and invites a retry that can never succeed, and on `/image` an
-// unknown-but-in-cap id gets the WARMING PLACEHOLDER, so a destroyed token would say "still loading"
-// forever. `AbxEditionLib.uri(id)` has no existence gate and a zero-supply id can mint again, so
-// nothing there is permanently gone and `410` would be the lie instead.
+// direct contradiction with the contract it speaks for. `404` would read as "not available yet"
+// and invite a retry that can never succeed. `AbxEditionLib.uri(id)` has no existence gate and a
+// zero-supply id can mint again, so nothing there is permanently gone and `410` would be the lie
+// instead.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {Server} from 'node:http';
@@ -119,16 +118,16 @@ test('every 721 token route answers 410 `burned` for a destroyed id', async () =
   });
 });
 
-test('a live id and an unminted-but-in-cap id are untouched — only the burn changes', async () => {
+test('a live id, an unminted id, and an out-of-range id keep distinct responses', async () => {
   await withNode(async (base, indexer) => {
     indexer.register({address: ADDR, chainKey: CHAIN_KEY, fromBlock: '100', factory: null, label: 'burn'});
     indexer.store.putProject(seriesState([tok('0', 'live', ADDR), tok('1', 'burned'), tok('2', 'unminted')]));
 
     const live = await fetch(`${base}/t/${CHAIN_ID}/${ADDR}/0`);
     assert.equal(live.status, 200);
-    // The pre-mint warming view still works: that path is exactly the one a burned id must not reach.
-    const warming = await fetch(`${base}/t/${CHAIN_ID}/${ADDR}/2`);
-    assert.equal(warming.status, 200);
+    const unminted = await fetch(`${base}/t/${CHAIN_ID}/${ADDR}/2`);
+    assert.equal(unminted.status, 200);
+    assert.deepEqual(await unminted.json(), {minted: false});
     // And an id outside the cap is still a 404 about the CONTRACT's id space, not a 410.
     const outside = await fetch(`${base}/t/${CHAIN_ID}/${ADDR}/99`);
     assert.equal(outside.status, 404);
