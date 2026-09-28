@@ -24,6 +24,7 @@ built-in help.
 | `verify` | Check canonical deployment, byte commitments, and render freshness |
 | `tokenuri` / `contracturi` | Read committed metadata; `contracturi` follows its URI and `--json` is machine-readable |
 | `tokens` | List token state from the contract |
+| `artifacts` | List served artifacts and current or stale effect output |
 | `status` | Show resolver indexing state |
 | `version` / `help` | Show the installed version or command help |
 
@@ -90,6 +91,7 @@ built-in help.
 | `storage upload` / `storage status` | Upload bytes or check retrieval |
 | `storage balance` / `storage topup` | Manage Arweave upload credit |
 | `storage backup-key` | Back up the managed storage key |
+| `vacuum` | Inspect or reclaim space in the local SQLite projection |
 | `deploy-contract` | Deploy exact compiled EVM initcode, including custom hooks and renderers |
 | `deploy-resolver` / `deploy-effects` | Deploy self-hosted services |
 | `remote` | Inspect or test a conforming hosted service |
@@ -122,56 +124,13 @@ before authorization or broadcast.
 
 ### Structured deploy plan (`--dry-run --json`)
 
-Every `deploy` / `deploy-series` / `deploy-code` emit — preview and real send alike, across every
-product lane (1/1, editions, Series, code) and `deploy-code --resume` — carries a `plan` object
-alongside the existing fields, versioned with a `schemaVersion` so it can evolve without breaking a
-consumer that pins a version. It covers what the human preview already prints, structured for a
-script instead of scraped from prose: the wallet transaction/approval count and ordered signing
-stages (always ending with `"deploy"` itself when non-null), expected signer/owner/royalty/minter/
-payee roles, custody and URI-resolution choices (including the on-chain renderer address and, for a
-single-file `--onchain-image` lane, that file's byte size/staged size/MIME type/keccak256), the mint
-plan, a cost estimate where one is genuinely computed, and every warning that run raised. A field a
-given lane has no answer for is reported as `null`, never silently absent.
+`deploy`, `deploy-series`, and `deploy-code` include a versioned `plan` object in JSON output. It
+contains the signing lane, transaction groups, roles, royalties, custody, mint plan, estimates,
+warnings, required public surfaces, dependencies, and resume state. Unknown values are `null`.
 
-```json
-{
-  "command": "deploy-code",
-  "address": null,
-  "plan": {
-    "schemaVersion": 2,
-    "family": "code",
-    "lane": "send",
-    "transactions": {"approvals": 2, "legs": ["chunks", "onchain-uri", "mints", "deploy"]},
-    "roles": {"signer": "0x...", "owner": "0x...", "royaltyReceiver": "0x...", "primaryPayee": null, "minter": null},
-    "royalty": {"bps": 500, "capBps": 1000, "burnable": false},
-    "custody": {"onChainUri": true, "imageOnChain": null, "backend": null, "tokenUriBase": null, "contractUriBase": null, "renderer": "0x...", "image": null},
-    "mint": {"deferred": false, "count": 1, "amountPerId": null, "recipient": "0x..."},
-    "estimate": {"ethApprox": "0.00058", "gasApprox": "546712"},
-    "warnings": [],
-    "surfaces": {"thumbnail": {"ok": false, "detail": "..."}, "traits": {"ok": true, "detail": "..."}, "postParams": {"ok": true, "detail": "..."}},
-    "dependencies": {"count": 0, "registry": null},
-    "resume": null
-  }
-}
-```
-
-`custody.image` is populated only on the single-file image lanes (`deploy --onchain-image`, with or
-without `--copies`) — a Series/Series-edition stages one file PER token, so no single-file shape fits
-and it stays `null` there even with `imageOnChain: true`.
-
-A `deploy-code` setup (the script chunks, PostParam schemas, dependency declarations, on-chain-URI
-legs, and reserve mints) rides one combined transaction when it fits — the example above. A large
-on-chain script splits that setup into several gas-bounded transactions instead of failing against
-the `eth_estimateGas` allowance, ordered chunks, then config, then mints strictly last (chunk writes
-and config setters are idempotent, so `--resume` finishes an interruption at any split point; a mint
-is not, which is why it always rides last). `transactions.approvals` always reports the real
-transaction count for the whole plan — read it rather than assuming 2 — and `legs` still names the
-GROUPS riding it, not a literal per-transaction count.
-
-This is deliberately NOT a rewrite of the human preview: the prose above it is unchanged, byte for
-byte, and is still the primary surface for a person reading a terminal. The plan object is an
-additional, machine-checkable projection of the same facts, kept in sync by a CI test that fails if a
-future change adds a value to the prose without adding it to the plan.
+`transactions.approvals` is the number of wallet approvals. `transactions.legs` names the logical
+groups they contain. Large code deployments may split setup across transactions. `deploy-code
+--resume` continues the idempotent setup steps, and reserve mints run last.
 
 ## Agent skill and updates
 

@@ -191,7 +191,7 @@ export function renderArtifactKey(
 }
 
 /**
- * The **bound** effect outputs — `site/content/docs/protocol/effects.mdx → Bound vs referenced`. An output is
+ * The **bound** effect outputs (`site/content/docs/protocol/effects.mdx#metadata-binding`). An output is
  * bound iff a binding stitches its *content* into the metadata JSON, which is what decides who holds
  * its bytes:
  *

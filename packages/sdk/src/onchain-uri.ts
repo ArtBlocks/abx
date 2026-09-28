@@ -2,8 +2,8 @@
  * The on-chain tokenURI lane for code projects (`abx deploy-code --onchain-uri`) — pure leg
  * composition + the verify-time honesty reads, all unit-testable with a mocked client.
  *
- * The lane (site/content/docs/protocol/code-projects.mdx → "The canonical generator — AbxGenerator" +
- * site/content/docs/protocol/metadata.mdx → "URI resolution"): the collection-scope `animation_url`
+ * The lane (site/content/docs/protocol/code-projects.mdx#rendering +
+ * site/content/docs/protocol/metadata.mdx#uri-resolution): the collection-scope `animation_url`
  * field points at the canonical generator via the `renderer` representation
  * (`abi.encode(address)`), and the token's `tokenURIRenderer` toggles tokenURI to the canonical
  * on-chain metadata renderer (`setContractURIRenderer` does the same for contractURI). Both ride

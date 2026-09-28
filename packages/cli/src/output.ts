@@ -583,8 +583,8 @@ export async function loadEffects(): Promise<typeof import('@artblocks/abx-effec
  * The publish topology's one hard prerequisite, checked BEFORE any capture.
  *
  * A resolver that doesn't share this machine's disk serves referenced output (the still, a video, a
- * model) by **redirect** — so it needs a URL, and it refuses the bytes (`site/content/docs/protocol/effects.mdx →
- * Bound vs referenced`). A backend that can't name a locator therefore has no publish lane at all,
+ * model) by **redirect** — so it needs a URL, and it refuses the bytes
+ * (`site/content/docs/protocol/effects.mdx#metadata-binding`). A backend that can't name a locator therefore has no publish lane at all,
  * and every render against one would be work spent to earn a 400.
  *
  * So this refuses up front and names the ways out, rather than warning and letting the render run.

@@ -1,13 +1,13 @@
 {
-  "title": "Start",
+  "title": "Use ABX",
   "icon": "Terminal",
   "pages": [
     "quickstart",
     "installation",
     "agent-and-skill",
+    "creator-wallet",
     "guides",
     "remote-services",
-    "creator-wallet",
     "self-hosting",
     "upgrading"
   ]

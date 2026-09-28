@@ -3,23 +3,21 @@ title: "Creator wallet"
 description: "Deploy on eligible Base networks without bringing a funded wallet."
 ---
 
-ABX Services can give a verified account one embedded creator wallet. The wallet address stays tied
-to the account's email and API key; the API key cannot sign.
+ABX Services gives each verified account one creator wallet. The API key identifies the account but
+cannot sign transactions.
 
-Gas sponsorship is supported on **Base Sepolia** and **Base**. Base mainnet protocol support remains
-beta. Sponsorship may be limited or paused. When it is available, it is the recommended path for a
-first testnet launch: no private key, funded wallet, or faucet visit is required.
+The [network table](/docs/reference/deployments) shows where sponsorship is available. Sponsorship may
+be limited or paused. Start on a testnet.
 
 ```bash
 abx auth login
 abx remote abx
-abx deploy ... --dry-run --json
-abx deploy ... --sponsor
+abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --dry-run --json
+abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor
 ```
 
-For the real send, match the code shown by the CLI, review the transaction group, and approve it.
-Sponsored operations cannot send ETH. If sponsorship is unavailable or the operation is not
-eligible, use your own wallet with `--send`, `--sign`, or `--unsigned`.
+Match the code shown by the CLI, review the transaction group, and approve it. Sponsored operations
+cannot send ETH. If the operation is not eligible, use `--send`, `--sign`, or `--unsigned`.
 
-Prove the exact flow on Base Sepolia before using Base. On Base, review the production-network
-warning, transaction group, and every permanent choice before approving.
+Run the same flow on the paired testnet before using a production network. Check the network, value,
+and permanent settings before approval.

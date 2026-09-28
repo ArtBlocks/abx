@@ -541,7 +541,7 @@ test('a path for a chain this node does not serve is 400 unsupported_chain + the
 });
 
 // ── the artifact registry: a POINTER registry, not an upload endpoint ─────────────────────────────
-// `site/content/docs/protocol/effects.mdx → Bound vs referenced`. Which form is legal is decided by the output's
+// `site/content/docs/protocol/effects.mdx#metadata-binding`. Which form is legal is decided by the output's
 // BINDING, never by the producer, and BOTH mismatches are loud: accept-and-drop either leaves a token
 // permanently unrenderable (media bytes discarded) or serves a confidently wrong answer (a locator
 // recorded for traits, then never stitched).

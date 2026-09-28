@@ -792,7 +792,7 @@ export async function cmdDeployEffects(flags: Flags) {
   const environmentId = (flags['env-id'] as string | undefined) ?? process.env.ABX_ENVIRONMENT_ID;
   const storageBackend = process.env.ABX_STORAGE_BACKEND;
   // A HOSTED runner holds its own render bytes and hands the resolver a URL — that's the whole
-  // topology (`site/content/docs/protocol/effects.mdx → Bound vs referenced`). The default `fs` writes to the
+  // topology (`site/content/docs/protocol/effects.mdx#metadata-binding`). The default `fs` writes to the
   // runner CONTAINER's disk, which nothing else can reach, so there is no URL to publish: the runner
   // now REFUSES to start on that config. Scaffolding it anyway would just deploy a container that
   // exits, so this is a hard stop rather than the warning it used to be.

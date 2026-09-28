@@ -74,6 +74,7 @@
 import {loadDotEnv} from '@artblocks/abx-sdk/node';
 import {
   type Address,
+  CHAIN_SUPPORT,
   chainSupportByKey,
   DEFAULT_CHAIN_KEY,
   KNOWN_CHAIN_KEYS,
@@ -185,11 +186,28 @@ function assertKnownChainEnv(): void {
         `  This release will not operate on it. Qualify the paired ${support.pairedChain} network and wait for an enabled release.\n\n`,
     );
   } else {
-    const mainnetish = /^(mainnet|homestead|eth|1|8453|4663)$/i.test(key.trim());
+    const productionChains = CHAIN_SUPPORT.filter((chain) => chain.environment === 'production');
+    const productionAliases = new Set([
+      'mainnet',
+      'homestead',
+      'eth',
+      'ethereum',
+      ...productionChains.flatMap((chain) => [chain.key, String(chain.chainId)]),
+    ]);
+    const mainnetish = productionAliases.has(key.trim().toLowerCase());
+    const production = productionChains
+      .filter((chain) => chain.supportLevel !== 'disabled')
+      .map((chain) => `${chain.name} (${chain.key}, ${chain.supportLevel})`)
+      .join(', ');
+    const disabled = productionChains
+      .filter((chain) => chain.supportLevel === 'disabled')
+      .map((chain) => chain.name)
+      .join(', ');
+    const disabledNote = disabled ? ` Disabled: ${disabled}.` : '';
     process.stderr.write(
       `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
         (mainnetish
-          ? `  Base and Robinhood Chain are available as beta with ABX_CHAIN=base or ABX_CHAIN=robinhood. Ethereum remains disabled.\n` +
+          ? `  Selectable production networks: ${production}.${disabledNote}\n` +
             `  Prove the same flow on the paired testnet before using real funds.\n\n`
           : `  Unset it to use the default (${DEFAULT_CHAIN_KEY}), or set one of the above.\n\n`),
     );
@@ -1281,7 +1299,7 @@ function help() {
   console.log(`
   ${bold('abx')} — the ABX CLI · agentic surface of the Self-Host Toolkit
 
-    active chain: ${g(CHAIN)}   select another supported testnet with ${g('ABX_CHAIN=<chain>')} (there is no --chain flag)
+    active chain: ${g(CHAIN)}   select another available network with ${g('ABX_CHAIN=<chain>')} (there is no --chain flag)
 
     ${g('abx demo')}                deploy a 1/1 to ${CHAIN}, index it, and serve it
     ${g('abx deploy')} [--image ..] deploy + index a ${bold('single 1/1')} token (no server)

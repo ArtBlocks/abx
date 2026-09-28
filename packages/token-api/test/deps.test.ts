@@ -1,6 +1,6 @@
 // Registry-aware dependency resolution + the query-string size budget
-// (site/content/docs/protocol/code-projects.mdx "Consumers"; code-projects.md "The canonical
-// generator" / tokenData delivery). The resolution order under test: the collection's
+// (site/content/docs/protocol/code-projects.mdx rendering and token-data sections). The resolution
+// order under test: the collection's
 // registry pointer (availableOnChain → inline the gunzipped bytes → else preferredCDN
 // `<script src>`) → the built-in CDN map (last resort, warns). Resolution NEVER throws —
 // the document always assembles. The URL budget applies only to URL-carried ?abx= lanes

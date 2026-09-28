@@ -1,7 +1,7 @@
 // The publish topology's prerequisite, enforced at the CLI membrane.
 //
 // A resolver you don't share a disk with serves referenced output (the still, a video, a model) by
-// REDIRECT — it takes a URL and refuses the bytes (`site/content/docs/protocol/effects.mdx → Bound vs referenced`).
+// REDIRECT — it takes a URL and refuses the bytes (`site/content/docs/protocol/effects.mdx#metadata-binding`).
 // So a backend that can't name a public URL has no publish lane, and rendering against one is work
 // spent to earn a 400.
 //
