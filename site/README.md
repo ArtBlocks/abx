@@ -19,13 +19,14 @@ under `components/`, `lib/`, and each section's `meta.json`.
 
 ## Analytics
 
-`instrumentation-client.ts` initialises PostHog. Both variables are read at build time and are
-public by design; the project key is write-only and cannot read data back out.
+The site reports page traffic to PostHog (US cloud) from `instrumentation-client.ts`. It is
+disabled unless `NEXT_PUBLIC_POSTHOG_KEY` is set, so local builds and forks send nothing.
 
-| Variable                   | Required | Default                    |
-| -------------------------- | -------- | -------------------------- |
-| `NEXT_PUBLIC_POSTHOG_KEY`  | yes      | unset, analytics disabled  |
-| `NEXT_PUBLIC_POSTHOG_HOST` | no       | `https://us.i.posthog.com` |
+Collection is PostHog's automatic instrumentation: pageviews including client-side navigation,
+pageleaves, autocaptured clicks and form interactions, and rageclicks. Each event carries the
+URL, referrer, campaign parameters, and browser and device details, with location resolved from
+the request IP.
 
-Leave the key unset for local development and forks. Never put a PostHog **personal** API key in a
-`NEXT_PUBLIC_` variable — those are secret and grant read access to the project.
+Every event is anonymous. The site never calls `identify`, and `person_profiles` is left at its
+`identified_only` default, so no person profiles or user records are created. Session replay is
+off, and no personal data is collected.
