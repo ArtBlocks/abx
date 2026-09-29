@@ -20,7 +20,7 @@
   text-align: center;
   padding: 9px 12px;
   border-radius: 8px;
-  font-family: var(--font-mono-face), ui-monospace, monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 12.5px;
   letter-spacing: 0.02em;
   color: var(--color-fd-muted-foreground);
@@ -44,7 +44,7 @@
 .stage {
   padding: 34px 20px 26px;
   color: var(--abx-ink);
-  font-family: var(--font-mono-face), ui-monospace, monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
 }
 
 .row {
@@ -150,7 +150,7 @@
 
 .caption {
   margin-top: 22px;
-  font-family: var(--font-body), sans-serif;
+  font-family: var(--font-sans), sans-serif;
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-fd-muted-foreground);

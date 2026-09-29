@@ -83,7 +83,8 @@
       "decode-uri-component": "^0.5.0",
       "stream-json": "^3.5.0",
       "js-yaml@^3": "3.15.2",
-      "js-yaml@^4": "4.3.2"
+      "js-yaml@^4": "4.3.2",
+      "lucide-react": "file:./site/phosphor-lucide"
     }
   }
 }

@@ -1,22 +1,33 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import { GithubLogo } from '@phosphor-icons/react/ssr';
+import { AbxMark } from '@/components/abx-mark';
 import { gitConfig } from './shared';
 
 export function baseOptions(): BaseLayoutProps {
   return {
+    links: [
+      {
+        type: 'icon',
+        url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
+        text: 'GitHub',
+        label: 'GitHub',
+        icon: <GithubLogo />,
+        external: true,
+      },
+    ],
     nav: {
       title: (
         <span
           style={{
-            fontFamily: 'var(--font-mono-face), ui-monospace, monospace',
-            fontWeight: 700,
-            fontSize: '1.05rem',
-            letterSpacing: '-0.03em',
+            display: 'inline-flex',
+            alignItems: 'center',
+            color: 'var(--page-ink)',
           }}
         >
-          abx<span style={{ color: 'var(--abx-rust)' }}>.</span>
+          <span className="sr-only">ABX</span>
+          <AbxMark width={45} height={24} />
         </span>
       ),
     },
-    githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
   };
 }
