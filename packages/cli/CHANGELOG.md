@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.71
+
+### Patch Changes
+
+- 0a9ed51: Reuse Privy creator-wallet grants across sponsored CLI commands through the native operating-system credential store.
+
 ## 0.1.0-alpha.70
 
 ### Patch Changes
