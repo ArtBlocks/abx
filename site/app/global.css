@@ -248,12 +248,14 @@ html > body[data-scroll-locked] {
   padding: 1.5rem;
   flex-direction: column;
   gap: 1rem;
-  border: none;
+  border: var(--hairline) solid rgb(255 255 255 / 22%);
   border-radius: 4px;
   background: rgb(255 255 255 / 6%);
-  box-shadow: 0 4px 43.7px 9px rgb(0 0 0 / 25%);
+  box-shadow:
+    var(--glass-sheen),
+    0 1px 2px rgb(0 0 0 / 14%),
+    0 4px 43.7px 9px rgb(0 0 0 / 25%);
   backdrop-filter: blur(7px) saturate(115%);
-  overflow: clip;
 }
 
 .prompt-card-header {
