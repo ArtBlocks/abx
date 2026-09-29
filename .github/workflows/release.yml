@@ -39,6 +39,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `changeset publish` runs every package's `prepack` concurrently, and each one is a `tsc -b`
+      # over a project graph that includes packages/sdk. Building once up front leaves those
+      # concurrent builds with nothing to emit, so they can't read a .d.ts another is mid-write.
+      - run: pnpm build
+
       - name: Create Release PR or publish to npm
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
