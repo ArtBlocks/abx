@@ -16,10 +16,13 @@ import {
   type PreparedTx,
 } from '@artblocks/abx-sdk';
 import type {TransactionReceipt} from 'viem';
-import {CreatorAgentAuthorization} from './creator-agent.js';
+import {CreatorAgentAuthorization, CreatorAuthorizationError} from './creator-agent.js';
+import {CreatorKeyringStore} from './creator-keyring.js';
+import {warn} from './output.js';
 import {ABX_SERVICES_URL} from './remote.js';
 
 const SPONSORABLE_BASE_CHAINS = new Set([8_453, 84_532]);
+const CREATOR_GRANTS_URL = 'https://services.abx.io/authorize';
 
 /** Preserve the exact RPC estimate across the JSON service boundary. This is a serialization
  * guard, not a sponsorship-policy ceiling; real EVM transaction limits are many orders of
@@ -178,9 +181,9 @@ function openBrowser(url: string): void {
 }
 
 /**
- * Open one short-lived creator authorization session. The human authorizes the agent once; every
- * exact transaction in this CLI invocation is then signed by that same ephemeral grant. Neither the
- * OAuth token nor the decrypted authorization key is written to disk or returned to callers.
+ * Open a creator authorization session. Privy's rotating grant is retained in the user's native OS
+ * credential store and reused across CLI invocations. The decrypted request-signing key remains
+ * memory-only and every exact transaction is still prepared, signed, and reconciled independently.
  */
 export async function openSponsoredSession(chainKey: string): Promise<SponsoredSession> {
   const chain = resolveChain(chainKey);
@@ -198,19 +201,54 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
     throw new Error(`ABX gas sponsorship is not enabled for ${chain.name} on this account.`);
   }
 
-  const authorization = new CreatorAgentAuthorization({appId: wallet.providerAppId});
+  let persistenceWarningShown = false;
+  const persistenceWarning = () => {
+    if (persistenceWarningShown) return;
+    persistenceWarningShown = true;
+    warn('Could not use the OS credential store. This authorization works for the current command only.');
+  };
+  const store = new CreatorKeyringStore(wallet.providerAppId, wallet.address);
+  let authorization = new CreatorAgentAuthorization({
+    appId: wallet.providerAppId,
+    store,
+    onPersistenceError: persistenceWarning,
+  });
   try {
-    const device = await authorization.start();
-    const verificationUrl = device.verificationUriComplete ?? device.verificationUri;
-    console.log(`\n  Authorize this agent once for the transaction group:`);
-    console.log(`  ${verificationUrl}`);
-    console.log(`  Code: ${device.userCode}\n`);
-    openBrowser(verificationUrl);
-    const wallets = await authorization.wait();
+    let canPersist = true;
+    let newlyApproved = false;
+    let wallets;
+    try {
+      wallets = await authorization.restore();
+    } catch (error) {
+      if (error instanceof CreatorAuthorizationError) throw error;
+      persistenceWarning();
+      canPersist = false;
+      authorization.dispose();
+      authorization = new CreatorAgentAuthorization({appId: wallet.providerAppId});
+      wallets = null;
+    }
+    if (!wallets) {
+      newlyApproved = true;
+      const device = await authorization.start();
+      const verificationUrl = device.verificationUriComplete ?? device.verificationUri;
+      console.log(`\n  Authorize this agent to use your ABX creator wallet:`);
+      console.log(`  ${verificationUrl}`);
+      console.log(`  Code: ${device.userCode}\n`);
+      openBrowser(verificationUrl);
+      wallets = await authorization.wait();
+    }
     const authorized = wallets.find(
       (candidate) => candidate.chainType === 'ethereum' && candidate.address.toLowerCase() === wallet.address.toLowerCase(),
     );
     if (!authorized) throw new Error(`Privy authorized a different wallet; expected ${wallet.address}.`);
+    if (newlyApproved && canPersist) {
+      try {
+        await authorization.remember();
+        console.log(`  Agent access saved in your OS credential store. Manage or revoke it at ${CREATOR_GRANTS_URL}.\n`);
+      } catch {
+        persistenceWarning();
+      }
+    }
 
     const publicClient = makePublicClient({chainKey});
     let closed = false;
@@ -236,7 +274,7 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           data: tx.data,
           gasLimit: sponsoredGasLimit(gas),
         });
-        const signed = authorization.sign({
+        const signed = await authorization.sign({
           walletId: prepared.signingRequest.walletId,
           body: prepared.signingRequest.body,
           idempotencyKey: prepared.signingRequest.idempotencyKey,

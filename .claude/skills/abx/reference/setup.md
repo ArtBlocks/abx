@@ -213,7 +213,9 @@ human confirmation authorizes execution.
 9. Confirm the plan and only then execute.
 
 For an eligible first-party account, `--sponsor` replaces local key and faucet setup with an
-account-bound creator wallet and one short-lived authorization per transaction group. Use it only
-when the live descriptor and account capabilities advertise the active chain. Test the exact flow on
-the reported paired testnet before production. Read [services.md](services.md) before using it.
-Sponsorship is zero-value and never a reason to skip the dry run or transaction summary.
+account-bound creator wallet. The first use opens a Privy agent grant; later commands reuse that
+grant for up to 30 days, unless the creator revokes it first. Do not ask for another browser approval when the
+CLI resumes an existing grant. Use sponsorship only when the live descriptor and account
+capabilities advertise the active chain. Test the exact flow on the reported paired testnet before
+production. Read [services.md](services.md) before using it. Sponsorship is zero-value and never a
+reason to skip the dry run or transaction summary.
