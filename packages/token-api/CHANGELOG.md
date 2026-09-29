@@ -1,5 +1,49 @@
 # @artblocks/abx-token-api
 
+## 0.1.0
+
+### Minor Changes
+
+- 21e3d6c: Drop-in for existing v2 integrations; new deployments use the canonical v3 contracts.
+  Record the synchronized v3 factory generation and testnet deployments, retain full v2 service
+  compatibility (including already-assigned v2 sale minters), and update the renderer scaffold to
+  `abx-contracts` 3.0.0.
+- 9065128: Drop-in for existing clients; service consumers can now inspect verified contract-generation facts.
+  Advertise understood generations and include a project generation in summaries and status responses
+  only when factory provenance and the on-chain core version agree.
+
+### Patch Changes
+
+- 4d5e2b1: Return minimal metadata for unminted token positions and keep their image, data, and live-view URLs unavailable until mint.
+- 8f35dae: Prepare package metadata, release notes, and public-facing source comments for the initial public
+  source release.
+- 719b9fe: Make the bundled skill read network and sponsorship support from CLI capabilities and the live
+  service descriptor instead of a hardcoded network list. Refresh public documentation references in
+  the published packages.
+- Updated dependencies [21e3d6c]
+- Updated dependencies [22abce8]
+- Updated dependencies [4d5e2b1]
+- Updated dependencies [56973c4]
+- Updated dependencies [2290b0a]
+- Updated dependencies [b9197bc]
+- Updated dependencies [8ccbede]
+- Updated dependencies [d925eb1]
+- Updated dependencies [ea57f7a]
+- Updated dependencies [3ddba71]
+- Updated dependencies [8f35dae]
+- Updated dependencies [719b9fe]
+- Updated dependencies [9065128]
+- Updated dependencies [c2400a7]
+- Updated dependencies [3d7fe3c]
+- Updated dependencies [7b462e2]
+- Updated dependencies [ddb2e0b]
+- Updated dependencies [4512962]
+- Updated dependencies [76cfc6a]
+- Updated dependencies [5522192]
+  - @artblocks/abx-sdk@0.1.0
+  - @artblocks/abx-indexer@0.1.0
+  - @artblocks/abx-storage@0.1.0
+
 ## 0.1.0-alpha.52
 
 ### Patch Changes
