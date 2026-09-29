@@ -1,5 +1,12 @@
 # @artblocks/abx-cli
 
+## 0.1.0-alpha.70
+
+### Patch Changes
+
+- 1294757: Make available ABX updates a clear pre-deployment recommendation in the CLI and bundled agent skill,
+  including the matching skill refresh and compatibility expectations for existing projects.
+
 ## 0.1.0-alpha.69
 
 ### Patch Changes
