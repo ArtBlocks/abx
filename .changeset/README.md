@@ -22,19 +22,20 @@ Publishing goes through `pnpm -r publish`, which rewrites `workspace:*` dependen
 concrete published version in each tarball (a plain `npm publish` would ship an uninstallable
 `workspace:*`).
 
-## Pre-release (alpha) mode
+## Release channels
 
-We are in **`alpha`** pre-release mode (`pre.json`), so version bumps stay `0.1.0-alpha.N`. The npm
-`latest` dist-tag points at the current alpha, so `npx abx` resolves it.
+The packages publish stable versions from `main` to npm's `latest` dist-tag. Normal changes should
+use the four-step flow above; do not enter prerelease mode for routine releases.
 
-To graduate to a stable line:
+For a deliberate prerelease cycle, enter Changesets prerelease mode with a named npm dist-tag:
 
 ```sh
-pnpm changeset pre exit   # leave alpha mode
-git commit -am "chore: exit alpha pre-release mode"
+pnpm changeset pre enter alpha
 ```
 
-Then merge the resulting Version Packages PR (the next bump drops the `-alpha.N` suffix).
+Commit that state before merging changes intended for the prerelease line. Existing packages then
+publish under `alpha`, not `latest`. To graduate that line, run `pnpm changeset pre exit`, merge the
+resulting Version Packages PR, and confirm that npm's `latest` dist-tag points to the stable release.
 
 ## Requirements: OIDC trusted publishing (no token)
 
@@ -52,7 +53,8 @@ name:
 | Allowed actions | `npm publish` |
 
 Packages to configure: `@artblocks/abx-sdk`, `@artblocks/abx-indexer`, `@artblocks/abx-storage`,
-`@artblocks/abx-token-api`, `@artblocks/abx-effects`, `@artblocks/abx-cli`.
+`@artblocks/abx-storage-arweave`, `@artblocks/abx-token-api`, `@artblocks/abx-effects`, and
+`@artblocks/abx-cli`.
 
 Notes:
 

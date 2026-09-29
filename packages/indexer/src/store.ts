@@ -451,8 +451,8 @@ export class SqliteStore implements Store {
 
   /** Shape changes that must land BEFORE the schema exec (its indexes reference new columns).
    *  effect_artifacts pre-data-plane shape (key/address/locator only) → drop; the schema recreates
-   *  it. Dropping is safe pre-release: rows are producer-published and self-heal from a runner's
-   *  next sweep (record-on-skip / republish) — no chain data is lost. */
+   *  it. Dropping is safe: rows are producer-published and self-heal from a runner's next sweep
+   *  (record-on-skip / republish) — no chain data is lost. */
   private premigrate(): void {
     const cols = this.db.prepare(`PRAGMA table_info(effect_artifacts)`).all() as Array<{name: string}>;
     if (cols.length > 0 && !cols.some((c) => c.name === 'token_id')) {

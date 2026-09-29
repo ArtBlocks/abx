@@ -17,8 +17,9 @@ private channel is established.
 
 ## Supported versions
 
-ABX is currently alpha and pre-mainnet. Security fixes are applied to the latest published package
-versions and current canonical testnet deployments. Older prereleases are not maintained.
+Security fixes are applied to the latest stable package releases and current canonical deployments
+on supported networks. Older package releases and superseded contract generations are not maintained
+unless the public documentation says otherwise.
 
 ## Operational safety
 

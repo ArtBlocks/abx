@@ -101,9 +101,9 @@ run with Arweave, IPFS, or cloud custody.
 
 Before any transaction on an `experimental` or `beta` network, name the network and support level,
 explain what the transaction or transaction group will do, and state the relevant contract,
-configuration, and real-funds risks. Production beta support is prerelease software without an
-independent third-party audit; bugs, misconfiguration, and nondeterministic agent behavior may cause
-permanent loss. Link to the open source, use-at-your-own-risk implementation at
+configuration, and real-funds risks. ABX has not had an independent third-party audit; bugs,
+misconfiguration, and nondeterministic agent behavior may cause permanent loss. Link to the open
+source, use-at-your-own-risk implementation at
 https://github.com/ArtBlocks/abx. Qualify the same flow on the paired testnet before production.
 
 Use per-chain RPC variables when operating more than one chain. `abx doctor` checks chain identity,
