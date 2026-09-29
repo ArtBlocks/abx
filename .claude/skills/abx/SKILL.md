@@ -24,6 +24,12 @@ typed errors outrank remembered prose.
   inspect configuration safely.
 - Use `pnpm abx …` inside the ABX source repository. Use `abx …` in a creator project or installed
   environment. Run `abx version` if provenance is uncertain.
+- Treat an available CLI update as an action item. Recommend upgrading before further planning or
+  preparing a write: current ABX releases retain support for canonical projects created by earlier
+  releases, and updating local tooling does not change deployed contracts. Never upgrade silently.
+  After an upgrade, run the scope-appropriate `abx skill install`, restart the agent, and rerun
+  `abx doctor` plus any help or dry run used for the plan. If the creator defers, state that the
+  installed version remains behind and use only that version's live help and capabilities.
 - Read the full `chains` array from `abx capabilities --json` before choosing a network. Never
   operate on a `disabled` chain. Call out `experimental` or `beta` status and its risks before a
   transaction. Select with `ABX_CHAIN=<chain>`; there is deliberately no `--chain` flag.
@@ -57,10 +63,11 @@ Follow this state machine instead of accumulating retries:
 
 1. **Discover** — identify the working directory, CLI provenance/version, active chain, artifacts,
    existing contract addresses, configured remote, and signer preference. Run `abx doctor` for a
-   deployment or unfamiliar environment. If the creator has not chosen a signer, inspect the live
-   remote and prefer `--sponsor` when the active chain and command are advertised as eligible;
-   otherwise choose the appropriate bring-your-own lane. Never silently replace an explicit signer
-   choice.
+   deployment or unfamiliar environment. Surface and recommend any available CLI update before
+   planning a deployment or write; do not bury the notice in setup output. If the creator has not
+   chosen a signer, inspect the live remote and prefer `--sponsor` when the active chain and command
+   are advertised as eligible; otherwise choose the appropriate bring-your-own lane. Never silently
+   replace an explicit signer choice.
 2. **Classify surfaces** — decide collection shape, runtime, required public surfaces, custody,
    resolution, authority, mutability, and mint/sale timing. Use the model below.
 3. **Inspect** — run `abx capabilities --json`; for code run `abx inspect` and `abx preview`. For an

@@ -14,6 +14,10 @@ abx skill install
 The skill version is stamped when the CLI ships. `abx doctor` warns when the installed copy no longer
 matches. Run the install command again after each CLI upgrade.
 
+When ABX reports a newer CLI, the agent recommends upgrading before planning a deployment or write.
+Updating local tooling does not change deployed projects, and the current release continues to
+support earlier canonical project generations unless one is explicitly quarantined.
+
 The default install covers Claude Code, Cursor, Codex CLI, Gemini CLI, and GitHub Copilot. To limit the
 install, use one of these:
 

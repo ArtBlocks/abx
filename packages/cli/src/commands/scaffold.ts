@@ -354,8 +354,11 @@ export async function cmdDoctor(flags: Flags) {
     check('binary', true, provenance === 'source' ? 'running the source checkout (not an npm install)' : 'npm install');
   }
   const latest = await checkForCliUpdate(cliVersion);
-  if (latest) check('npm', false, `v${cliVersion} → v${latest} available — npm i -g @artblocks/abx-cli@latest`);
-  else check('npm', true, `v${cliVersion} (or offline — checked at most every 6h)`);
+  if (latest) {
+    check('npm', false, `v${cliVersion} → v${latest} available — upgrade recommended before planning or sending`);
+    console.log(`${CONT}${dim('npm i -g @artblocks/abx-cli@latest · then abx skill install and restart the agent')}`);
+    console.log(`${CONT}${dim('updating local tooling does not change deployed projects; earlier canonical generations remain supported')}`);
+  } else check('npm', true, `v${cliVersion} (or offline — checked at most every 6h)`);
   if (skillNeedsMigration) check('skill ver', false, `legacy skill name remains active — ${skillFix}`);
   else if (skillMissing) check('skill ver', false, 'no installed skill to compare — abx skill install');
   else if (skillStale) check('skill ver', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion}${staleWhere} — ${skillFix}`);

@@ -6,6 +6,7 @@ or preparing a real transaction.
 ## Contents
 
 - [Resolve the tool before the project](#resolve-the-tool-before-the-project)
+- [Upgrade when a release is available](#upgrade-when-a-release-is-available)
 - [Never expose secrets](#never-expose-secrets)
 - [Select the chain explicitly through the environment](#select-the-chain-explicitly-through-the-environment)
 - [Choose one signing lane](#choose-one-signing-lane)
@@ -38,6 +39,38 @@ the old folder manually. Restart the agent after installation.
 ABX requires Node 22.13 or newer. Prefer a project-local npm dependency for reproducible automation;
 use a global install for interactive machine-wide use. Avoid repeated `npx` execution when version
 provenance matters because caches can outlive an upgrade.
+
+## Upgrade when a release is available
+
+Treat an `update available` notice or an outdated `npm` row in `abx doctor` as a recommendation to
+upgrade before planning a deployment or preparing a write. Do not silently change a global install
+or a project's dependencies; tell the creator which version is installed, which version is
+available, and give the command for that install:
+
+```bash
+# Global install
+npm install -g @artblocks/abx-cli@latest
+
+# Project-local install
+npm install --save-dev @artblocks/abx-cli@latest
+```
+
+The latest ABX release retains support for canonical projects made with earlier releases unless a
+specific contract generation is explicitly quarantined for a security or correctness reason.
+Updating the CLI does not redeploy or mutate a project. New deployments may use newer factories or
+defaults, so rerun help, capabilities, and the JSON dry run after upgrading.
+
+Then refresh the copied skill in the same scope reported by the CLI, restart the agent, and check the
+environment again:
+
+```bash
+abx skill install           # project copy
+abx skill install --global  # global copy, when reported
+abx doctor
+```
+
+If the creator defers the upgrade, say so once and continue only with the installed release's live
+help and capability output. Never assume a newer flag or behavior exists in an older binary.
 
 ## Never expose secrets
 
