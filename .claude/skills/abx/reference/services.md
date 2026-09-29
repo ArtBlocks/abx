@@ -87,10 +87,15 @@ resolver and verify the resulting public surfaces as described in [hosting.md](h
 
 An account with a verified email can use one persistent ABX creator wallet. The
 `ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` discovers the provider's
-`abx-creator-wallet/v1` endpoint, provisions or reuses the wallet, starts a Privy device authorization,
-and asks the human to match one code before an agent may
-sign the exact transaction group. Tokens and signing material stay in memory for that command and
-are discarded afterward.
+`abx-creator-wallet/v1` endpoint and provisions or reuses the wallet. The first sponsored command
+asks the human to match one code and approve a Privy agent grant. The CLI keeps the rotating grant in
+the operating system's credential store and reuses it for up to 30 days, unless the creator revokes
+it first. The request-signing key remains memory-only. A reused grant removes another browser step; it does
+not remove the dry run, transaction summary, or production confirmation.
+
+The approval is authority for the agent to use the creator wallet, not approval of one displayed
+transaction. Review each exact network and transaction plan in the terminal. The creator can inspect
+and revoke active grants at `https://services.abx.io/authorize`.
 
 Treat the live descriptor and account capabilities as the authority for sponsored networks. The
 public [network table](https://docs.abx.io/docs/reference/deployments) is the human-readable summary,
@@ -103,7 +108,8 @@ the paired testnet and repeat the production warning before confirmation. Before
 3. run the same command with `--dry-run --json`;
 4. summarize the network, creator-wallet address, transaction group, zero value, permanent choices,
    and any experimental or beta status;
-5. after approval, repeat with `--sponsor`.
+5. repeat with `--sponsor`; if no usable grant exists, give the human the verified URL and code and
+   resume the same command after approval.
 
 The lane accepts zero-value calls and receipt-dependent staged content groups up to the live network
 and provider policy. ABX does not impose an additional per-transaction gas ceiling. Use

@@ -16,8 +16,13 @@ abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --dry-run
 abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor
 ```
 
-Match the code shown by the CLI, review the transaction group, and approve it. Sponsored operations
-cannot send ETH. If the operation is not eligible, use `--send`, `--sign`, or `--unsigned`.
+The first sponsored command asks you to match a code and approve the agent. ABX stores the grant in
+your operating system's credential store and reuses it for up to 30 days, unless you revoke it first. You
+still review the network and transaction plan in your terminal before each send.
+
+[Manage agent access](https://services.abx.io/authorize) to review or revoke active grants.
+Sponsored operations cannot send ETH. If the operation is not eligible, use `--send`, `--sign`, or
+`--unsigned`.
 
 Run the same flow on the paired testnet before using a production network. Check the network, value,
 and permanent settings before approval.
