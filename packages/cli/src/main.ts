@@ -279,7 +279,9 @@ async function maybeNotifyUpdate(flags: Flags): Promise<void> {
       // real per-release notes, so it's readable offline and always matches the version you have.
       console.error(
         `\n    ${c.orange}⚠${c.reset}  update available: ${bold('abx')} ${dim(current)} → ${g(latest)}\n` +
+          `       ${bold('recommended: upgrade before planning or sending')} ${dim('· earlier canonical ABX projects remain supported')}\n` +
           `       upgrade: ${g('npm i -g @artblocks/abx-cli@latest')} ${dim('· or invoke:')} ${g('npx @artblocks/abx-cli@latest <command>')}\n` +
+          `       after upgrading: ${g('abx skill install')} ${dim('then restart the agent and rerun abx doctor')}\n` +
           `       release notes: ${g('CHANGELOG.md')} ${dim('(ships with the CLI) · all versions: https://www.npmjs.com/package/@artblocks/abx-cli?activeTab=versions')}\n` +
           `       ${dim('silence: ABX_NO_UPDATE_CHECK=1')}\n`,
       );

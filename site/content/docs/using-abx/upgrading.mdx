@@ -9,6 +9,11 @@ ABX is pre-1.0. Check the CLI version before debugging a missing command or unex
 abx version
 ```
 
+When the CLI reports an update, upgrade before planning a deployment or preparing a write. The
+latest ABX release supports canonical projects created by earlier releases unless a contract
+generation is explicitly quarantined for a security or correctness reason. Updating the CLI does
+not redeploy or change an existing project.
+
 ## Global install
 
 ```bash
@@ -31,8 +36,9 @@ itself. The check is disabled in CI and does nothing when offline.
 The skill is versioned with the CLI but copied into your agent directory. Reinstall it after every CLI
 upgrade.
 
-New releases may point new deployments at newer factories or shared contracts. Existing projects keep
-the addresses stored at deployment. Run `abx verify <address>` to inspect one.
+New releases may point new deployments at newer factories or shared contracts. Existing projects
+keep the addresses stored at deployment. Rerun help, capabilities, and the dry run after upgrading.
+Run `abx verify <address>` to inspect an existing project.
 
 Release notes ship in the package `CHANGELOG.md` and on
 [npm](https://www.npmjs.com/package/@artblocks/abx-cli?activeTab=versions).
