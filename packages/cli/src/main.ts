@@ -232,7 +232,7 @@ function warnActiveChainRisk(cmd: string | undefined): void {
   }
   process.stderr.write(
     `\n\u001b[38;5;215m⚠\u001b[0m ${support.name} production beta (chain ${support.chainId}).\n` +
-      `  Real funds and irreversible state are at risk. ABX is prerelease software and has not had an independent third-party audit.\n` +
+      `  Real funds and irreversible state are at risk. ABX has not had an independent third-party audit.\n` +
       `  Prove the flow on ${support.pairedChain}; verify the network, signer, actions, value, and locks before sending. Use at your own risk.\n\n`,
   );
 }

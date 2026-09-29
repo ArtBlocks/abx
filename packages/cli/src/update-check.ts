@@ -23,7 +23,7 @@ import {findCliPackageRoot, findRepoRoot} from './output.js';
 
 const REGISTRY = 'https://registry.npmjs.org';
 const PKG = '@artblocks/abx-cli';
-// How long a check is cached. 6h rather than a day because releases land fast in the alpha line: a
+// How long a check is cached. 6h rather than a day because releases can land quickly: a
 // 24h cache let someone work a whole session — deploys included — against a CLI that had been
 // superseded that morning and never hear about it. 6h caps that at roughly one sitting.
 const TTL_MS = 6 * 60 * 60 * 1000;
@@ -67,8 +67,8 @@ export function readSdkVersion(): string {
 
 /**
  * Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b. Handles the
- * prerelease rule (1.0.0-alpha < 1.0.0) since our own versions are prereleases today
- * (0.1.0-alpha.0). Build metadata (+…) is ignored per semver. Tolerant of a leading `v`.
+ * prerelease rule (1.0.0-alpha < 1.0.0) so stable and prerelease channels compare correctly.
+ * Build metadata (+…) is ignored per semver. Tolerant of a leading `v`.
  */
 export function compareVersions(a: string, b: string): number {
   const pa = parseSemver(a);
@@ -153,12 +153,9 @@ function parseSemver(v: string): {main: [number, number, number]; pre: string[]}
  * identifier is a version counter, not a channel name).
  *
  * Why this exists: the update check must not depend on prereleases living under `latest`.
- * Today they do — `ci:publish` runs `pnpm -r publish` with no `--tag`, so npm points `latest`
- * at each new alpha and asking for `/latest` happens to find it. That breaks the moment a
- * stable release ships and the pipeline starts publishing prereleases under `--tag alpha`:
- * `/latest` would only ever report the stable, and the nudge would go SILENT for every alpha
- * user with nothing erroring. Resolving the running version's own channel alongside `latest`
- * makes the check correct in both eras, whichever tag the pipeline uses.
+ * Once a stable line exists, Changesets publishes prereleases under their named dist-tag, so
+ * `/latest` reports only the stable line. Resolving the running version's own channel alongside
+ * `latest` keeps the nudge correct for both stable and prerelease users.
  */
 export function prereleaseChannel(version: string): string | null {
   const first = parseSemver(version).pre[0];
