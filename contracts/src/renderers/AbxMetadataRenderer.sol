@@ -126,6 +126,19 @@ interface ICollectionName {
 ///      `initialize` ABI moved. (`SeriesCode` had 862 bytes of EIP-170 headroom; the getter pair the
 ///      design first called for measured 909.)
 ///
+/// @dev **v12:** stored image bytes declare their media type. Through v11 every `inline` / `reader`
+///      `image` was wrapped as `data:image/svg+xml`, whatever the bytes were — while the CLI staged
+///      JPEG, PNG, GIF and WebP files behind a `reader` field. The served `image` was a raster
+///      labelled SVG, which browsers and marketplaces refuse to draw, and nothing in the document
+///      said so: the bytes matched the source file exactly, only the label was wrong.
+///
+///      The type is DECLARED, never sniffed, in the reserved field {F_IMAGE_TYPE}
+///      (`abx_image_type`, `inline`, token scope then collection scope — the same fallback the
+///      `image` field itself takes). Unset or malformed → `image/svg+xml`, so every token that
+///      rendered under v11 renders byte-identically here. Like the gateway keys it is a serving
+///      declaration, not metadata: never projected, never an artifact, and freezable with the
+///      field store's own per-field lock.
+///
 /// @dev **Which keys this renderer projects, and which are the resolver's alone.** The field store is
 ///      one; serving is two planes, and they are not meant to match key-for-key. This renderer emits
 ///      what a chain-reachable representation can produce (`inline` / `reader` / `renderer` / `url` /
@@ -146,7 +159,7 @@ interface ICollectionName {
 ///      party it exists to hold accountable can rewrite is worse than none, so this is a version bump
 ///      and not a silent patch: a project pointed at a v4 renderer must be able to tell.
 contract AbxMetadataRenderer is IAbxMetadataRenderer {
-    uint256 private constant SPEC_VERSION = 11;
+    uint256 private constant SPEC_VERSION = 12;
 
     /// @dev The tokenId a field renderer receives for collection-surface reads (no token).
     uint256 private constant COLLECTION_TOKEN_ID = type(uint256).max;
@@ -190,6 +203,10 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
     bytes32 private constant F_GATEWAY_IPFS = "abx_gateway_ipfs";
     bytes32 private constant F_GATEWAY_ARWEAVE = "abx_gateway_arweave";
 
+    // Reserved field declaring the media type of stored (`inline` / `reader`) image bytes (v12).
+    // Token scope, else collection scope; only `inline` counts. See {_imageType}.
+    bytes32 private constant F_IMAGE_TYPE = "abx_image_type";
+
     /// @dev The public floors, used when a collection states no preference. Constants rather
     ///      than constructor args so the renderer stays argument-free and `predictRenderer()`
     ///      remains `CREATE2(salt, creationCode)` with nothing appended.
@@ -199,6 +216,10 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
     /// @dev The content type inline/`reader` `animation_url` bytes are wrapped with (v4) —
     ///      the twin of the SVG assumption inline/`reader` `image` bytes already ride.
     string private constant CT_HTML = "text/html";
+
+    /// @dev The media type stored image bytes are wrapped with when `abx_image_type` is unset (v1–v11
+    ///      applied it unconditionally).
+    string private constant CT_SVG = "image/svg+xml";
 
     /// @inheritdoc IAbxMetadataRenderer
     function specVersion() external pure returns (uint256) {
@@ -330,7 +351,8 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
     }
 
     /// @dev Required `image`: a `data:` URI / locator if renderable on-chain (token→collection),
-    ///      else a deterministic fallback SVG. Inline/reader bytes are treated as SVG (v1).
+    ///      else a deterministic fallback SVG. Inline/reader bytes are wrapped with the declared
+    ///      `abx_image_type`, else as SVG (v12; see {_imageType}).
     ///      `artifact` (v2) is a data-plane manifest entry for the `renderer` representation —
     ///      the one whose mimeType is declared on-chain (the staticcall returns it); every other
     ///      case returns it empty (the spec's MAY-omit for reserved-key duplicates).
@@ -343,14 +365,14 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
         if (v.length != 0) {
             if (rep == R_INLINE) {
                 return (
-                    _svgDataUri(v),
+                    _dataUri(_imageType(token, tokenId), v),
                     _prov("image", "inline", _scopeNote(_sourceNote(R_INLINE), fromColl)),
                     ""
                 );
             }
             if (rep == R_READER) {
                 return (
-                    _svgDataUri(_readViaReader(v)),
+                    _dataUri(_imageType(token, tokenId), _readViaReader(v)),
                     _prov("image", "reader", _scopeNote(_sourceNote(R_READER), fromColl)),
                     ""
                 );
@@ -612,6 +634,33 @@ contract AbxMetadataRenderer is IAbxMetadataRenderer {
         );
         if (gv.length != 0 && grep == R_INLINE) return string(gv);
         return rep == R_IPFS ? FLOOR_IPFS : FLOOR_ARWEAVE;
+    }
+
+    /// @dev The media type of stored image bytes: the declared `abx_image_type` (token scope, else
+    ///      collection scope) when it is `inline` and a well-formed `image/*` type, else SVG.
+    ///
+    ///      The value is owner-chosen and lands inside a `data:` URI, whose mediatype ends at the
+    ///      first `,` and takes parameters after `;`. An unrestricted string could therefore make
+    ///      part of the type the payload. {_isImageType} admits only `image/` plus a lowercase
+    ///      RFC 6838 subtype, so neither delimiter can appear, and anything else renders exactly as
+    ///      v11 did rather than producing a document no consumer can read.
+    function _imageType(address token, uint256 tokenId) private view returns (string memory) {
+        (bytes32 rep, bytes memory v,) = _field(token, tokenId, F_IMAGE_TYPE);
+        if (rep == R_INLINE && _isImageType(v)) return string(v);
+        return CT_SVG;
+    }
+
+    /// @dev `image/` followed by 1–58 of `[a-z0-9.+-]`, starting with a letter or digit.
+    function _isImageType(bytes memory v) private pure returns (bool) {
+        uint256 n = v.length;
+        if (n < 7 || n > 64) return false;
+        if (!LibString.startsWith(string(v), "image/")) return false;
+        for (uint256 i = 6; i < n; ++i) {
+            uint8 c = uint8(v[i]);
+            bool alnum = (c >= 0x61 && c <= 0x7A) || (c >= 0x30 && c <= 0x39);
+            if (!alnum && (i == 6 || (c != 0x2B && c != 0x2D && c != 0x2E))) return false;
+        }
+        return true;
     }
 
     /// @dev Substitute the decimal `tokenId` for every `{id}` in a URL template.

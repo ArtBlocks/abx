@@ -136,6 +136,8 @@ Important boundaries:
   `--mint-amount` if the original deploy premint ids).
 - `--onchain-image` works for static 721s and editions in hot, wallet, or sponsored lanes. It cannot
   be prepared as one cold `--unsigned` bundle because staged transactions depend on prior receipts.
+  It stores SVG, PNG, JPEG, GIF, WebP, and AVIF files, declaring each raster's type in
+  `abx_image_type`. See `reference/deploy.md` for repairing a raster that serves as SVG.
 - Deploy tested custom hooks/renderers from exact compiled initcode with `abx deploy-contract`.
   ABX sends the bytes; it does not compile, link, audit, or infer constructor types. Test on the
   paired testnet and source-verify before wiring a production address. Under `--sponsor`, the
