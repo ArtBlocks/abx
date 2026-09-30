@@ -20,11 +20,15 @@ const redHatMono = Red_Hat_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://docs.abx.io'),
   title: {
-    default: 'ABX | Put it onchain',
-    template: '%s · ABX',
+    default: 'ABX Docs | Start building',
+    template: '%s | ABX Docs',
   },
   description:
     'Launch, sell, and serve NFTs on Base and other EVM networks with the ABX CLI, SDK, or a coding agent.',
+  // og:image and twitter:image come from app/opengraph-image.png (Next file convention).
+  twitter: {
+    card: 'summary_large_image',
+  },
 };
 
 export default function Layout({ children }: LayoutProps<'/'>) {
