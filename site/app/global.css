@@ -54,11 +54,13 @@
   --terminal-border: var(--feature-divider);
   --terminal-radius: 2px;
 
-  /* Glass material */
-  --glass-edge: rgb(255 255 255 / 38%);
-  --glass-fill: linear-gradient(rgb(255 255 255 / 20%), rgb(255 255 255 / 8%));
-  --glass-sheen: inset 0 1px 0 rgb(255 255 255 / 28%);
-  --glass-blur: blur(7px) saturate(115%);
+  /* Home hero — a flat warm surface, one step darker than the page */
+  --hero-fill: #e6e0d9;
+  --hero-outline: rgb(0 0 0 / 58%);
+  --hero-outline-fill: transparent;
+  --hero-card-border: #a2a2a2;
+  --hero-action-fill: var(--page-ink);
+  --hero-action-ink: #fff;
 
   /* Spacing / layout */
   --space-1: 0.25rem;
@@ -104,6 +106,13 @@
   --built-mono: #c9a77c;
   --built-frost: rgb(3 8 18 / 42%);
   --terminal-fill: color-mix(in srgb, var(--page-background) 86%, var(--page-ink));
+
+  --hero-fill: #09101f;
+  --hero-outline: rgb(255 255 255 / 58%);
+  --hero-outline-fill: rgb(255 255 255 / 6%);
+  --hero-card-border: rgb(255 255 255 / 41%);
+  --hero-action-fill: #f7f5ee;
+  --hero-action-ink: #000;
 
   --color-fd-primary: var(--rust-bright);
   --color-fd-primary-foreground: #030812;
@@ -240,7 +249,6 @@ html > body[data-scroll-locked] {
 }
 
 .prompt-card--hero {
-  z-index: 1;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -248,14 +256,10 @@ html > body[data-scroll-locked] {
   padding: 1.5rem;
   flex-direction: column;
   gap: 1rem;
-  border: var(--hairline) solid rgb(255 255 255 / 22%);
+  border: var(--hairline) solid var(--hero-card-border);
   border-radius: 4px;
-  background: rgb(255 255 255 / 6%);
-  box-shadow:
-    var(--glass-sheen),
-    0 1px 2px rgb(0 0 0 / 14%),
-    0 4px 43.7px 9px rgb(0 0 0 / 25%);
-  backdrop-filter: blur(7px) saturate(115%);
+  background: transparent;
+  box-shadow: none;
 }
 
 .prompt-card-header {
@@ -314,7 +318,7 @@ figure.shiki figcaption {
 .prompt-card--hero .prompt-card-label,
 .prompt-card--hero p,
 .prompt-card--hero button {
-  color: #fff;
+  color: var(--page-ink);
 }
 
 .prompt-card--hero .prompt-card-label,
@@ -323,12 +327,12 @@ figure.shiki figcaption {
 }
 
 .prompt-card--hero button {
-  border-color: rgb(255 255 255 / 50%);
+  border-color: color-mix(in srgb, var(--page-ink) 50%, transparent);
 }
 
 .prompt-card--hero button:hover {
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
+  background: var(--row-hover);
+  color: var(--page-ink);
   opacity: 1;
 }
 

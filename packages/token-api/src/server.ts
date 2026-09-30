@@ -16,6 +16,7 @@ import {
   gatewayConfigFromEnv,
   projectGatewayPrefix,
   projectGatewayUrl,
+  storedImageType,
   type ProjectState,
   type PublicClient,
   type TokenState,
@@ -89,7 +90,7 @@ export interface ServerOptions {
  * representation (token scope first, else the collection-wide field — the same fallback the
  * JSON assembly uses): on-chain content — `inline` / `inline-gzip` / `reader` / `reader-gzip`,
  * all decoded by the shared {@link resolveFieldBytes} (which calls `read(pointer)` for a
- * reader and gunzips the gzip variants) → computed content (`renderer` — eth_call, typed by
+ * reader and gunzips the gzip variants) and typed by the declared `abx_image_type` → computed content (`renderer` — eth_call, typed by
  * the returned contentType; `text/uri-list` means the bytes are a locator the route redirects
  * to) → off-chain custody located by the on-chain `keccak256`/`sha256` hash → graceful
  * placeholder. The node never errors on missing bytes.
@@ -101,7 +102,9 @@ export async function resolveContent(
 ): Promise<{contentType: string; body: Uint8Array | string}> {
   const image = fieldOf(token.fields, F.image) ?? fieldOf(state.collectionFields, F.image);
   const onChain = await resolveFieldBytes(chainClientLazy(), image); // inline / inline-gzip / reader / reader-gzip
-  if (onChain) return {contentType: IMAGE_MEDIA_TYPE, body: onChain};
+  // Stored bytes carry no type of their own: serve the declared `abx_image_type` (SVG when unset) —
+  // the same rule the v12 renderer wraps its `data:` URI with, so both planes label one file alike.
+  if (onChain) return {contentType: storedImageType(token.fields, state.collectionFields), body: onChain};
   // computed on-chain at read (`renderer`) — best-effort: a reverting renderer degrades to the
   // placeholder rather than erroring the route (mirrors the on-chain renderer's fallback rule).
   if (image?.representation === R.renderer) {
@@ -718,7 +721,7 @@ async function serveFieldArtifact(
     const onChain = await resolveFieldBytes(chainClientLazy(), entry);
     if (onChain) {
       res.writeHead(200, {
-        'content-type': await fieldMimeType(chainClientLazy(), state, entry, field, tokenId, display, storage),
+        'content-type': await fieldMimeType(chainClientLazy(), state, entry, field, tokenId, display, storage, token?.fields),
         'cache-control': 'public, max-age=300',
       });
       res.end(onChain);

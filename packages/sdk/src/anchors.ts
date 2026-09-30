@@ -267,7 +267,7 @@ export async function ensureSeriesFactory(
 
 // ── the canonical on-chain renderer ────────────────────────────────────────────
 
-/** Is the configured renderer the spec version this build expects (**v11**)? A behind-spec renderer
+/** Is the configured renderer the spec version this build expects (**v12**)? A behind-spec renderer
  *  is treated as stale so {@link ensureRenderer} deploys a fresh one (greenfield redeploy-freely:
  *  this number is what tells the CLI a deployed renderer predates behavior the current build emits).
  *  Bump in lockstep with `AbxMetadataRenderer.SPEC_VERSION`.
@@ -301,6 +301,10 @@ export async function ensureSeriesFactory(
  *    `source: url` for bytes that live on IPFS. v11 projects them through the collection's
  *    preferred gateway (`abx_gateway_ipfs` / `abx_gateway_arweave`, public floors otherwise). A v10
  *    renderer serves the placeholder SVG for the very same chain state.
+ *  - v11 → v12: stored (`inline` / `reader`) image bytes were always wrapped as `image/svg+xml`, so a
+ *    JPEG or PNG staged with `--onchain-image` was served as SVG and drew as a broken image. v12
+ *    wraps them with the declared `abx_image_type` (SVG when unset). A v11 renderer ignores the
+ *    declaration and keeps mislabelling the raster.
  *
  *  Read `specVersion()` rather than probing for a feature: a capability probe answers yes for every
  *  build that has the feature, which is exactly how a stale factory once reported as current. */
@@ -311,7 +315,7 @@ export async function isCurrentRenderer(publicClient: PublicClient, renderer: Ad
       abi: abxMetadataRendererAbi,
       functionName: 'specVersion',
     })) as bigint;
-    return v === 11n;
+    return v === 12n;
   } catch {
     return false;
   }

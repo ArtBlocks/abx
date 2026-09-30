@@ -44,6 +44,10 @@ Use the CLI's dry run and gas report before choosing this route:
 abx deploy --image ./work.png --onchain-image --dry-run
 ```
 
+Raster images need a declared media type because the chunk store holds only bytes. `--onchain-image`
+writes `abx_image_type` from the file extension for PNG, JPEG, GIF, WebP, and AVIF files. See
+[Stored image type](/docs/protocol/metadata#stored-image-type).
+
 There is no universal RPC ceiling. A document that works through one endpoint may fail through another.
 Code projects provide piecewise reads for large generated documents.
 

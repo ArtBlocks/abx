@@ -13,51 +13,14 @@
   flex-direction: column;
   min-height: inherit;
   overflow: clip;
-  color: #fff;
-}
-
-.media {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.day,
-.night {
-  object-fit: cover;
-  transition: opacity var(--theme-fade) var(--theme-ease);
-}
-
-.day {
-  opacity: 1;
-}
-
-.night {
-  opacity: 0;
-}
-
-:global(html.dark) .day {
-  opacity: 0;
-}
-
-:global(html.dark) .night {
-  opacity: 1;
-}
-
-.scrim {
-  position: absolute;
-  inset: 0;
-  background: rgb(0 0 0 / 20%);
-  transition: background-color var(--theme-fade) var(--theme-ease);
-}
-
-:global(html.dark) .scrim {
-  background: rgb(0 0 0 / 28%);
+  background: var(--hero-fill);
+  color: var(--page-ink);
+  transition:
+    background-color var(--theme-fade) var(--theme-ease),
+    color var(--theme-fade) var(--theme-ease);
 }
 
 .heroBody {
-  position: relative;
-  z-index: 1;
   flex: 1;
   display: flex;
   align-items: center;
@@ -75,7 +38,7 @@
 
 .eyebrow {
   margin: 0;
-  color: #fff;
+  color: var(--page-ink);
   font-family: var(--font-mono);
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
@@ -85,7 +48,7 @@
 
 .hero h1 {
   margin: 0;
-  color: #fff;
+  color: var(--page-ink);
   font-size: clamp(2.5rem, 5vw, 3.375rem);
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-display);
@@ -95,7 +58,7 @@
 
 .lede {
   margin: 0;
-  color: #fff;
+  color: var(--page-ink);
   font-size: var(--text-lg);
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-caps);
@@ -123,7 +86,6 @@
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  box-shadow: 0 4px 43.7px 9px rgb(0 0 0 / 25%);
   transition:
     transform 150ms ease-out,
     background 150ms ease-out,
@@ -132,15 +94,15 @@
 }
 
 .primaryAction {
-  border: var(--hairline) solid transparent;
-  background: #f7f5ee;
-  color: #000;
+  border: var(--hairline) solid var(--hero-action-fill);
+  background: var(--hero-action-fill);
+  color: var(--hero-action-ink);
 }
 
 .secondaryAction {
-  border: var(--hairline) solid rgb(255 255 255 / 58%);
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
+  border: var(--hairline) solid var(--hero-outline);
+  background: var(--hero-outline-fill);
+  color: var(--page-ink);
 }
 
 .primaryAction:hover,
@@ -155,16 +117,14 @@
 }
 
 .facts {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 2rem;
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem var(--page-gutter);
-  border-top: var(--hairline) solid rgb(255 255 255 / 70%);
-  color: #fff;
+  border-top: var(--hairline) solid var(--page-ink);
+  color: var(--page-ink);
   font-family: var(--font-mono);
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
