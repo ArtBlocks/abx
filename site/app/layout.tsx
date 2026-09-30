@@ -17,6 +17,9 @@ const redHatMono = Red_Hat_Mono({
   weight: ['400', '500', '600'],
 });
 
+// Served from public/. Resolved against metadataBase, so it is absolute in the emitted tags.
+const ogImage = '/opengraph-image-ABXdocs.png';
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://docs.abx.io'),
   title: {
@@ -25,9 +28,12 @@ export const metadata: Metadata = {
   },
   description:
     'Launch, sell, and serve NFTs on Base and other EVM networks with the ABX CLI, SDK, or a coding agent.',
-  // og:image and twitter:image come from app/opengraph-image.png (Next file convention).
+  openGraph: {
+    images: [{ url: ogImage, width: 1200, height: 630, type: 'image/png' }],
+  },
   twitter: {
     card: 'summary_large_image',
+    images: [ogImage],
   },
 };
 
