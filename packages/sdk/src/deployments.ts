@@ -76,14 +76,15 @@ export interface ChainDeployment {
  * The cross-chain-identical set — CREATE2 (keyless proxy + `AbxSalts`), so these addresses are the
  * SAME on every chain. Factory addresses list their EIP-1167 implementation; the implementations are
  * identical cross-chain too (a factory does exactly one CREATE at nonce 1 from its own — identical —
- * address). The renderer is **spec v11** — the version `isCurrentRenderer` gates on, and the reason a
+ * address). The renderer is **spec v12** — the version `isCurrentRenderer` gates on, and the reason a
  * behind-spec renderer is treated as stale rather than merely older: each bump changed what the
  * document actually contains (v5 escaped the provenance note, v6 changed rendered output for hostile
  * input, v7 renamed the `artist` collection field to `creator`, v8 retired the `abx_params` block and
  * narrowed provenance to the route a field took rather than a claim about its destination, v9 stopped
  * duplicating a computed image into `artifacts`, which changes what the document contains, v10 added
- * four reserved keys neither plane emitted, and v11 moved `ipfs`/`arweave` out of the fallback set:
- * a v10 renderer serves the placeholder SVG for chain state a v11 renderer resolves).
+ * four reserved keys neither plane emitted, v11 moved `ipfs`/`arweave` out of the fallback set —
+ * a v10 renderer serves the placeholder SVG for chain state a v11 renderer resolves — and v12 wraps
+ * stored image bytes with the declared `abx_image_type` instead of always labelling them SVG).
  *
  * The delegatecalled write-path libraries are CREATE2-deterministic and identical everywhere too —
  * that is a property of CREATE2, not a lucky accident, and linking a library does not cost the
@@ -122,7 +123,7 @@ const CANONICAL = {
   //      than by forge's automatic linking at salt zero.
   //
   // Implementations are noted inline because a factory's implementation is the code a clone runs;
-  // `abxVersion()` reads 3 on all six, and `specVersion()` reads 11 on the renderer.
+  // `abxVersion()` reads 3 on all six, and `specVersion()` reads 12 on the renderer.
   factory: '0x2ff8828a9150401225bB217CAA8b9b5e666a1c97', // impl 0x71D8aeB80Ee9baeAa56Eadc4D4956B1A11E2a0e1
   seriesFactory: '0x83222f791cA243FEb0c1Fef93a8732eCe3001b4b', // impl 0x2a548E83E106c6DdA42076042755ca1E2F15aDCe
   seriesCodeFactory: '0xEAB8a19fEada0DDba2FDE324715eBbB6234B5616', // impl 0x785CD3F74e86E4495c178B5FFCD047c57e699270
@@ -130,7 +131,7 @@ const CANONICAL = {
   editionFactory: '0xCC29eD68f26693dc9Aa5f090B21F37985206cc19', // impl 0x656794e3608e179088155499f4c25baAF9f19a59
   editionCodeFactory: '0x86f9CFe597ab145452f4A66ac102291d54e8EB46', // impl 0x752533e77F5f6EF87b72B51eb453B631Eb0FbafA
 
-  renderer: '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417', // spec v11
+  renderer: '0xBfa4181cd005b2CA64f8F124456c9fb6111a3A27', // spec v12 (replaces 0x5772249A8fA0bAFfD4B2e3378189465B4dB67417, spec v11)
   chunkStore: '0x1Ca63a4ADEeF5e722ADA25b892BA40E3b2bcB905',
   seedSource: '0xD01d4eDc17F8b4493A43A5e70DCD9813FB1b9A0A',
   fixedPriceMinter: '0xfb5C61274a3A7dA83CcDD88DdEC914438244E2c9',

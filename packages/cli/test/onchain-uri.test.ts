@@ -31,7 +31,9 @@ test('isCurrentRenderer gates on the same SPEC_VERSION the renderer contract dec
   // `abx_provenance` note — a v4 renderer will forge provenance on request, so this gate is a
   // security floor, not just a feature floor. v11 projects `ipfs`/`arweave` through the
   // collection's preferred gateway; a v10 renderer serves the placeholder SVG for the same state.
-  assert.equal(gate![1], '11');
+  // v12 wraps stored image bytes with the declared `abx_image_type`; a v11 renderer labels a stored
+  // JPEG as SVG.
+  assert.equal(gate![1], '12');
 
   const sol = resolve(dirname(fileURLToPath(import.meta.url)), '../../../contracts/src/renderers/AbxMetadataRenderer.sol');
   const declared = /SPEC_VERSION\s*=\s*(\d+)\s*;/.exec(readFileSync(sol, 'utf8'));

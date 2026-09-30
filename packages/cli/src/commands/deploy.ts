@@ -195,6 +195,7 @@ import {
   sessionStagingSender,
   stageImageField,
   stageImageFieldsBatch,
+  storedImageTypeFor,
 } from '../ownerops.js';
 import {canonicalLabel} from '../remote.js';
 import {assertLaneCanSign, confirmSend, gatedSend, laneFromFlags} from '../riskgate.js';
@@ -1082,7 +1083,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // doesn't depend on the clone address) and bake it as a `reader` field below. Ownerless
   // staging tx(s) via the env key; the deploy then references the manifest. Skipped on a
   // dry run (no bytes written) — we note that a real deploy would stage it.
-  let bakedImage: OnChainFieldInput | undefined;
+  let bakedImage: OnChainFieldInput[] | undefined;
   if (onchainImage) {
     if (!flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
     // On-chain staging is a SEQUENCE (chunk write(s) → the deploy that references the manifest)
@@ -1099,8 +1100,8 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     } else if (lane === 'send') {
       // hot lane: the env key stages now (deployer-independent — the manifest doesn't depend
       // on the clone address), then the deploy below bakes in the reader field.
-      const {field, note} = await stageImageField(flags.image, parseCompress(flags.compress), envStagingSender());
-      bakedImage = field;
+      const {fields, note} = await stageImageField(flags.image, parseCompress(flags.compress), envStagingSender());
+      bakedImage = fields;
       info(note);
     } else {
       // wallet lane: the staging tx(s) are signed by the connecting wallet, so they're deferred
@@ -1121,6 +1122,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   const approvals = onchainImage
     ? (() => {
         const bytes = readFileSync(resolvePath(flags.image as string));
+        storedImageTypeFor(bytes, resolvePath(flags.image as string)); // refuse an unstorable file before any session opens
         const compress = parseCompress(flags.compress);
         const contentPlan = computeContentPlan(bytes, compress);
         planImageFile = {
@@ -1170,7 +1172,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     // dry run staging is skipped (bakedImage undefined), so don't fall through to the inline
     // path — that would mislabel a reader deploy as INLINE. Note the reader path instead.
     const {tokenFields, contentNote} = bakedImage
-      ? {tokenFields: [bakedImage], contentNote: 'content: image staged ON-CHAIN via reader (self-resolving, no custody)'}
+      ? {tokenFields: [...bakedImage], contentNote: 'content: image staged ON-CHAIN via reader (self-resolving, no custody)'}
       : onchainImage
         ? {tokenFields: [] as OnChainFieldInput[], contentNote: 'content: image would be staged ON-CHAIN via reader (chunk store) — dry run skips the staging write'}
         : await prepareContent(flags.image, clone, storageOverrides(flags), !dryRun, onChainUri, uploadRemoteEth, deployer, flags);
@@ -1349,8 +1351,8 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
       const signer = await session.connect();
       deployerAddr = signer;
       // Stage on-chain through the session (sets bakedImage, which buildForDeployer reads below).
-      const {field, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
-      bakedImage = field;
+      const {fields, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
+      bakedImage = fields;
       info(note);
       const {clone: predicted, params, salt, contentNote} = await buildForDeployer(signer);
       info(contentNote);
@@ -1373,8 +1375,8 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
         throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
       }
       deployerAddr = session.address;
-      const {field, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
-      bakedImage = field;
+      const {fields, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
+      bakedImage = fields;
       info(note);
       const {clone: predicted, params, salt, contentNote} = await buildForDeployer(session.address);
       info(contentNote);
@@ -1733,13 +1735,13 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   }
 
   step(`Deploy an edition of "${name}" to ${CHAIN}`);
-  let bakedImage: OnChainFieldInput | undefined;
+  let bakedImage: OnChainFieldInput[] | undefined;
   // On the WALLET lane staging cannot happen here — it has to run inside the sign session, after the
   // connect, so the connecting wallet pays for and owns every chunk write. `stageNow` is the hot-lane
   // (and dry-run) path; the session branch below calls the same helper with a session-backed sender.
   const stageOnChainImage = async (sender: Parameters<typeof stageImageField>[2]): Promise<void> => {
-    const {field, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sender);
-    bakedImage = field;
+    const {fields, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sender);
+    bakedImage = fields;
     info(note);
   };
   if (onchainImage) {
@@ -1770,6 +1772,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   const approvals = onchainImage
     ? (() => {
         const bytes = readFileSync(resolvePath(flags.image as string));
+        storedImageTypeFor(bytes, resolvePath(flags.image as string)); // refuse an unstorable file before any session opens
         const compress = parseCompress(flags.compress);
         const contentPlan = computeContentPlan(bytes, compress);
         planImageFile = {
@@ -1793,7 +1796,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, deployer);
     const clone = await predictClone(publicClient, {factory, salt});
     const {tokenFields, contentNote} = bakedImage
-      ? {tokenFields: [bakedImage], contentNote: 'content: image staged ON-CHAIN via reader (self-resolving, no custody)'}
+      ? {tokenFields: [...bakedImage], contentNote: 'content: image staged ON-CHAIN via reader (self-resolving, no custody)'}
       : onchainImage
         ? {tokenFields: [] as OnChainFieldInput[], contentNote: 'content: image would be staged ON-CHAIN via reader (chunk store) — dry run skips the staging write'}
         : await prepareContent(flags.image, clone, storageOverrides(flags), !dryRun, onChainUri, undefined, undefined, flags);
@@ -2252,6 +2255,9 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   // wallet-lane session `total` below, computed once so preview/confirm text and the real
   // session can never disagree. TX signatures only — see the 1/1's `approvals` for the same note
   // on why an Arweave message signature doesn't add to this count.
+  // Settle every file's `abx_image_type` now, so an unstorable file is refused on the dry run and
+  // before the first staging tx rather than midway through the batch.
+  if (onchainImage) for (const {path} of tokenPaths) storedImageTypeFor(readFileSync(path), path);
   const approvals = onchainImage
     ? tokenPaths.reduce((n, {path}) => {
         const plan = computeContentPlan(readFileSync(path), compress).plan;
@@ -2294,8 +2300,11 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   const buildImageFields = async (stage?: SendTx): Promise<void> => {
     // --onchain-image: stage every token's bytes into ONE shared chunk store, each a `reader` field.
     if (onchainImage) {
-      const {fields} = await stageImageFieldsBatch(tokenPaths.map((s) => s.path), compress, stage!, flags['chunk-store']);
-      tokenFields = tokenPaths.map(({tokenId}, i) => tokenFieldOf(tokenId, fields[i]));
+      const {fields, typeFields} = await stageImageFieldsBatch(tokenPaths.map((s) => s.path), compress, stage!, flags['chunk-store']);
+      tokenFields = tokenPaths.flatMap(({tokenId}, i) => {
+        const typeField = typeFields[i];
+        return typeField ? [tokenFieldOf(tokenId, fields[i]), tokenFieldOf(tokenId, typeField)] : [tokenFieldOf(tokenId, fields[i])];
+      });
       return;
     }
     // --onchain-uri + durable backend: image lives off-chain (ipfs/arweave); JSON renders on-chain.
@@ -2926,6 +2935,9 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   // Wallet-signature count for THIS deploy — parity with the 721 Series twin, which prints it and
   // whose count the skill promises "every preview" shows. Same per-id chunk math as that twin, so the
   // preview, the confirm text, and the wallet session's `total` can never disagree.
+  // Settle every file's `abx_image_type` now, so an unstorable file is refused on the dry run and
+  // before the first staging tx rather than midway through the batch.
+  if (onchainImage) for (const {path} of tokenPaths) storedImageTypeFor(readFileSync(path), path);
   const approvals = onchainImage
     ? tokenPaths.reduce((n, {path}) => {
         const plan = computeContentPlan(readFileSync(path), compress).plan;
@@ -2943,8 +2955,12 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
     // field pointing at its manifest. Ported from the 721 Series twin — the edition lane refused this
     // outright before the edition parity work, though nothing on-chain prevented it.
     if (onchainImage) {
-      const {fields} = await stageImageFieldsBatch(tokenPaths.map((s) => s.path), compress, stage!, flags['chunk-store']);
-      tokenPaths.forEach(({tokenId}, i) => tokenFields.push(tokenFieldOf(tokenId, fields[i])));
+      const {fields, typeFields} = await stageImageFieldsBatch(tokenPaths.map((s) => s.path), compress, stage!, flags['chunk-store']);
+      tokenPaths.forEach(({tokenId}, i) => {
+        tokenFields.push(tokenFieldOf(tokenId, fields[i]));
+        const typeField = typeFields[i];
+        if (typeField) tokenFields.push(tokenFieldOf(tokenId, typeField));
+      });
       if (seriesTraitsOnchain) for (const [tokenId, attrs] of seriesTraits) tokenFields.push(tokenFieldOf(tokenId, attributesInlineField(attrs)));
       info(`uri()/contractURI() resolve ON-CHAIN via the renderer — the image BYTES are on-chain too, nothing off-chain at all.`);
       return;
