@@ -68,26 +68,3 @@ export function BrandKitAssets() {
     </div>
   );
 }
-
-const colors = [
-  {name: 'Paper', value: '#F7F5EE', className: styles.paper},
-  {name: 'Ink', value: '#000000', className: styles.ink},
-  {name: 'Night', value: '#030812', className: styles.night},
-  {name: 'Rust', value: '#974020', className: styles.rust},
-];
-
-export function BrandPalette() {
-  return (
-    <div className={styles.palette}>
-      {colors.map((color) => (
-        <div className={styles.swatch} key={color.value}>
-          <span className={`${styles.color} ${color.className}`} aria-hidden />
-          <span>
-            <strong>{color.name}</strong>
-            <code>{color.value}</code>
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
