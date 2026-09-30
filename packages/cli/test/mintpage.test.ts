@@ -126,5 +126,7 @@ test('PUBLIC_RPC: known chains have a keyless endpoint — INCLUDING the default
   assert.ok(PUBLIC_RPC[8453]);
   assert.ok(PUBLIC_RPC[11155111]);
   assert.ok(PUBLIC_RPC[1]);
+  assert.ok(PUBLIC_RPC[42161]);
+  assert.ok(PUBLIC_RPC[421614]);
   assert.doesNotMatch(PUBLIC_RPC[11155111], /apiKey|infura|alchemy/i);
 });

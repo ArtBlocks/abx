@@ -11,9 +11,11 @@ test('env-key consent follows the shared chain environment registry', () => {
   assert.equal(envKeyRequiresYes('base-sepolia'), false);
   assert.equal(envKeyRequiresYes('sepolia'), false);
   assert.equal(envKeyRequiresYes('robinhood-testnet'), false);
+  assert.equal(envKeyRequiresYes('arbitrum-sepolia'), false);
   assert.equal(envKeyRequiresYes('base'), true);
   assert.equal(envKeyRequiresYes('robinhood'), true);
   assert.equal(envKeyRequiresYes('ethereum'), true);
+  assert.equal(envKeyRequiresYes('arbitrum'), true);
   assert.equal(envKeyRequiresYes('unknown-chain'), true);
 });
 

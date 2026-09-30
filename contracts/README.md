@@ -404,23 +404,23 @@ forge verify-contract <addr> src/renderers/AbxChunkStore.sol:AbxChunkStore \
   --chain sepolia --compilation-profile default --watch
 ```
 
-Run it for each deployed chain (`--chain sepolia`, `--chain base-sepolia`, `--chain base`, or
-`--chain mainnet`). Robinhood Chain explorers use Blockscout: pass chain ID `46630` (testnet) or
-`4663` (production), `--verifier blockscout`, and the matching explorer API URL from Robinhood's
-official deployment guide.
+Run it for each deployed chain (`--chain sepolia`, `--chain base-sepolia`, `--chain base`,
+`--chain arbitrum-sepolia`, `--chain arbitrum`, or `--chain mainnet`). Robinhood Chain explorers use
+Blockscout: pass chain ID `46630` (testnet) or `4663` (production), `--verifier blockscout`, and the
+matching explorer API URL from Robinhood's official deployment guide.
 `--compilation-profile default` is required whenever the build cache holds more than one profile
 (otherwise forge stops with *"Ambiguous compilation profiles found in cache"*).
 
-If Robinhood's Blockscout API returns a Cloudflare HTML challenge to non-browser clients, submit the
-same source to Sourcify and require `Status: exact_match`; do not weaken the check to a similarity
-match. Sourcify also attempts to forward successful verification to the explorer, but the Sourcify
-record and explorer display are separate outcomes:
+If an explorer API is unavailable, submit the same standard compiler input to Sourcify and require
+`match: exact_match` and `runtimeMatch: exact_match`; do not weaken the check to a similarity match.
+Sourcify also attempts to forward successful verification to explorers, but its record and an
+explorer display are separate outcomes.
 
-```bash
-ETHERSCAN_API_KEY=unused forge verify-contract <addr> <source>:<contract> \
-  --chain-id 4663 --rpc-url https://rpc.mainnet.chain.robinhood.com \
-  --verifier sourcify --compilation-profile default --watch
-```
+Sourcify's legacy v1 API was retired on July 7, 2026. Use a Foundry release that targets the v2 API,
+or generate standard JSON with `forge verify-contract --show-standard-json-input` and submit it to
+[`POST /v2/verify/{chainId}/{address}`](https://docs.sourcify.dev/docs/api/). Poll the returned job,
+then read the public contract record before declaring verification complete. An `Invalid API Key`
+response from an older `forge --verifier sourcify` is tooling drift, not verification evidence.
 
 **Three settings matter, each on a different set of paths.** Miss any and a verifier returns the same
 unhelpful *"Compiled contract deployment bytecode does NOT match"*:
