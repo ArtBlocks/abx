@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import {ArrowRight} from '@phosphor-icons/react/ssr';
 import {PromptCard} from '@/components/prompt-card';
@@ -9,26 +8,6 @@ export default function HomePage() {
   return (
     <main className={`${styles.home} [grid-area:main]`} data-layout-main="">
       <section className={styles.hero}>
-        <div className={styles.media} aria-hidden>
-          <Image
-            src="/hero/marfa-day.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className={styles.day}
-          />
-          <Image
-            src="/hero/marfa-night.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className={styles.night}
-          />
-          <div className={styles.scrim} />
-        </div>
-
         <div className={styles.heroBody}>
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>ABX Docs</p>
