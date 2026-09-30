@@ -20,7 +20,7 @@
         "editionFactory": "0xCC29eD68f26693dc9Aa5f090B21F37985206cc19",
         "editionCodeFactory": "0x86f9CFe597ab145452f4A66ac102291d54e8EB46"
       },
-      "note": "Current production-candidate factory generation. Runtime behavior matches the final v2 generation apart from its reported core version."
+      "note": "Current canonical factory generation. Runtime behavior matches the final v2 generation apart from its reported core version."
     },
     {
       "id": "abx-core-v2",

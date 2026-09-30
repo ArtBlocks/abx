@@ -4,9 +4,9 @@
 # setup-node's `registry-url` (it creates an npmrc that interferes with pnpm's token exchange).
 # Packages must configure this repository as a trusted publisher on npmjs.com.
 #
-# The repository is in Changesets alpha mode. Before a stable release, run `pnpm changeset pre exit`.
-# Prereleases currently land on `latest`; once a stable line exists, publish prereleases with the
-# `alpha` dist-tag instead.
+# Stable releases publish from `main` to npm's `latest` dist-tag. A deliberate prerelease cycle must
+# enter Changesets prerelease mode with `pnpm changeset pre enter <tag>`; Changesets then publishes
+# existing packages under that dist-tag until `pnpm changeset pre exit` completes the stable release.
 name: Release
 
 on:

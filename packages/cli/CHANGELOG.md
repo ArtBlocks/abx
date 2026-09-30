@@ -1,5 +1,109 @@
 # @artblocks/abx-cli
 
+## 0.1.0
+
+### Minor Changes
+
+- 21e3d6c: Drop-in for existing v2 integrations; new deployments use the canonical v3 contracts.
+  Record the synchronized v3 factory generation and testnet deployments, retain full v2 service
+  compatibility (including already-assigned v2 sale minters), and update the renderer scaffold to
+  `abx-contracts` 3.0.0.
+- 22abce8: Generalize the creator-wallet sponsorship lane to direct zero-value contract creation and
+  receipt-dependent on-chain image staging. Add `abx deploy-contract` for exact Foundry artifact or
+  initcode deployment through any signing lane.
+- ea57f7a: Add provider-neutral remote interface discovery, the ABX Creators account API client, and the Base
+  Sepolia creator-wallet `--sponsor` signing lane. A provider catalog may advertise its account and
+  wallet interfaces at a separate HTTPS origin without changing existing same-origin remotes.
+
+### Patch Changes
+
+- f9d7a44: Clarify fully on-chain image deployment tradeoffs and make static-project verification report
+  `onChainUri.chainComplete` as not applicable instead of false.
+- d50cecd: Classify env-key signing risk from the shared chain registry so newly supported testnets, including
+  Robinhood Chain Testnet, work in bounded autonomous smoke tests without being mistaken for mainnet.
+  The contributor smoke runner now pins one testnet, gives the worker a fresh small-funded wallet,
+  copies only the requested hosted-provider credential, and records evidence without per-transaction
+  prompts. Remote discovery accepts `remote list`, and on-chain image planning now calls out the
+  single-transaction inline-SVG alternative when it applies.
+- 90bde50: Document the supported creator-wallet sponsorship lane in hook, mint, and transfer command help.
+- 70d2761: Make release-candidate automation fail closed: accept the documented hot-signing flag for code
+  editions, simulate purchase dry-runs as the configured hot signer, and return a failed exit status
+  when any requested render fails.
+- b8f2876: Keep sponsored deploy guidance consistent: an ABX creator wallet no longer receives a faucet warning when its native balance is intentionally zero.
+- 56973c4: Preserve `maxInvocations` as an exact uint256 value instead of narrowing it through a JavaScript
+  number. Reuse an existing hosted-service credential on login and add self-service API-key listing
+  and revocation for accounts at their active-key limit.
+- 0a9ed51: Reuse Privy creator-wallet grants across sponsored CLI commands through the native operating-system credential store.
+- c324a8f: Make sponsored deployment previews resolve the existing ABX creator wallet without provisioning external state, so the preview and real send use the same owner, mint recipient, and deterministic salt.
+- 2290b0a: Recover ambiguous creator-wallet submissions through the existing operation status instead of replaying them. Sponsored sends now keep polling safely when the provider response is temporarily unknown and surface the operation ID if reconciliation cannot complete.
+- ee24497: Add machine-readable `--json` output to `contracturi` and `add`. Collection metadata reads now emit
+  the resolved document alone, while registration reports identify the target surface, chain and
+  address, scan floor, lifecycle status, and whether remote catch-up is complete or still backfilling.
+- 8ccbede: Enable Robinhood Chain production as beta after canonical deployment, paired-testnet qualification,
+  and managed-service validation. Surface the same real-funds warning and testnet-first gate used for
+  other production beta networks.
+- d925eb1: Breaking only for SDK callers that directly prepared an unsupported sponsored `to: null` request;
+  drop-in for existing hot, wallet, and unsigned deployments. Route sponsored custom-contract
+  deployments through ABX's existing keyless CREATE2 proxy, expose the exact signer-bound salt and
+  predicted address, verify code after confirmation, and document the proxy constructor-caller boundary.
+- e89896a: Reject deterministic deploy salts reserved to a different signer before authorization or broadcast.
+- 8f35dae: Prepare package metadata, release notes, and public-facing source comments for the initial public
+  source release.
+- 719b9fe: Make the bundled skill read network and sponsorship support from CLI capabilities and the live
+  service descriptor instead of a hardcoded network list. Refresh public documentation references in
+  the published packages.
+- f9ba363: Clarify edition live-supply caps, intentional ERC-721 self-transfer hook callbacks, and OP Stack
+  seed-source behavior in the bundled ABX skill.
+- c2400a7: Stage Robinhood Chain and its testnet as disabled qualification targets, keep the network registry
+  focused on the current roadmap, and stop sale inspection from turning RPC read failures into false
+  zero-state results.
+- cf2708c: Allow the beta creator-wallet sponsorship lane on Base mainnet when the live provider and account explicitly advertise eligibility, while retaining Base Sepolia as the recommended first run.
+- b6f941d: Preserve authorship fields in exact deploy replay commands, keep deferred-mint staging narration
+  accurate, and distinguish chain-resident image bytes from independently hash-verified content.
+- 3d7fe3c: Record the verified canonical Robinhood Chain Testnet deployment and enable the network for
+  experimental qualification with explicit CLI and agent guidance.
+- 66cf489: Mark the qualified creator-wallet sponsorship lane as supported while preserving Base mainnet's protocol-beta warnings.
+- 1294757: Make available ABX updates a clear pre-deployment recommendation in the CLI and bundled agent skill,
+  including the matching skill refresh and compatibility expectations for existing projects.
+- ddb2e0b: Refuse irreversible URI locks when the current token or collection base uses `abx.io`. Clarify that
+  managed resolver URLs must remain mutable unless a creator-controlled domain is routed and verified.
+- 5164922: Teach the bundled agent skill to prefer live-advertised gas sponsorship for eligible operations while
+  keeping hot-key, browser-wallet, and unsigned signing as first-class choices.
+- 4512962: Enable Base production as beta, add a keyless read fallback, and surface production risk and paired-testnet guidance in the CLI, agent skill, and public docs.
+- 76cfc6a: Follow each remote service interface's advertised origin so provider catalogs can separate token data from account and control APIs.
+- 04c0919: Remove ABX's artificial 3,000,000-gas ceiling from sponsored transactions. Sponsored calls now use
+  the network estimate and remain subject to the active chain and provider sponsorship policy.
+- Updated dependencies [21e3d6c]
+- Updated dependencies [22abce8]
+- Updated dependencies [4d5e2b1]
+- Updated dependencies [56973c4]
+- Updated dependencies [2290b0a]
+- Updated dependencies [b9197bc]
+- Updated dependencies [8ccbede]
+- Updated dependencies [d925eb1]
+- Updated dependencies [ea57f7a]
+- Updated dependencies [3ddba71]
+- Updated dependencies [8f35dae]
+- Updated dependencies [719b9fe]
+- Updated dependencies [9065128]
+- Updated dependencies [c2400a7]
+- Updated dependencies [3d7fe3c]
+- Updated dependencies [7b462e2]
+- Updated dependencies [ddb2e0b]
+- Updated dependencies [4512962]
+- Updated dependencies [76cfc6a]
+- Updated dependencies [5522192]
+  - @artblocks/abx-sdk@0.1.0
+  - @artblocks/abx-token-api@0.1.0
+  - @artblocks/abx-indexer@0.1.0
+  - @artblocks/abx-storage@0.1.0
+
+## 0.1.0-alpha.71
+
+### Patch Changes
+
+- 0a9ed51: Reuse Privy creator-wallet grants across sponsored CLI commands through the native operating-system credential store.
+
 ## 0.1.0-alpha.70
 
 ### Patch Changes

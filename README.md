@@ -4,7 +4,7 @@ ABX is an open protocol and toolkit for creating, operating, and serving NFTs. T
 the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
 public documentation.
 
-ABX tooling is prerelease software. ABX is adding EVM networks. See the current
+ABX is adding EVM networks. See the current
 [network table](https://docs.abx.io/docs/reference/deployments) before deploying.
 
 ## Quickstart

@@ -1,5 +1,36 @@
 # @artblocks/abx-indexer
 
+## 0.1.0
+
+### Patch Changes
+
+- 8f35dae: Prepare package metadata, release notes, and public-facing source comments for the initial public
+  source release.
+- 719b9fe: Make the bundled skill read network and sponsorship support from CLI capabilities and the live
+  service descriptor instead of a hardcoded network list. Refresh public documentation references in
+  the published packages.
+- Updated dependencies [21e3d6c]
+- Updated dependencies [22abce8]
+- Updated dependencies [4d5e2b1]
+- Updated dependencies [56973c4]
+- Updated dependencies [2290b0a]
+- Updated dependencies [b9197bc]
+- Updated dependencies [8ccbede]
+- Updated dependencies [d925eb1]
+- Updated dependencies [ea57f7a]
+- Updated dependencies [3ddba71]
+- Updated dependencies [8f35dae]
+- Updated dependencies [719b9fe]
+- Updated dependencies [9065128]
+- Updated dependencies [c2400a7]
+- Updated dependencies [3d7fe3c]
+- Updated dependencies [7b462e2]
+- Updated dependencies [ddb2e0b]
+- Updated dependencies [4512962]
+- Updated dependencies [76cfc6a]
+- Updated dependencies [5522192]
+  - @artblocks/abx-sdk@0.1.0
+
 ## 0.1.0-alpha.50
 
 ### Patch Changes

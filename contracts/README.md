@@ -7,10 +7,10 @@ three ERC-721 — **`OneOfOneImage`** (a 1/1), **`SeriesImage`** (a multi-token 
 shared renderer, reader, minter, and seed-source singletons. See the maintained
 [event-spine reference](../site/content/docs/protocol/event-spine.mdx).
 
-> **Security status:** ABX tooling is prerelease, and Base network support is beta. The
-> release-candidate contracts are deployed and verified, but the repository does not publish a
-> completed independent third-party audit. Review the source, tests, deployed bytecode, owner
-> powers, and [security policy](../SECURITY.md) before relying on it.
+> **Security status:** Production-network support is beta. The canonical contracts are deployed and
+> verified, but the repository does not publish a completed independent third-party audit. Review
+> the source, tests, deployed bytecode, owner powers, and [security policy](../SECURITY.md) before
+> relying on it.
 
 ## Install as a Solidity dependency
 
@@ -24,7 +24,7 @@ abx-contracts = "3.0.0"
 
 Then run `forge soldeer install` and import, for example,
 `abx-contracts/src/extensions/configurable-params/IAbxParamHooks.sol`. The package major follows
-the core protocol version, independently of CLI prerelease versions. See
+the core protocol version, independently of CLI package versions. See
 [`SOLDEER.md`](SOLDEER.md) for packaging and release policy.
 
 ## Layout — organized by the spine's abstractions

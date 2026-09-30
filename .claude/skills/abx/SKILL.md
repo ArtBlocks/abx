@@ -9,7 +9,7 @@ description: >-
   change an ABX collection, or to determine whether ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
-  version: "0.1.0-alpha.70"
+  version: "0.1.0"
 ---
 
 # ABX
@@ -33,8 +33,8 @@ typed errors outrank remembered prose.
 - Read the full `chains` array from `abx capabilities --json` before choosing a network. Never
   operate on a `disabled` chain. Call out `experimental` or `beta` status and its risks before a
   transaction. Select with `ABX_CHAIN=<chain>`; there is deliberately no `--chain` flag.
-- On a production `beta` network, say that real funds and irreversible state are at risk; ABX is
-  prerelease software without an independent third-party audit; bugs, misconfiguration, and
+- On a production `beta` network, say that real funds and irreversible state are at risk; ABX has
+  not had an independent third-party audit; bugs, misconfiguration, and
   nondeterministic agent behavior may cause permanent loss. Link to https://github.com/ArtBlocks/abx,
   prove the same flow on the paired testnet, and summarize the network, signer, transaction group,
   value, and irreversible choices before asking to send. An environment key may still sign deliberate
