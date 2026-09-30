@@ -1,0 +1,41 @@
+---
+title: "Brand kit"
+description: "ABX marks, attribution lockups, colors, and usage guidance."
+---
+
+Use these files when you refer to ABX or credit the infrastructure behind a project. SVG is the
+preferred format for websites and interfaces. PNG is included for tools that need a raster image.
+
+<BrandKitAssets />
+
+## Attribution
+
+“Built on ABX” is the clearest credit for a project, mint page, or developer tool. Choose the light
+or dark lockup that has the strongest contrast. Link it to [abx.io](https://abx.io) and serve the
+downloaded file from your own site.
+
+```html
+<a href="https://abx.io" aria-label="Built on ABX">
+  <img src="/assets/built-on-abx-light.svg" alt="Built on ABX" width="180" height="56" />
+</a>
+```
+
+Text is fine too: `Built on ABX` or `Powered by ABX`.
+
+## Color and type
+
+<BrandPalette />
+
+ABX uses [Manrope](https://fonts.google.com/specimen/Manrope) for display and body copy and
+[Red Hat Mono](https://fonts.google.com/specimen/Red+Hat+Mono) for code and technical labels. You do
+not need either font to use the mark or attribution lockups.
+
+## Keep it clear
+
+- Keep the mark's proportions and give it room.
+- Use black on a light surface or white on a dark surface.
+- Do not rotate, outline, stretch, recolor, or add effects to the mark.
+- Keep your product's identity primary. Attribution should read as infrastructure credit.
+- Do not imply that ABX or Art Blocks reviewed, certified, or endorsed your project.
+
+Need another format? Open an issue in the [ABX repository](https://github.com/ArtBlocks/abx).
