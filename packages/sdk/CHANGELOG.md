@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- 1cd7c8c: Drop-in for existing consumers; Arbitrum Sepolia is a new opt-in network.
+
+  Add experimental Arbitrum Sepolia support and stage Arbitrum production metadata for its later canonical deployment.
+
 ## 0.2.0
 
 ### Minor Changes
