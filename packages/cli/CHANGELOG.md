@@ -1,5 +1,21 @@
 # @artblocks/abx-cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 1cd7c8c: Drop-in for existing consumers; Arbitrum Sepolia is a new opt-in network.
+
+  Add experimental Arbitrum Sepolia support and stage Arbitrum production metadata for its later canonical deployment.
+
+### Patch Changes
+
+- Updated dependencies [1cd7c8c]
+  - @artblocks/abx-sdk@0.3.0
+  - @artblocks/abx-indexer@0.1.2
+  - @artblocks/abx-storage@0.1.2
+  - @artblocks/abx-token-api@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
