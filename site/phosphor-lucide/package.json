@@ -1,0 +1,20 @@
+{
+  "name": "lucide-react",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phosphor stand-in for the lucide-react imports Fumadocs makes.",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

@@ -3,62 +3,171 @@
 @import 'fumadocs-ui/css/preset.css';
 
 :root {
-  --abx-rust: #a33e25;
-  --abx-sun: #e3a047;
-  --abx-ridge: #c8a77f;
-  --abx-ink: #211c16;
-  --abx-paper: #f6efe3;
-  --color-fd-background: #f2eadc;
-  --color-fd-card: #f8f2e8;
-  --color-fd-muted: #e5dac9;
-  --color-fd-muted-foreground: #625a50;
-  --color-fd-border: #cfc2af;
+  /* Fonts */
+  --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-red-hat-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* Weights — nothing goes to bold */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.5rem;
+  --text-xl: 2rem;
+  --text-display: clamp(2.25rem, 4.4vw, 3.5rem);
+  --label-size: var(--text-sm);
+
+  --tracking-display: -0.02em;
+  --tracking-heading: -0.01em;
+  --tracking-large: 0;
+  --tracking-body: 0.01em;
+  --tracking-caps: 0.06em;
+  --tracking-eyebrow: 0.12em;
+  --label-tracking: var(--tracking-eyebrow);
+
+  --leading-display: 1.1;
+  --leading-heading: 1.2;
+  --leading-large: 1.3;
+  --leading-body: 1.5;
+
+  /* Colors — light */
+  --page-background: #f7f5ee;
+  --page-ink: #000;
+  --body-copy: #2e2a25;
+  --label-muted: #636363;
+  --rust: #974020;
+  --rust-bright: oklch(0.72 0.15 45);
+  --feature-rule: rgb(0 0 0 / 16%);
+  --feature-divider: rgb(0 0 0 / 28%);
+  --row-hover: rgb(0 0 0 / 4%);
+  --built-mono: #5b4425;
+  --built-frost: rgb(20 14 8 / 38%);
+  --field-hint: rgb(255 255 255 / 62%);
+
+  /* Terminal / prompt surfaces — a warm tan step darker than the page */
+  --terminal-fill: color-mix(in srgb, var(--page-background) 88%, var(--built-mono));
+  --terminal-border: var(--feature-divider);
+  --terminal-radius: 2px;
+
+  /* Glass material */
+  --glass-edge: rgb(255 255 255 / 38%);
+  --glass-fill: linear-gradient(rgb(255 255 255 / 20%), rgb(255 255 255 / 8%));
+  --glass-sheen: inset 0 1px 0 rgb(255 255 255 / 28%);
+  --glass-blur: blur(7px) saturate(115%);
+
+  /* Spacing / layout */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --page-gutter: clamp(1rem, 3.75vw, 3rem);
+  --nav-gap: 2.5rem;
+  --icon-size: 1rem;
+  --hairline: 1px;
+
+  /* Motion */
+  --theme-fade: 520ms;
+  --theme-ease: cubic-bezier(0.455, 0.03, 0.515, 0.955);
+
+  /* Fumadocs bridge */
+  --color-fd-background: var(--page-background);
+  --color-fd-foreground: var(--page-ink);
+  --color-fd-card: color-mix(in srgb, var(--page-background) 92%, var(--page-ink));
+  --color-fd-muted: color-mix(in srgb, var(--page-background) 88%, var(--page-ink));
+  --color-fd-muted-foreground: var(--label-muted);
+  --color-fd-border: var(--feature-divider);
+  --color-fd-primary: var(--rust);
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-ring: var(--page-ink);
+  --color-fd-accent: var(--row-hover);
+  --color-fd-accent-foreground: var(--page-ink);
+  --color-fd-secondary: color-mix(in srgb, var(--page-background) 90%, var(--page-ink));
+  --color-fd-secondary-foreground: var(--body-copy);
+
+  /* Legacy aliases used by a few older rules */
+  --abx-rust: var(--rust);
+  --abx-ink: var(--page-ink);
+  --abx-paper: var(--page-background);
 }
 
 .dark {
-  --abx-rust: #dc7958;
-  --abx-sun: #c47737;
-  --abx-ridge: #513d2d;
-  --abx-ink: #f0e5d3;
-  --abx-paper: #18130f;
-  --color-fd-background: #17130f;
-  --color-fd-card: #201a15;
-  --color-fd-muted: #2b231c;
-  --color-fd-muted-foreground: #b7aa98;
-  --color-fd-border: #3a3027;
+  --page-background: #030812;
+  --page-ink: #fff;
+  --body-copy: #fff;
+  --label-muted: #a4a4a4;
+  --feature-rule: rgb(180 180 180 / 68%);
+  --feature-divider: rgb(180 180 180 / 68%);
+  --row-hover: rgb(255 255 255 / 6%);
+  --built-mono: #c9a77c;
+  --built-frost: rgb(3 8 18 / 42%);
+  --terminal-fill: color-mix(in srgb, var(--page-background) 86%, var(--page-ink));
+
+  --color-fd-primary: var(--rust-bright);
+  --color-fd-primary-foreground: #030812;
+  --color-fd-ring: var(--page-ink);
+  --color-fd-accent-foreground: var(--page-ink);
+  --color-fd-secondary-foreground: var(--body-copy);
+  --abx-rust: var(--rust-bright);
 }
 
 @theme inline {
-  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-red-hat-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
-:root {
-  --color-fd-primary: var(--abx-rust);
-  --color-fd-primary-foreground: #ffffff;
-  --color-fd-ring: var(--abx-rust);
+html {
+  scrollbar-gutter: stable;
+  background: var(--page-background);
+  color: var(--page-ink);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-body);
+  line-height: var(--leading-body);
+  transition:
+    background-color var(--theme-fade) var(--theme-ease),
+    color var(--theme-fade) var(--theme-ease);
 }
-.dark {
-  --color-fd-primary: var(--abx-rust);
-  --color-fd-primary-foreground: #17130f;
-  --color-fd-ring: var(--abx-rust);
+
+body {
+  background: var(--page-background);
+  color: var(--body-copy);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-regular);
 }
 
 h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-display), var(--font-body), sans-serif;
-  letter-spacing: -0.02em;
+  color: var(--page-ink);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-heading);
+  line-height: var(--leading-heading);
 }
+
+h1 {
+  font-size: var(--text-display);
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-display);
+}
+
 code,
 pre,
 kbd {
-  font-family: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--font-mono);
 }
 
-html {
-  scrollbar-gutter: stable;
+:focus-visible {
+  outline: 1px solid var(--page-ink);
+  outline-offset: 4px;
+}
+
+#nd-sidebar {
+  background-color: var(--page-background);
 }
 
 html > body[data-scroll-locked] {
@@ -68,65 +177,210 @@ html > body[data-scroll-locked] {
 
 .prompt-card {
   position: relative;
-  max-width: 720px;
-  margin-top: 2rem;
-  padding: 1.25rem 7.25rem 1.25rem 1.25rem;
-  border: 1px solid var(--color-fd-border);
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--color-fd-card) 88%, transparent);
+  max-width: 36.2rem;
+  margin-top: 0;
+  padding: 1.5rem;
+  border: var(--hairline) solid var(--terminal-border);
+  border-radius: var(--terminal-radius);
+  background: var(--terminal-fill);
+  box-shadow: none;
 }
 
 .prompt-card-label {
-  margin-bottom: 0.55rem;
-  color: var(--abx-rust);
-  font-family: var(--font-mono-face), ui-monospace, monospace;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  margin-bottom: var(--space-2);
+  color: var(--label-muted);
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--label-tracking);
   text-transform: uppercase;
 }
 
 .prompt-card p {
   margin: 0;
-  font-family: var(--font-mono-face), ui-monospace, monospace;
-  font-size: 0.82rem;
-  line-height: 1.65;
+  color: var(--page-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--tracking-caps);
+  line-height: 1.5;
 }
 
 .prompt-card button {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 1.5rem;
+  right: 1.5rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--color-fd-border);
-  border-radius: 2px;
-  background: var(--color-fd-background);
-  font-size: 0.75rem;
-  font-weight: 650;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: var(--hairline) solid var(--terminal-border);
+  border-radius: var(--terminal-radius);
+  background: transparent;
+  color: var(--label-muted);
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  transition:
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    background 150ms ease-out;
 }
 
 .prompt-card button:hover {
-  background: var(--color-fd-muted);
+  background: var(--row-hover);
+  color: var(--page-ink);
 }
 
 .prompt-card button svg {
-  width: 0.85rem;
-  height: 0.85rem;
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
+.prompt-card--hero {
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  padding: 1.5rem;
+  flex-direction: column;
+  gap: 1rem;
+  border: var(--hairline) solid rgb(255 255 255 / 22%);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 6%);
+  box-shadow:
+    var(--glass-sheen),
+    0 1px 2px rgb(0 0 0 / 14%),
+    0 4px 43.7px 9px rgb(0 0 0 / 25%);
+  backdrop-filter: blur(7px) saturate(115%);
+}
+
+.prompt-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+}
+
+.prompt-card--hero .prompt-card-label {
+  margin-bottom: 0;
+  font-size: var(--text-base);
+  letter-spacing: 0.03em;
+}
+
+.prompt-card--hero p {
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+}
+
+.prompt-card--hero button {
+  position: static;
+  flex-shrink: 0;
+  font-size: var(--text-base);
+  letter-spacing: 0.03em;
+  border-radius: 2px;
+}
+
+/* Fumadocs command / code blocks on docs pages */
+figure.shiki {
+  border-radius: var(--terminal-radius) !important;
+  border-color: var(--terminal-border) !important;
+  background: var(--terminal-fill) !important;
+  box-shadow: none !important;
+  color: var(--page-ink);
+}
+
+figure.shiki > div:first-child {
+  border-color: var(--terminal-border);
+}
+
+figure.shiki figcaption {
+  color: var(--label-muted);
+}
+
+/* Inline code in prose — match the terminal surface */
+.prose :not(pre) > code {
+  border-radius: var(--terminal-radius);
+  border: var(--hairline) solid var(--terminal-border);
+  background: var(--terminal-fill);
+  color: var(--page-ink);
+  box-shadow: none;
+}
+
+.prompt-card--hero .prompt-card-label,
+.prompt-card--hero p,
+.prompt-card--hero button {
+  color: #fff;
+}
+
+.prompt-card--hero .prompt-card-label,
+.prompt-card--hero button {
+  opacity: 0.75;
+}
+
+.prompt-card--hero button {
+  border-color: rgb(255 255 255 / 50%);
+}
+
+.prompt-card--hero button:hover {
+  background: rgb(255 255 255 / 10%);
+  color: #fff;
+  opacity: 1;
+}
+
+@media (max-width: 1000px) {
+  :root {
+    --text-lg: 1.25rem;
+    --text-xl: 1.75rem;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --text-md: 1rem;
+    --text-display: clamp(2rem, 8vw, 2.75rem);
+    --nav-gap: clamp(1.5rem, 7vw, 2.5rem);
+  }
 }
 
 @media (max-width: 560px) {
-  .prompt-card {
-    padding-right: 1.25rem;
+  .prompt-card:not(.prompt-card--hero) {
+    padding-right: 1.5rem;
     padding-bottom: 4rem;
   }
 
-  .prompt-card button {
+  .prompt-card:not(.prompt-card--hero) button {
     top: auto;
     right: auto;
-    bottom: 1rem;
-    left: 1.25rem;
+    bottom: 1.5rem;
+    left: 1.5rem;
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --page-gutter: 0.75rem;
+    --nav-gap: 1.25rem;
+    --icon-size: 0.875rem;
+    --label-size: var(--text-xs);
+  }
+}
+
+@media (min-resolution: 192dpi) {
+  :root {
+    --hairline: 0.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
   }
 }
