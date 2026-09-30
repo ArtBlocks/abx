@@ -30,6 +30,15 @@
       "supportLevel": "experimental"
     },
     {
+      "key": "arbitrum-sepolia",
+      "chainId": 421614,
+      "name": "Arbitrum Sepolia",
+      "environment": "testnet",
+      "pairedChain": "arbitrum",
+      "contractStatus": "deployed",
+      "supportLevel": "experimental"
+    },
+    {
       "key": "base",
       "chainId": 8453,
       "name": "Base",
@@ -53,6 +62,15 @@
       "name": "Ethereum",
       "environment": "production",
       "pairedChain": "sepolia",
+      "contractStatus": "not-deployed",
+      "supportLevel": "disabled"
+    },
+    {
+      "key": "arbitrum",
+      "chainId": 42161,
+      "name": "Arbitrum",
+      "environment": "production",
+      "pairedChain": "arbitrum-sepolia",
       "contractStatus": "not-deployed",
       "supportLevel": "disabled"
     }

@@ -10,8 +10,10 @@ ABX is adding EVM networks. This table is the central human-readable list.
 | Base Sepolia | `84532` | Testnet | Supported, default | Deployed | Available |
 | Sepolia | `11155111` | Testnet | Supported | Deployed | No |
 | Robinhood Chain Testnet | `46630` | Testnet | Experimental | Deployed | No |
+| Arbitrum Sepolia | `421614` | Testnet | Experimental | Deployed | No |
 | Base | `8453` | Production | Beta | Deployed | Available |
 | Robinhood Chain | `4663` | Production | Beta | Deployed | No |
+| Arbitrum | `42161` | Production | Planned | Not deployed | No |
 | Ethereum | `1` | Production | Disabled | Not deployed | No |
 
 `Supported` networks are ready for their stated environment. `Experimental` networks are under
@@ -62,12 +64,13 @@ Address resolution follows this order: explicit option, environment override, SD
 | Base Sepolia | `84532` | <CopyAddress>0x05823faC69865F8A6c15c69D1Cb8F10Db87014e2</CopyAddress> |
 | Sepolia | `11155111` | <CopyAddress>0x7fcf8118D400FF004fF0772a37c24196D9aA7b17</CopyAddress> |
 | Robinhood Chain Testnet | `46630` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
+| Arbitrum Sepolia | `421614` | <CopyAddress>0x53818B5d272E24BE03358350fbe67FBEe59cE239</CopyAddress> |
 | Base | `8453` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
 | Robinhood Chain | `4663` | <CopyAddress>0x4F74De4835B51414a4DA83527589aEDc41A26FaE</CopyAddress> |
 
 Sepolia also has the Art Blocks `DependencyRegistryV0` at
 <CopyAddress>0x5Fcc415BCFb164C5F826B5305274749BeB684e9b</CopyAddress>. Base, Base Sepolia, Robinhood Chain
-Testnet, and Robinhood Chain have no canonical dependency registry.
+Testnet, Robinhood Chain, and Arbitrum Sepolia have no canonical dependency registry.
 
 A dependency registry is separate from the token and factories. A collection may set its own registry
 until it locks dependencies. Adding a registry later does not require a new token deployment.

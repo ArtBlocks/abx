@@ -1406,7 +1406,11 @@ export async function cmdSetPrimaryPayee(address: string | undefined, flags: Fla
  * as the hardcoded explorer table that once sent every Base Sepolia link to Etherscan — hence
  * `testnet` now comes from the chain registry instead of a second hand-maintained set.
  */
-const OPENSEA_CHAIN: Record<string, string> = {'base-sepolia': 'base_sepolia', sepolia: 'sepolia'};
+const OPENSEA_CHAIN: Record<string, string> = {
+  'base-sepolia': 'base_sepolia',
+  sepolia: 'sepolia',
+  arbitrum: 'arbitrum',
+};
 export async function cmdRefresh(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(address, 'abx refresh <address> [--token 0]');
   const tokenId = flags.token ?? '0';

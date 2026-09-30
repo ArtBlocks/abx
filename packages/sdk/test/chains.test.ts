@@ -18,19 +18,24 @@ test('chain registry separates recognized networks from selectable networks', ()
     'base-sepolia',
     'sepolia',
     'robinhood-testnet',
+    'arbitrum-sepolia',
     'base',
     'robinhood',
     'ethereum',
+    'arbitrum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'base', 'robinhood']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 5);
+  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'arbitrum-sepolia', 'base', 'robinhood']);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 6);
   assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
+  assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
+  assert.equal(chainSupportByKey('arbitrum-sepolia')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('robinhood')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'disabled');
+  assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'disabled');
 });
 
 test('registry ids agree with viem chain metadata, including disabled production networks', () => {
@@ -42,6 +47,11 @@ test('registry ids agree with viem chain metadata, including disabled production
 
 test('Robinhood Chain Testnet has a keyless default RPC ready for qualification', () => {
   assert.deepEqual(resolveRpcUrls('robinhood-testnet'), ['https://rpc.testnet.chain.robinhood.com']);
+});
+
+test('Arbitrum networks have keyless default RPCs', () => {
+  assert.deepEqual(resolveRpcUrls('arbitrum-sepolia'), ['https://sepolia-rollup.arbitrum.io/rpc']);
+  assert.deepEqual(resolveRpcUrls('arbitrum'), ['https://arb1.arbitrum.io/rpc']);
 });
 
 test('Base has a keyless default RPC for beta access', () => {
