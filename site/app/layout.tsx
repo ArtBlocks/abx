@@ -1,11 +1,21 @@
 import type { Metadata } from 'next';
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import { Manrope, Red_Hat_Mono } from 'next/font/google';
 import './global.css';
-import { Fraunces, Hanken_Grotesk, Overpass_Mono } from 'next/font/google';
 
-const display = Fraunces({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
-const body = Hanken_Grotesk({ subsets: ['latin'], variable: '--font-body', display: 'swap' });
-const mono = Overpass_Mono({ subsets: ['latin'], variable: '--font-mono-face', display: 'swap' });
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-manrope',
+  display: 'swap',
+  weight: ['400', '500', '600'],
+});
+
+const redHatMono = Red_Hat_Mono({
+  subsets: ['latin'],
+  variable: '--font-red-hat-mono',
+  display: 'swap',
+  weight: ['400', '500', '600'],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://docs.abx.io'),
@@ -21,7 +31,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="en"
-      className={`${body.variable} ${display.variable} ${mono.variable}`}
+      className={`${manrope.variable} ${redHatMono.variable}`}
       suppressHydrationWarning
     >
       <body className="flex flex-col min-h-screen">

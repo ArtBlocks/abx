@@ -1,43 +1,60 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import {ArrowRight} from 'lucide-react';
+import {ArrowRight} from '@phosphor-icons/react/ssr';
 import {PromptCard} from '@/components/prompt-card';
 import {QUICKSTART_PROMPT} from '@/lib/quickstart';
 import styles from './home.module.css';
 
 export default function HomePage() {
   return (
-    <main className={styles.home}>
+    <main className={`${styles.home} [grid-area:main]`} data-layout-main="">
       <section className={styles.hero}>
-        <div className={styles.sky} aria-hidden>
-          <span className={styles.sun} />
-          <span className={styles.horizon} />
+        <div className={styles.media} aria-hidden>
+          <Image
+            src="/hero/marfa-day.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={styles.day}
+          />
+          <Image
+            src="/hero/marfa-night.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className={styles.night}
+          />
+          <div className={styles.scrim} />
         </div>
 
-        <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}>ABX / OPEN PROTOCOL</p>
-          <h1>Put it onchain.</h1>
-          <p className={styles.lede}>
-            Create, operate, and serve digital work from one open protocol.
-          </p>
+        <div className={styles.heroBody}>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>ABX Docs</p>
+            <h1>Start building.</h1>
+            <p className={styles.lede}>
+              Guides and reference for the ABX protocol, CLI, agent skill, and SDK.
+            </p>
 
-          <PromptCard prompt={QUICKSTART_PROMPT} />
+            <PromptCard prompt={QUICKSTART_PROMPT} variant="hero" />
 
-          <div className={styles.actions}>
-            <Link href="/docs/using-abx/quickstart" className={styles.primaryAction}>
-              Quickstart <ArrowRight aria-hidden />
-            </Link>
-            <a href="https://github.com/ArtBlocks/abx" className={styles.secondaryAction}>
-              View source
-            </a>
+            <div className={styles.actions}>
+              <Link href="/docs/using-abx/quickstart" className={styles.primaryAction}>
+                Quickstart <ArrowRight aria-hidden weight="regular" />
+              </Link>
+              <a href="https://github.com/ArtBlocks/abx" className={styles.secondaryAction}>
+                View source
+              </a>
+            </div>
           </div>
         </div>
-      </section>
 
-      <footer className={styles.facts}>
-        <span>Open source</span>
-        <span>EVM</span>
-        <span>Built by the team at Art Blocks</span>
-      </footer>
+        <footer className={styles.facts}>
+          <span>Open source</span>
+          <span>Built by the team at Art Blocks</span>
+        </footer>
+      </section>
     </main>
   );
 }

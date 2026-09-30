@@ -1,5 +1,6 @@
 import { docs } from 'collections/server';
 import { loader } from 'fumadocs-core/source';
+// Fumadocs resolves these names through the Phosphor build of lucide-react.
 import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
 import { docsContentRoute, docsImageRoute, docsRoute } from './shared';
 

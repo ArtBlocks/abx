@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy } from '@phosphor-icons/react/ssr';
 
 /**
  * A monospace address with a copy button, used in the deployments table where every row

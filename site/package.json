@@ -13,11 +13,12 @@
     "types:check": "fumadocs-mdx && next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "cnfast": "^0.2.0",
     "fumadocs-core": "^16.15.10",
     "fumadocs-mdx": "^15.4.0",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.15.7",
-    "lucide-react": "^1.45.0",
+    "lucide-react": "file:./phosphor-lucide",
     "mermaid": "^11.16.1",
     "next": "16.3.5",
     "next-themes": "^0.4.6",
