@@ -1,0 +1,136 @@
+.assets {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.assetCard {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--feature-divider);
+  border-radius: 2px;
+  background: var(--page-background);
+}
+
+.markPreview,
+.badgePreview {
+  display: grid;
+  min-height: 12rem;
+  border-bottom: 1px solid var(--feature-divider);
+}
+
+.markPreview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.markPreview > span {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+}
+
+.markPreview svg {
+  width: min(9rem, 60%);
+  height: auto;
+}
+
+.markLight {
+  color: #000;
+  background: #f7f5ee;
+}
+
+.markDark {
+  color: #fff;
+  background: #030812;
+}
+
+.badgePreview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 4%) 1px, transparent 1px),
+    linear-gradient(rgb(0 0 0 / 4%) 1px, transparent 1px),
+    #e6e0d9;
+  background-size: 16px 16px;
+}
+
+.badgePreview img {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 11.25rem;
+  height: auto;
+  margin: 0;
+}
+
+.assetBody {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+}
+
+.assetBody > div,
+.downloads {
+  min-width: 0;
+}
+
+.assetBody h3,
+.assetBody p {
+  margin: 0;
+}
+
+.assetBody h3 {
+  font-size: var(--text-md);
+}
+
+.assetBody p {
+  max-width: 32rem;
+  margin-top: 0.25rem;
+  color: var(--label-muted);
+  font-size: var(--text-sm);
+}
+
+.downloads {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.downloads a {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--feature-divider);
+  border-radius: 2px;
+  color: var(--page-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.03em;
+  text-decoration: none;
+}
+
+.downloads a:hover {
+  background: var(--row-hover);
+}
+
+@media (max-width: 720px) {
+  .markPreview,
+  .badgePreview {
+    grid-template-columns: 1fr;
+  }
+
+  .assetBody {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .downloads {
+    justify-content: flex-start;
+  }
+}

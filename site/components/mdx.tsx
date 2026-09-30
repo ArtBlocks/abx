@@ -3,6 +3,7 @@ import type { MDXComponents } from 'mdx/types';
 import { Mermaid } from '@/components/mdx/mermaid';
 import { ArchitectureDiagram } from '@/components/architecture-diagram';
 import { CopyAddress } from '@/components/copy-address';
+import { BrandKitAssets } from '@/components/brand-kit';
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
@@ -10,6 +11,7 @@ export function getMDXComponents(components?: MDXComponents) {
     Mermaid,
     ArchitectureDiagram,
     CopyAddress,
+    BrandKitAssets,
     ...components,
   } satisfies MDXComponents;
 }
