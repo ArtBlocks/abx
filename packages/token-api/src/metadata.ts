@@ -11,6 +11,7 @@ import {
   gatewayConfigFromEnv,
   projectGatewayPrefix,
   projectGatewayUrl,
+  storedImageType,
   type Hex,
   type MetadataField,
   type OpenSeaAttribute,
@@ -590,7 +591,7 @@ async function rendererContentType(
 /**
  * The declared-type ladder for a FIELD artifact (`data-plane.md → Declared type, never sniffed`):
  * the representation is the declaration channel — `renderer` returns its contentType from chain;
- * on-chain image bytes are SVG by the registry convention; custody bytes carry the type declared
+ * on-chain image bytes take the declared `abx_image_type` (SVG when unset — spec v12); custody bytes carry the type declared
  * at upload; locator forms get a *labeled* extension-map fallback (never byte-sniffing). Unknown
  * → `application/octet-stream`, never omitted (the complete-listing rule).
  */
@@ -602,15 +603,17 @@ export async function fieldMimeType(
   tokenId: string,
   display: DisplayMeta,
   storage?: StorageBackend,
+  tokenFields?: readonly MetadataField[],
 ): Promise<string> {
   const rep = entry.representation;
   if (rep === R.renderer) {
     return (await rendererContentType(client, state.address, entry, field, tokenId)) ?? 'application/octet-stream';
   }
   if (rep === R.inline || rep === R.inlineGzip || rep === R.reader || rep === R.readerGzip) {
-    // registry conventions for on-chain content bytes: an `image` is SVG, an `animation_url` is
-    // the HTML document the renderer wraps as `data:text/html` (spec v4). Anything else: the floor.
-    if (field === F.image) return 'image/svg+xml';
+    // on-chain content bytes: an `image` takes its declared `abx_image_type` (SVG when unset, spec
+    // v12), an `animation_url` is the HTML document the renderer wraps as `data:text/html` (spec v4).
+    // Anything else: the floor.
+    if (field === F.image) return storedImageType(tokenFields, state.collectionFields);
     return field === F.animationUrl ? 'text/html' : 'application/octet-stream';
   }
   if (rep === R.keccak256 || rep === R.sha256) {
@@ -711,7 +714,7 @@ async function buildTokenArtifacts(
   if (resolved.imageEntry) {
     entries.push({
       key: F.image,
-      mimeType: await fieldMimeType(client, state, resolved.imageEntry, F.image, token.tokenId, display, storage),
+      mimeType: await fieldMimeType(client, state, resolved.imageEntry, F.image, token.tokenId, display, storage, token.fields),
       uri: resolved.imageUrl,
     });
   }

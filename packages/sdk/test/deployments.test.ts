@@ -27,7 +27,7 @@ const BASE = 8453;
 const UNDEPLOYED = 10;
 const GENERATOR = '0x7fcf8118D400FF004fF0772a37c24196D9aA7b17';
 const BASE_GENERATOR = '0x4F74De4835B51414a4DA83527589aEDc41A26FaE';
-const RENDERER = '0x5772249A8fA0bAFfD4B2e3378189465B4dB67417';
+const RENDERER = '0xBfa4181cd005b2CA64f8F124456c9fb6111a3A27';
 
 // Every recorded address must be a VALID EIP-55 checksum, not merely 40 hex characters.
 //
@@ -48,7 +48,7 @@ test('manifest: every address is a valid EIP-55 checksum', () => {
 });
 
 // The manifest is the zero-state trust root: the canonical generator + the CURRENT renderer
-// rev (spec v11) must
+// rev (spec v12) must
 // resolve with no env and no flags.
 test('manifest: shipped chains include the canonical generator + current renderer rev', () => {
   assert.equal(DEPLOYMENTS[SEPOLIA].generator, GENERATOR);

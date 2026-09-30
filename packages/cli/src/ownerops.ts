@@ -78,6 +78,7 @@ import {
   redactRpcUrl,
   type SendTx,
   encodeTag,
+  decodeTag,
   METADATA_FIELD as F,
   METADATA_REPRESENTATION as R,
   type Address,
@@ -113,7 +114,7 @@ import {
   tryReadContract,
   type ParamTypeName,
 } from '@artblocks/abx-sdk';
-import {hasParamEnumeration, GATEWAY_FIELD, GATEWAY_FLOOR, gatewayPrefixFrom, readCollectionPolicy, readEnv} from '@artblocks/abx-sdk';
+import {hasParamEnumeration, GATEWAY_FIELD, GATEWAY_FLOOR, gatewayPrefixFrom, readCollectionPolicy, readEnv, DEFAULT_STORED_IMAGE_TYPE, isDeclarableImageType, storedImageType, type MetadataField} from '@artblocks/abx-sdk';
 import {
   decodeFieldRenderer,
   encodeFieldRenderer,
@@ -2141,6 +2142,94 @@ async function putContentOnChain(
   });
 }
 
+// ── stored image types (`abx_image_type`, renderer spec v12) ──────────────────
+// Bytes stored in the `image` field carry no type of their own, so both serving planes label them
+// with the reserved `abx_image_type` declaration, SVG when unset. Every path that stores image bytes
+// on chain must therefore declare a raster's type alongside it — before v12 nothing could, and a
+// JPEG staged with `--onchain-image` was served as `image/svg+xml` and drew as a broken image.
+
+/** Types a stored `image` may carry: the formats browsers and marketplaces draw from a `data:` URI.
+ *  (`contentTypeFromPath` also knows TIFF and PSD, which no browser renders as an image.) */
+const STORABLE_IMAGE_TYPES = new Set(['image/svg+xml', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']);
+
+/**
+ * The `abx_image_type` a file stored in the `image` field needs: `null` for SVG (the default, nothing
+ * to declare), else the type named by the file's extension — the same declared-type convention
+ * `abx attach` uses; bytes are never sniffed for a raster type. Throws, before anything is staged,
+ * for a file no browser would draw as an image.
+ */
+export function storedImageTypeFor(bytes: Uint8Array, path: string): string | null {
+  if (/^\s*<(\?xml|svg)/i.test(new TextDecoder().decode(bytes.subarray(0, 256)))) return null;
+  const type = contentTypeFromPath(path);
+  if (type === DEFAULT_STORED_IMAGE_TYPE) return null;
+  if (!STORABLE_IMAGE_TYPES.has(type) || !isDeclarableImageType(type)) {
+    const named = type === 'application/octet-stream' ? 'has no recognised image extension' : `is ${type}`;
+    throw new Error(
+      `${basename(path)} ${named}. An on-chain image must be SVG, PNG, JPEG, GIF, WebP or AVIF, and its type is ` +
+        'declared from the file extension — rename the file with its real extension, or convert it first.',
+    );
+  }
+  return type;
+}
+
+/** The inline `abx_image_type` field declaring `type` for stored image bytes. */
+export const imageTypeField = (type: string): OnChainFieldInput => ({
+  field: encodeTag(F.imageType),
+  representation: encodeTag(R.inline),
+  value: toHex(type),
+});
+
+/**
+ * The `abx_image_type` write that must accompany storing `bytes` in the `image` field at this scope,
+ * or `null` when the type already served is right. Both scopes are read because the served type
+ * walks token → collection: a token inheriting `image/png` from its collection still needs its own
+ * declaration for a JPEG, and an SVG replacing a raster needs `image/svg+xml` written back (the
+ * field store rejects an empty value, so an explicit SVG declaration is how a type is cleared).
+ * Refuses — before anything is staged — when the needed write would hit a locked field.
+ */
+async function planImageTypeWrite(
+  contract: Address,
+  collection: boolean,
+  tokenId: bigint,
+  bytes: Uint8Array,
+  path: string,
+): Promise<string | null> {
+  const wanted = storedImageTypeFor(bytes, path) ?? DEFAULT_STORED_IMAGE_TYPE;
+  const publicClient = makePublicClient({chainKey: CHAIN});
+  const tag = encodeTag(F.imageType);
+  const asField = (r: readonly [Hex, Hex] | undefined): MetadataField[] =>
+    r && r[1] !== '0x' ? [{field: F.imageType, representation: decodeTag(r[0]), value: r[1]} as MetadataField] : [];
+  const coll = asField(await tryReadContract<readonly [Hex, Hex]>(publicClient, {address: contract, abi: oneOfOneImageAbi, functionName: 'contractField', args: [tag]}));
+  const tok = collection
+    ? undefined
+    : asField(await tryReadContract<readonly [Hex, Hex]>(publicClient, {address: contract, abi: oneOfOneImageAbi, functionName: 'tokenField', args: [tokenId, tag]}));
+  if (storedImageType(tok, coll) === wanted) return null;
+  const locked = collection
+    ? await tryReadContract<boolean>(publicClient, {address: contract, abi: oneOfOneImageAbi, functionName: 'contractFieldLocked', args: [tag]})
+    : await tryReadContract<boolean>(publicClient, {address: contract, abi: oneOfOneImageAbi, functionName: 'tokenFieldLocked', args: [tokenId, tag]});
+  if (locked) {
+    throw new Error(
+      `${basename(path)} must be served as ${wanted}, but ${F.imageType} is locked${collection ? ' at collection scope' : ` on token #${tokenId}`} ` +
+        `with a different type. Storing it would publish an image every browser mislabels, so nothing was staged.`,
+    );
+  }
+  return wanted;
+}
+
+/** A hand-set `abx_image_type` must be a value the renderer honors — anything else is silently
+ *  ignored on read and the image keeps serving as SVG, which is exactly the failure it exists to fix. */
+function assertImageTypeValue(flags: Flags): void {
+  const text = flags.text && flags.text !== 'true' ? flags.text : undefined;
+  const rep = flags.representation ?? R.inline;
+  if (!text || rep !== R.inline || !isDeclarableImageType(text)) {
+    throw new Error(
+      `${F.imageType} declares the media type of STORED image bytes and must be an inline image type, e.g.\n` +
+        `    abx set-field <address> --field ${F.imageType} --text image/jpeg [--collection | --token 0]\n` +
+        '  (lowercase `image/<subtype>`, no parameters). `abx set-field --field image --file <path>` writes it for you.',
+    );
+  }
+}
+
 export function refusePrewrappedImage(bytes: Uint8Array | string, label: string): void {
   const head = typeof bytes === 'string' ? bytes.slice(0, 40) : new TextDecoder().decode(bytes.subarray(0, 40));
   if (/^\s*data:/i.test(head)) {
@@ -2160,6 +2249,7 @@ export function refusePrewrappedImage(bytes: Uint8Array | string, label: string)
 export async function previewImageStaging(imagePath: string, compress: Compress): Promise<string> {
   const bytes = readFileSync(resolvePath(imagePath));
   refusePrewrappedImage(bytes, basename(resolvePath(imagePath)));
+  const type = storedImageTypeFor(bytes, resolvePath(imagePath));
   const p = computeContentPlan(bytes, compress);
   // The gate runs on the dry-run too: a refusal a creator only meets after the first staging tx has
   // landed is a refusal that already cost them gas.
@@ -2167,7 +2257,8 @@ export async function previewImageStaging(imagePath: string, compress: Compress)
   return (
     `would stage ${basename(resolvePath(imagePath))} on-chain (chunk store): ` +
     `${planSizeLine(bytes.length, p, compress)} as ${p.representation}; ` +
-    `${planTxLine(p, '1 deploy (bakes the reader field)')}`
+    `${planTxLine(p, '1 deploy (bakes the reader field)')}` +
+    (type ? `; declares ${type} (abx_image_type)` : '')
   );
 }
 
@@ -2182,13 +2273,15 @@ export async function stageImageField(
   imagePath: string,
   compress: Compress,
   send: SendTx,
-): Promise<{field: OnChainFieldInput; note: string}> {
+): Promise<{fields: OnChainFieldInput[]; note: string}> {
   const bytes = readFileSync(resolvePath(imagePath));
   refusePrewrappedImage(bytes, basename(resolvePath(imagePath)));
+  const type = storedImageTypeFor(bytes, resolvePath(imagePath)); // refuse before the first staging tx
   const {value, representation} = await putContentOnChain(bytes, compress, 'image', send, '1 deploy (bakes the reader field)');
   return {
-    field: {field: encodeTag(F.image), representation: encodeTag(representation), value},
-    note: `image: ${bytes.length}B staged ON-CHAIN via reader (${representation}) — baked into the deploy`,
+    // A raster also bakes its declared type — without it every plane serves the bytes as SVG.
+    fields: [{field: encodeTag(F.image), representation: encodeTag(representation), value}, ...(type ? [imageTypeField(type)] : [])],
+    note: `image: ${bytes.length}B staged ON-CHAIN via reader (${representation})${type ? `, declared ${type}` : ''} — baked into the deploy`,
   };
 }
 
@@ -2197,14 +2290,20 @@ export async function stageImageField(
  * {@link stageImageField} for a Series. The store is resolved/deployed **once** (not per token),
  * then every file is staged against it and returned as its own `reader`-backed `image` field.
  * Each field still points at its own manifest, so each token's work is independent; they just
- * share the store contract. Returns the fields in input order (token order).
+ * share the store contract. Returns the fields in input order (token order), with each file's
+ * `abx_image_type` declaration (`null` for SVG) at the same index in `typeFields`.
  */
 export async function stageImageFieldsBatch(
   imagePaths: string[],
   compress: Compress,
   send: SendTx,
   storeOverride?: string,
-): Promise<{fields: OnChainFieldInput[]; store: Address}> {
+): Promise<{fields: OnChainFieldInput[]; typeFields: (OnChainFieldInput | null)[]; store: Address}> {
+  // Every file's type is settled before the store is touched, so an unstorable file costs nothing.
+  const typeFields = imagePaths.map((imagePath) => {
+    const type = storedImageTypeFor(readFileSync(resolvePath(imagePath)), resolvePath(imagePath));
+    return type ? imageTypeField(type) : null;
+  });
   const store = await ensureChunkStore(send, storeOverride);
   const fields: OnChainFieldInput[] = [];
   for (const imagePath of imagePaths) {
@@ -2219,7 +2318,7 @@ export async function stageImageFieldsBatch(
     );
     fields.push({field: encodeTag(F.image), representation: encodeTag(representation), value});
   }
-  return {fields, store};
+  return {fields, typeFields, store};
 }
 
 // ── the generator repoint guard ───────────────────────────────────────────────
@@ -2399,9 +2498,17 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   const owner = await read<Address>(contract, 'owner');
   await assertGeneratorRepointable(contract, field, flags); // legacy impl + the current generator = params silently invisible
   const staging = !!(flags.file && flags.file !== 'true'); // large content ON-CHAIN via chunk store/reader
-  if (staging && field === 'image') {
-    refusePrewrappedImage(readFileSync(resolvePath(flags.file as string)), `--file`);
+  // Stored image bytes are served with the declared `abx_image_type`, so settle the type write that
+  // must follow the image write now — an unstorable file or a locked declaration is refused here,
+  // before any chunk is staged.
+  let imageTypeWrite: string | null = null;
+  if (staging && field === F.image) {
+    const path = resolvePath(flags.file as string);
+    const bytes = readFileSync(path);
+    refusePrewrappedImage(bytes, `--file`);
+    imageTypeWrite = await planImageTypeWrite(contract, collection, BigInt(flags.token ?? '0'), bytes, path);
   }
+  if (field === F.imageType) assertImageTypeValue(flags);
 
   // --file + --dry-run: preview the on-chain staging plan and store/send NOTHING. (The locator/text
   // path flows through runWrite, which previews there; staging must short-circuit before any upload.)
@@ -2413,14 +2520,18 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
     console.log(`\n  ${bold('◆ set-field ' + field)} ${dim('(dry run — nothing staged or sent)')}`);
     console.log(`    ${dim('scope'.padEnd(12))} ${collection ? 'collection' : `token #${flags.token ?? '0'}`}`);
     console.log(`    ${planSizeLine(bytes.length, p, parseCompress(flags.compress))}`);
+    if (imageTypeWrite) console.log(`    ${dim('then'.padEnd(12))} set ${F.imageType} = ${imageTypeWrite} ${dim('(1 more tx — the type the image is served with)')}`);
     console.log(dim(`\n  Re-run without --dry-run to stage on-chain (lane: ${lane}).\n`));
     return;
   }
 
-  const buildTx = (value: Hex, representation: string): PreparedTx =>
+  const buildFieldTx = (f: string, value: Hex, representation: string): PreparedTx =>
     collection
-      ? prepareSetContractField({contract, field, representation, value, chainId: chainId()})
-      : prepareSetTokenField({contract, tokenId: BigInt(flags.token ?? '0'), field, representation, value, chainId: chainId()});
+      ? prepareSetContractField({contract, field: f, representation, value, chainId: chainId()})
+      : prepareSetTokenField({contract, tokenId: BigInt(flags.token ?? '0'), field: f, representation, value, chainId: chainId()});
+  const buildTx = (value: Hex, representation: string): PreparedTx => buildFieldTx(field, value, representation);
+  // The declaration that follows a stored image, at the image's own scope.
+  const typeTx = imageTypeWrite ? buildFieldTx(F.imageType, toHex(imageTypeWrite), R.inline) : null;
 
   // On-chain staging (--file) is a SEQUENCE — chunk write(s) → manifest → the field-set that
   // references it — where each tx's receipt feeds the next, so it can't be signed offline.
@@ -2442,6 +2553,7 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
     try {
       const {value, representation} = await putContentOnChain(bytes, compress, field, sessionStagingSender(session));
       await session.send(buildTx(value, representation));
+      if (typeTx) await session.send(typeTx);
     } finally {
       session.close();
     }
@@ -2459,7 +2571,7 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
     const session = await openWalletSession({
       chainKey: CHAIN,
       expectedSigner: owner,
-      total: stagingTxs + 1,
+      total: stagingTxs + 1 + (typeTx ? 1 : 0),
       port: flags.port ? Number(flags.port) : undefined,
       signUrlFile: flags['sign-url-file'],
     });
@@ -2467,6 +2579,7 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
       await session.connect();
       const {value, representation} = await putContentOnChain(bytes, compress, field, sessionStagingSender(session));
       await session.send(buildTx(value, representation));
+      if (typeTx) await session.send(typeTx);
     } finally {
       session.close();
     }
@@ -2495,7 +2608,8 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   // encoded from putContentOnChain; this only ever changes a hand-passed --value.)
   value = encodeStructuredFieldValue(representation, value);
   if (representation === R.renderer) await assertFieldRendererDeployed(value);
-  const sent = await runWrite(contract, buildTx(value, representation), flags, owner);
+  let sent = await runWrite(contract, buildTx(value, representation), flags, owner);
+  if (sent && typeTx) sent = await runWrite(contract, typeTx, flags, owner);
   // Then prove the thing the creator actually cares about: that the served document still reads.
   // A field renderer is the project's OWN contract — it can revert for reasons no static check
   // sees — so the honest confirmation is to call tokenURI once, after the write.

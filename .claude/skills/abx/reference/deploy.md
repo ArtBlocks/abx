@@ -48,6 +48,20 @@ content directly in the deployment transaction. This can keep a tiny static proj
 transaction, while the reader/chunk path is normally more economical for real files. Trust the dry
 run's measured transaction count and plan rather than a memorized byte threshold.
 
+Stored image bytes have no type of their own. The renderer labels them with the reserved field
+`abx_image_type`, and uses `image/svg+xml` when it is unset. `--onchain-image` and
+`abx set-field --field image --file` write the field from the file extension for PNG, JPEG, GIF,
+WebP, and AVIF files, and the dry run says `declares image/<type>`. They refuse TIFF, PSD, video, and
+files without an extension. Convert or rename those files; don't wrap a raster in an SVG.
+
+Renderers before spec v12 ignore the field. If a stored raster serves as `data:image/svg+xml`, run
+`abx verify <address>` and check whether the tokenURI renderer is current. To repair it, run
+`abx set-renderer <address>` to point the token URI at the current renderer, and again with
+`--collection` for the collection URI. If the type was
+never declared, add it with `abx set-field <address> --field abx_image_type --text image/jpeg`
+(`--collection` for a whole series). Both are owner transactions, so confirm before sending. A locked
+URI configuration cannot be repointed.
+
 ### Media external, metadata JSON on-chain, no resolver
 
 Use `--onchain-uri --backend arweave|ipfs|cloud`. The CLI uploads media, bakes its public locator into

@@ -33,6 +33,8 @@ contract AbxMetadataRendererTest is Test {
     bytes32 internal constant FEATURED_IMAGE = "featured_image";
     bytes32 internal constant GATEWAY_IPFS = "abx_gateway_ipfs";
     bytes32 internal constant GATEWAY_ARWEAVE = "abx_gateway_arweave";
+    bytes32 internal constant IMAGE_TYPE = "abx_image_type";
+    bytes32 internal constant READER = "reader";
 
     string internal constant JSON_PREFIX = "data:application/json;base64,";
 
@@ -409,8 +411,8 @@ contract AbxMetadataRendererTest is Test {
     /// silently-updated constant. 7 = the `artist` → `creator` rename, which changes the member key
     /// this renderer emits into every collection document. `isCurrentRenderer` is what stops a chain
     /// running the OLD renderer from reporting as current.
-    function test_SpecVersionIsEleven() public view {
-        assertEq(renderer.specVersion(), 11);
+    function test_SpecVersionIsTwelve() public view {
+        assertEq(renderer.specVersion(), 12);
     }
 
     // ---- v10: the four reserved keys that were documented but projected by neither plane ----
@@ -686,6 +688,138 @@ contract AbxMetadataRendererTest is Test {
             '"source":"ipfs","note":"stored on chain; a content-addressed locator, served through the collection\'s preferred gateway"'
         );
         assertFalse(LibString.contains(json, "verified"), "no verification claim");
+    }
+
+    // ---- v12: stored image bytes declare their media type ----
+
+    /// JPEG magic followed by filler — enough for the base64 assertions to pin exactly.
+    function _jpeg() internal pure returns (bytes memory) {
+        return bytes.concat(hex"ffd8ffe000104a464946", _blob(64));
+    }
+
+    function _imageUri(OneOfOneImage nft) internal view returns (string memory) {
+        return _decodeJson(nft.tokenURI(0));
+    }
+
+    /// The reported bug: a raster behind a `reader` field was labelled `image/svg+xml`.
+    function test_V12_ReaderImageWrapsWithDeclaredType() public {
+        bytes memory jpg = _jpeg();
+        FixedReader reader = new FixedReader(jpg);
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+        f[0] = _field(IMAGE, READER, abi.encode(address(reader), address(0)));
+        f[1] = _field(IMAGE_TYPE, INLINE, bytes("image/jpeg"));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+
+        string memory json = _imageUri(nft);
+        _assertContains(json, string.concat('"image":"data:image/jpeg;base64,', Base64.encode(jpg), '"'));
+        assertFalse(LibString.contains(json, "image/svg+xml"), "no SVG label on a raster");
+    }
+
+    function test_V12_InlineImageWrapsWithDeclaredType() public {
+        bytes memory png = bytes.concat(hex"89504e470d0a1a0a", _blob(32));
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+        f[0] = _field(IMAGE, INLINE, png);
+        f[1] = _field(IMAGE_TYPE, INLINE, bytes("image/png"));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+
+        _assertContains(_imageUri(nft), string.concat('"image":"data:image/png;base64,', Base64.encode(png), '"'));
+    }
+
+    /// Unset → exactly the v11 document for the same chain state.
+    function test_V12_UnsetTypeStaysSvg() public {
+        bytes memory svg = bytes("<svg xmlns='http://www.w3.org/2000/svg'/>");
+        FixedReader reader = new FixedReader(svg);
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](1);
+        f[0] = _field(IMAGE, READER, abi.encode(address(reader), address(0)));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+
+        _assertContains(_imageUri(nft), string.concat('"image":"data:image/svg+xml;base64,', Base64.encode(svg), '"'));
+    }
+
+    /// A Series sets the type once at collection scope; a token can still override it.
+    function test_V12_CollectionTypeCoversTokenAndTokenOverrides() public {
+        bytes memory jpg = _jpeg();
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](1);
+        f[0] = _field(IMAGE, INLINE, jpg);
+        IAbxOnChainMetadata.FieldInput[] memory cf = new IAbxOnChainMetadata.FieldInput[](1);
+        cf[0] = _field(IMAGE_TYPE, INLINE, bytes("image/jpeg"));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_paramsC(address(renderer), f, cf)));
+        _assertContains(_imageUri(nft), '"image":"data:image/jpeg;base64,');
+
+        vm.prank(owner);
+        nft.setTokenField(0, IMAGE_TYPE, INLINE, bytes("image/webp"));
+        _assertContains(_imageUri(nft), '"image":"data:image/webp;base64,');
+    }
+
+    /// The value lands inside a `data:` URI: `,` would end the mediatype and `;` would add
+    /// parameters, so anything but a plain `image/*` type is ignored rather than trusted.
+    function test_V12_MalformedTypesFallBackToSvg() public {
+        string[8] memory bad = [
+            "text/html",
+            "image/",
+            "image/png,<script>",
+            "image/png;charset=x",
+            "IMAGE/PNG",
+            "image/PNG",
+            "image/-png",
+            "image/png\\"
+        ];
+        for (uint256 i; i < bad.length; ++i) {
+            IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+            f[0] = _field(IMAGE, INLINE, _jpeg());
+            f[1] = _field(IMAGE_TYPE, INLINE, bytes(bad[i]));
+            OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+            _assertContains(_imageUri(nft), '"image":"data:image/svg+xml;base64,');
+        }
+    }
+
+    function test_V12_OverlongTypeFallsBackToSvg() public {
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+        f[0] = _field(IMAGE, INLINE, _jpeg());
+        f[1] = _field(IMAGE_TYPE, INLINE, bytes(string.concat("image/", LibString.repeat("a", 59))));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+        _assertContains(_imageUri(nft), '"image":"data:image/svg+xml;base64,');
+    }
+
+    /// Only `inline` declares a type, like the gateway keys.
+    function test_V12_NonInlineTypeIsIgnored() public {
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+        f[0] = _field(IMAGE, INLINE, _jpeg());
+        f[1] = _field(IMAGE_TYPE, URL, bytes("image/jpeg"));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+        _assertContains(_imageUri(nft), '"image":"data:image/svg+xml;base64,');
+    }
+
+    /// The type describes STORED bytes only. A locator carries its own type; a computed image
+    /// declares one from its renderer; the placeholder is always SVG.
+    function test_V12_TypeDoesNotTouchOtherImageRoutes() public {
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+        f[0] = _field(IMAGE, URL, bytes("https://example.test/a.png"));
+        f[1] = _field(IMAGE_TYPE, INLINE, bytes("image/jpeg"));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+        _assertContains(_imageUri(nft), '"image":"https://example.test/a.png"');
+
+        FixedFieldRenderer fr = new FixedFieldRenderer("image/svg+xml", bytes("<svg/>"));
+        f[0] = _field(IMAGE, "renderer", abi.encode(address(fr)));
+        nft = OneOfOneImage(factory.deploy(_params(address(renderer), f)));
+        _assertContains(_imageUri(nft), '"image":"data:image/svg+xml;base64,');
+
+        IAbxOnChainMetadata.FieldInput[] memory onlyType = new IAbxOnChainMetadata.FieldInput[](1);
+        onlyType[0] = _field(IMAGE_TYPE, INLINE, bytes("image/jpeg"));
+        nft = OneOfOneImage(factory.deploy(_params(address(renderer), onlyType)));
+        _assertContains(_imageUri(nft), '"image":"data:image/svg+xml;base64,');
+    }
+
+    /// A serving declaration, not metadata: neither document carries the key.
+    function test_V12_ImageTypeNeverAppearsInEitherDocument() public {
+        IAbxOnChainMetadata.FieldInput[] memory f = new IAbxOnChainMetadata.FieldInput[](2);
+        f[0] = _field(IMAGE, INLINE, _jpeg());
+        f[1] = _field(IMAGE_TYPE, INLINE, bytes("image/jpeg"));
+        IAbxOnChainMetadata.FieldInput[] memory cf = new IAbxOnChainMetadata.FieldInput[](1);
+        cf[0] = _field(IMAGE_TYPE, INLINE, bytes("image/png"));
+        OneOfOneImage nft = OneOfOneImage(factory.deploy(_paramsC(address(renderer), f, cf)));
+        assertFalse(LibString.contains(_imageUri(nft), "abx_image_type"), "not a token key");
+        assertFalse(LibString.contains(_decodeJson(nft.contractURI()), "abx_image_type"), "not a collection key");
     }
 
 }

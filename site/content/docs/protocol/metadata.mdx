@@ -47,6 +47,31 @@ For URI fields such as `image` and `animation_url`, inline or computed content i
 onchain metadata document. A resolver serves the same content through a URL. A renderer that returns
 `text/uri-list` is treated as a locator instead.
 
+## Stored image type
+
+Bytes stored in the `image` field itself (`inline`, `reader`, or their gzip forms) carry no media type.
+Both serving planes label them with the reserved field `abx_image_type`, and fall back to
+`image/svg+xml` when it is unset:
+
+```bash
+abx set-field 0xYourContract --field abx_image_type --text image/jpeg
+```
+
+The value must be `inline` and a lowercase `image/<subtype>` with no parameters. Any other value is
+ignored and the image is served as SVG. A token value overrides a collection value, so a series of
+JPEGs can declare the type once with `--collection`. `abx deploy --onchain-image` and
+`abx set-field --field image --file` write the declaration for you. They refuse formats that browsers
+don't draw, such as TIFF and PSD.
+
+The declaration applies only to stored bytes. A URL, CID, or hash commitment gets its type from the
+content it points to, and a `renderer` field returns its own type. Like the gateway fields,
+`abx_image_type` never appears in the metadata document or the artifact list. Lock it with
+`abx lock-field --field abx_image_type` when you lock `image`, or the owner can still change the label.
+
+Renderers before spec v12 ignore `abx_image_type` and label every stored image as SVG. Existing
+collections with raster images can move to the current renderer with `abx set-renderer`, unless the
+URI configuration is locked.
+
 ## URI resolution
 
 Each contract chooses one of two paths:

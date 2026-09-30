@@ -800,7 +800,7 @@ export async function cmdVerifyBody(
         generatorCurrent, // true | false | null (no canonical generator recorded for this chain)
         tokenURIRenderer: state.tokenURIRenderer ?? null,
         // null ⇒ no renderer set at all (nothing to compare) — distinct from `false` (set, but not
-        // spec v11). See `isCurrentRenderer`: a read failure ALSO reports `false`, same as a stale
+        // spec v12). See `isCurrentRenderer`: a read failure ALSO reports `false`, same as a stale
         // renderer — the underlying probe cannot tell those apart, so neither can this field.
         tokenURIRendererCurrent: rendererCurrent,
         branch: status.branchName,
@@ -819,10 +819,10 @@ export async function cmdVerifyBody(
           `generator is NOT the current canonical one for ${CHAIN} ${dim('(a prior deployment this project is pinned to, or a fully custom field renderer — it still works; repoint with')} ${bold(`abx set-field ${address} --field animation_url --representation renderer --value <generator> --collection`)}${dim(')')}`,
         );
       } // null: no canonical generator recorded for this chain at all — nothing to compare against, so say nothing rather than a false "NOT current".
-      if (rendererCurrent === true) ok(`tokenURI renderer is CURRENT (spec v11)`);
+      if (rendererCurrent === true) ok(`tokenURI renderer is CURRENT (spec v12)`);
       else if (rendererCurrent === false) {
         info(
-          `tokenURI renderer is NOT current (spec v11) ${dim(`— an older renderer still serves fine; it just doesn't have v11's capabilities (see the renderer's changelog in deployments.ts). Repoint with`)} ${bold(`abx set-renderer ${address} --collection`)}${dim(' (and without --collection for the per-token pointer)')}`,
+          `tokenURI renderer is NOT current (spec v12) ${dim(`— an older renderer still serves fine; it just doesn't have v12's capabilities (see the renderer's changelog in deployments.ts). Repoint with`)} ${bold(`abx set-renderer ${address} --collection`)}${dim(' (and without --collection for the per-token pointer)')}`,
         );
       }
       if (status.branchName === 'template') {
