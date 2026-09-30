@@ -91,6 +91,16 @@ test('resolveTokenView carries params (the rehearsal seedless-live-view bug)', (
   assert.equal(view?.params?.[0]?.key, 'seed');
 });
 
+test('resolveTokenView treats only the canonical decimal id as a token', () => {
+  const minted = {...driftToken(), tokenId: '1'} as TokenState;
+  const state = codeState({tokens: [minted]});
+  assert.equal(resolveTokenView(state, '1')?.lifecycle, 'live');
+  assert.equal(resolveTokenView(state, '5')?.lifecycle, 'unminted');
+  for (const alias of ['01', '0x1', '+1', ' 1', '0b1', '-0']) {
+    assert.equal(resolveTokenView(state, alias), null, alias);
+  }
+});
+
 // The edition twin of the bug above: resolveTokenView used to reconstruct the returned TokenState
 // field-by-field rather than passing `issued` through, so ERC-1155 editions' supply/maxSupply/
 // holders — added after `params` — got silently dropped on every route that goes through it

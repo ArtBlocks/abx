@@ -132,6 +132,8 @@ export async function resolveContent(
  *  fixed to {0}); that token gets its pre-mint view a different way — see {@link resolveTokenView}. */
 function withinCap(tokenId: string, maxInvocations: string | null | undefined): boolean {
   if (maxInvocations == null) return false;
+  // Canonical decimal only: BigInt also takes '01', '0x1', '+1' and ' 1', which name no token.
+  if (!/^(0|[1-9]\d*)$/.test(tokenId)) return false;
   try {
     const id = BigInt(tokenId);
     return id >= 0n && id < BigInt(maxInvocations);
