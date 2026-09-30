@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: '%s | ABX Docs',
   },
   description:
-    'Launch, sell, and serve NFTs on Base and other EVM networks with the ABX CLI, SDK, or a coding agent.',
+    'Guides and reference for ABX, the open-source protocol and toolkit for putting digital objects on the blockchain. Launch your first project with one prompt.',
   // og:image and twitter:image come from app/opengraph-image.png (Next file convention).
   twitter: {
     card: 'summary_large_image',
