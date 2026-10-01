@@ -1,5 +1,21 @@
 # @artblocks/abx-cli
 
+## 0.4.0
+
+### Minor Changes
+
+- d891b2a: Drop-in for existing consumers; Arbitrum is a new opt-in production-beta network.
+
+  Add canonical Arbitrum deployments and enable the network behind the standard production warning.
+
+### Patch Changes
+
+- Updated dependencies [d891b2a]
+  - @artblocks/abx-sdk@0.4.0
+  - @artblocks/abx-indexer@0.1.3
+  - @artblocks/abx-storage@0.1.3
+  - @artblocks/abx-token-api@0.2.2
+
 ## 0.3.0
 
 ### Minor Changes
