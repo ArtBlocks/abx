@@ -200,9 +200,11 @@ human confirmation authorizes execution.
    to configure a signer. Otherwise configure one of the bring-your-own lanes. For first-party hosted
    services, run `abx auth login --no-open` in a short-yield or resumable session: immediately hand
    its verified browser URL and matching code to the human, then resume that same polling process.
-   Let the CLI store `ABX_SERVICES_API_KEY` in ignored `.env` without printing it. Never ask for the
-   email OTP or key in chat, start duplicate login sessions, or add standing login instructions to
-   `AGENTS.md`/`CLAUDE.md`. The key is long-lived: reuse it across tasks and agent sessions. Run
+   Let the CLI store `ABX_SERVICES_API_KEY` in ignored `.env` without printing it. The same Privy
+   browser identity provisions or reuses the creator wallet; an existing browser session can avoid
+   another email code. Never ask for an email code or key in chat, start duplicate login sessions,
+   or add standing login instructions to `AGENTS.md`/`CLAUDE.md`. The key is long-lived: reuse it
+   across tasks and agent sessions. Run
    `abx auth keys` before creating a separate credential if the account is at its five-key limit;
    revoke an unused non-current key with `abx auth revoke-key <key-id>`. Run `abx auth logout` only
    for intentional teardown, compromise, rotation, or cleanup of the current key.

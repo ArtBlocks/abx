@@ -32,6 +32,21 @@ A schema tells wallets and applications how a parameter may be edited.
 `TokenOwner` accepts delegate.xyz delegates. On an ERC-1155 edition, it means any holder of that ID.
 They all edit one shared value, not a value attached to each copy.
 
+The onchain enum is zero-indexed in this exact order:
+
+| Value | Authority |
+| ---: | --- |
+| 0 | `Creator` |
+| 1 | `TokenOwner` |
+| 2 | `Address` |
+| 3 | `CreatorOrTokenOwner` |
+| 4 | `CreatorOrAddress` |
+| 5 | `TokenOwnerOrAddress` |
+| 6 | `CreatorOrTokenOwnerOrAddress` |
+
+The SDK exports this mapping as `AUTH_OPTIONS`. Decode a `paramSchema()` result with
+`AUTH_OPTIONS[Number(schema.auth)]`.
+
 ```bash
 abx set-schema 0xYourContract \
   --schema 'palette:Select[Ochre|Night|Sage]:TokenOwner'
@@ -68,6 +83,10 @@ function configureTokenParamData(
 
 Keys are readable ASCII packed into `bytes32`. Do not hash the key name. Use the CLI or SDK to avoid
 encoding mistakes.
+
+`NotParamAuthorized()` has no arguments in the current contract generation. It means the caller did
+not satisfy the key's current schema; it does not mean “creator only.” Read `paramSchema(key)`, use
+`abx state <address>`, or run `abx configure-param` to see the required authority before sending.
 
 First writes cost more than updates because the contract adds the key to its enumeration. Large blob
 writes also deploy an SSTORE2 data contract. Keep holder-writable edition parameters small unless shared

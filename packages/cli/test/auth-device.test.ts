@@ -428,6 +428,6 @@ test('logout never deletes a different file credential and is a no-op when none 
 
 test('auth rejects a bare --remote and stray positional arguments before any auth flow starts', async () => {
   await assert.rejects(cmdAuth(['login', '--remote'], {remote: 'true'}), /--remote needs a named remote/);
-  await assert.rejects(cmdAuth(['login', 'abx', 'extra'], {}), /usage: abx auth <login\|logout\|keys>/);
-  await assert.rejects(cmdAuth(['logout', 'abx', 'extra'], {}), /usage: abx auth <login\|logout\|keys>/);
+  await assert.rejects(cmdAuth(['login', 'abx', 'extra'], {}), /usage: abx auth <login\|logout\|keys\|wallet>/);
+  await assert.rejects(cmdAuth(['logout', 'abx', 'extra'], {}), /usage: abx auth <login\|logout\|keys\|wallet>/);
 });

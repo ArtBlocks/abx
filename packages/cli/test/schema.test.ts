@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseSchemaSpec, parseSchemaSpecs, describeSchema} from '../src/schema.js';
+import {parseSchemaSpec, parseSchemaSpecs, describeParamAuthority, describeSchema} from '../src/schema.js';
 import {PARAM_TYPES, AUTH_OPTIONS} from '@artblocks/abx-sdk';
 
 const ZERO32 = `0x${'0'.repeat(64)}`;
@@ -129,4 +129,16 @@ test('describeSchema: round-trips options + bounds for the readout', () => {
   assert.match(describeSchema(parseSchemaSpec('n:Uint256Range[0..100]:TokenOwner')), /Uint256Range\[0\.\.100\]/);
   assert.match(describeSchema(parseSchemaSpec('t:Int256Range[-5..5]:TokenOwner')), /\[-5\.\.5\]/);
   assert.match(describeSchema(parseSchemaSpec('d:DecimalRange[0..1]:TokenOwner')), /\[0\.\.1\]/);
+});
+
+test('describeParamAuthority decodes the public enum and its Address and delegate legs', () => {
+  const address = '0x71Cf70753636779Ed124F529De762B9A2B6629c4';
+  assert.equal(describeParamAuthority(0, address), 'Creator');
+  assert.equal(describeParamAuthority(1, address), 'TokenOwner · delegate.xyz delegates accepted');
+  assert.equal(describeParamAuthority(4, address), `CreatorOrAddress (${address})`);
+  assert.equal(
+    describeParamAuthority(6, address),
+    `CreatorOrTokenOwnerOrAddress (${address}) · delegate.xyz delegates accepted`,
+  );
+  assert.equal(describeParamAuthority(99, address), 'Unknown(99)');
 });

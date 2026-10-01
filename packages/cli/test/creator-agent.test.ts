@@ -10,6 +10,7 @@ import {
   assertSponsorConfigured,
   assertSponsoredPreparedTx,
   creatorApiUrl,
+  provisionCreatorWallet,
   sponsoredGasLimit,
   sponsoredPreviewAddress,
   sponsoredWalletAddress,
@@ -361,6 +362,30 @@ test('a real sponsored plan provisions the stable wallet once, then resolves it'
     {url: 'https://api.example/v1/account', method: 'GET'},
     {url: 'https://api.example/v1/wallet', method: 'POST'},
     {url: 'https://api.example/v1/account', method: 'GET'},
+  ]);
+});
+
+test('creator wallet setup provisions directly through the advertised API', async () => {
+  const address = '0xadCaecC6539F91646293ea058A9f398dCC2271A6' as Address;
+  const requests: Array<{url: string; method: string; authorization: string | null}> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    requests.push({
+      url: String(input),
+      method: init?.method ?? 'GET',
+      authorization: new Headers(init?.headers).get('authorization'),
+    });
+    return json({address, provider: 'privy', providerAppId: 'app_test', created: true}, 201);
+  };
+
+  assert.deepEqual(
+    await provisionCreatorWallet({
+      env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+      fetchImpl,
+    }),
+    {address, created: true},
+  );
+  assert.deepEqual(requests, [
+    {url: 'https://api.example/v1/wallet', method: 'POST', authorization: 'Bearer abx_test_key'},
   ]);
 });
 

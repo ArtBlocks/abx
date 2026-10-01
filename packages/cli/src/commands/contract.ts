@@ -80,6 +80,12 @@ export interface SponsoredContractPlan {
   transaction: PreparedTx;
 }
 
+/** A generated salt is valid only for this invocation. A dry-run address is actionable only when
+ * the caller pinned the salt and can replay it later. */
+export function sponsoredContractPreviewAddress(plan: SponsoredContractPlan, saltPinned: boolean): Address | null {
+  return saltPinned ? plan.address : null;
+}
+
 /** Build the target call used for a sponsored custom-contract deployment. Privy's sponsored relay
  * requires a call target, so this lane uses the already-canonical keyless CREATE2 proxy rather than
  * a raw `to: null` transaction. The initcode is unchanged, but constructors observe the proxy as
@@ -160,8 +166,12 @@ export async function cmdDeployContract(flags: Flags): Promise<void> {
   info(`${bold(sponsored ? 'sponsored CREATE2' : 'direct CREATE')} · ${bytes} initcode bytes · ${dim(keccak256(data))}`);
   info('ABX sends these exact bytes; it does not compile, link, or infer constructor arguments.');
   if (sponsored) {
-    info(`predicted address ${sponsored.address}`);
     info(`salt ${sponsored.salt}`);
+    const shownAddress = sponsoredContractPreviewAddress(sponsored, explicitSalt !== undefined);
+    if (shownAddress) info(`predicted address ${shownAddress}`);
+    else {
+      info(`address pinned by salt — re-run with ${bold(`--salt ${sponsored.salt}`)} to reproduce and reveal it`);
+    }
     info(`constructor msg.sender ${CREATE2_PROXY} (keyless CREATE2 proxy, not the creator wallet)`);
   }
   const result = await gatedSend(prepared, flags, {

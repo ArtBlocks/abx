@@ -12,6 +12,7 @@ import {
   type Address,
   CREATOR_TOKEN_INTERFACE_ID,
   type OpenSeaAttribute,
+  type ProjectState,
   type PublicClient,
   PARAM_TYPES,
   type RegisterProjectBody,
@@ -491,10 +492,32 @@ const ON_CHAIN_CONTENT_REPRESENTATIONS = new Set<string>([
   METADATA_REPRESENTATION.inlineGzip,
   METADATA_REPRESENTATION.reader,
   METADATA_REPRESENTATION.readerGzip,
+  METADATA_REPRESENTATION.renderer,
 ]);
 
-export function onChainImageSource(fields: MetadataField[]): string | null {
-  const image = fieldOf(fields, METADATA_FIELD.image);
+/** Token scope wins, then collection scope—the same precedence tokenURI uses. */
+export function effectiveMetadataField(
+  fields: MetadataField[],
+  collectionFields: MetadataField[] | undefined,
+  name: string,
+): MetadataField | null {
+  return fieldOf(fields, name) ?? fieldOf(collectionFields ?? [], name);
+}
+
+export function needsDerivedRenderImage(fields: MetadataField[], collectionFields?: MetadataField[]): boolean {
+  return effectiveMetadataField(fields, collectionFields, METADATA_FIELD.image) === null;
+}
+
+/** The render effect supplies a still and script-reported attributes as one paired output. */
+export function needsRenderEffect(fields: MetadataField[], collectionFields?: MetadataField[]): boolean {
+  return (
+    needsDerivedRenderImage(fields, collectionFields) ||
+    effectiveMetadataField(fields, collectionFields, METADATA_FIELD.attributes) === null
+  );
+}
+
+export function onChainImageSource(fields: MetadataField[], collectionFields?: MetadataField[]): string | null {
+  const image = effectiveMetadataField(fields, collectionFields, METADATA_FIELD.image);
   if (image && ON_CHAIN_CONTENT_REPRESENTATIONS.has(image.representation)) return image.representation;
   return null;
 }
@@ -521,8 +544,8 @@ const POINTER_REPRESENTATIONS = new Set<string>([
  * field is a bare locator, else `null` — including when there's no `image` field at all, which is
  * "no commitment", a different fact from "an unrecomputable one".
  */
-export function pointerOnlyImageCheck(fields: MetadataField[]): string | null {
-  const image = fieldOf(fields, METADATA_FIELD.image);
+export function pointerOnlyImageCheck(fields: MetadataField[], collectionFields?: MetadataField[]): string | null {
+  const image = effectiveMetadataField(fields, collectionFields, METADATA_FIELD.image);
   if (image && POINTER_REPRESENTATIONS.has(image.representation)) return image.representation;
   return null;
 }
@@ -633,7 +656,7 @@ export async function cmdVerifyBody(
     // same tri-state slot a hash check uses (`verified: null`), so a caller sees one consistent
     // shape instead of two different kinds of silence.
     if (t.checks.length === 0 && tok) {
-      const pointerKind = pointerOnlyImageCheck(tok.fields);
+      const pointerKind = pointerOnlyImageCheck(tok.fields, state.collectionFields);
       if (pointerKind) {
         unrecomputablePointers++;
         (verifyReport.contentChecks as unknown[]).push({
@@ -644,7 +667,7 @@ export async function cmdVerifyBody(
         });
         info(`${pointerKind} — pointer-only, not locally recomputable (no outbound fetch from this command)`);
       } else {
-        const representation = onChainImageSource(tok.fields);
+        const representation = onChainImageSource(tok.fields, state.collectionFields);
         if (representation) {
           onChainContent.push({tokenId: t.tokenId, lifecycle: tok.lifecycle, field: 'image', representation});
           info(`${representation} image — bytes are stored on chain; no separate hash commitment to compare`);
@@ -666,11 +689,12 @@ export async function cmdVerifyBody(
   let renderGap = false;
   // Hoisted above the `isCodeProject` branch: `availability` (computed right after it, whether or
   // not this project turns out to be a code project) needs the render counts that branch produces.
-  let codeRenders: {minted: number; present: number} | null = null;
+  let codeRenders: {minted: number; present: number; required: boolean} | null = null;
   if (isCodeProject(state)) {
     const client = makePublicClient({chainKey: CHAIN});
     const storageForRender = resolveBackend(storageOptions());
     const minted = state.tokens.filter((t) => t.lifecycle === 'live');
+    const renderable = minted.filter((t) => needsRenderEffect(t.fields, state.collectionFields));
     if (minted.length === 0) info('no tokens minted yet — mint token #0, then re-run to check its thumbnail.');
     // Live-data posture — the augment hook IS the opt-in: no hook ⇒ zero live reads (pure indexed
     // params); hook set ⇒ the live view reads chain per view, and the STILL snapshots settled state
@@ -725,33 +749,36 @@ export async function cmdVerifyBody(
     // This checks THIS machine's store. A render PUBLISHED to a hosted resolver (locator bridge) lives
     // on that resolver, NOT here — so a "not found" below can be a false negative for a hosted drop.
     // `abx verify <addr> --remote <resolver>` probes what the resolver actually serves (the truthful check).
-    if (minted.length) info(dim(`render check is against THIS node's store; for a HOSTED drop use \`abx verify ${address} --remote <resolver>\``));
+    if (renderable.length) info(dim(`render check is against THIS node's store; for a HOSTED drop use \`abx verify ${address} --remote <resolver>\``));
     // ONE line per outcome, not per token. This printed the same full-sentence advisory 32 times on a
     // 32-token project (~4KB of identical text) and pushed the four lines that answer "did my deploy
     // work" off the top of the screen; at a 1000-token supply it is unreadable. The per-token detail
     // that survives is the token LIST, which is the only part that differs.
     const missing: string[] = [];
     let present = 0;
-    for (const token of minted) {
+    for (const token of renderable) {
       const {found} = await currentRenderArtifact(client, state, token, storageForRender, 'image');
       if (found) present++;
       else missing.push(String(token.tokenId));
     }
     verifyReport.renders = {
-      minted: minted.length,
+      minted: renderable.length,
       present,
       missing, // token ids, so a caller can re-render exactly these
       // Named for what it IS: this node's store. A render PUBLISHED to a hosted resolver lives
       // there, not here, so `missing` is a false negative for a hosted drop — hence the scope.
       scope: "this node's store",
     };
-    codeRenders = {minted: minted.length, present};
+    codeRenders = {minted: renderable.length, present, required: renderable.length > 0 || minted.length === 0};
     emit(verifyReport);
-    if (present) ok(`${present}/${minted.length} minted token(s): real render present (in this node's store)`);
+    if (minted.length > 0 && renderable.length === 0) {
+      ok('render effect not required — every minted token has explicit image and attributes fields');
+    }
+    if (present) ok(`${present}/${renderable.length} minted token(s): real render present (in this node's store)`);
     if (missing.length) {
       renderGap = true;
       const ids = missing.length > 12 ? `${missing.slice(0, 12).join(', ')}, …+${missing.length - 12} more` : missing.join(', ');
-      console.log(`    ${c.orange}⚠${c.reset} ${missing.length}/${minted.length} token(s) have no render in THIS node's store ${dim(`(#${ids})`)}`);
+      console.log(`    ${c.orange}⚠${c.reset} ${missing.length}/${renderable.length} token(s) that need a derived image have no render in THIS node's store ${dim(`(#${ids})`)}`);
       console.log(`      ${dim('published to a hosted resolver? check there:')} ${bold(`abx verify ${address} --remote <resolver>`)}`);
       console.log(`      ${dim('else render them:')} ${bold(`abx render ${address}`)} ${dim('(once) ·')} ${bold('abx effects')} ${dim('(continuous)')}`);
     }
@@ -761,7 +788,7 @@ export async function cmdVerifyBody(
   // pass above have run, from facts they already gathered (no new reads). See `computeAvailability`.
   verifyReport.availability = jsonSafe(
     computeAvailability({
-      isCode: isCodeProject(state),
+      isCode: isCodeProject(state) && (codeRenders?.required ?? true),
       minted: codeRenders?.minted ?? 0,
       present: codeRenders?.present ?? 0,
       anyCheck,
@@ -950,13 +977,10 @@ export async function cmdVerifyRemote(
   if (!stateRes.ok) {
     throw new Error(`resolver ${base} doesn't serve ${address} (HTTP ${stateRes.status}) — register it first: abx add ${address} --remote ${remote.name?.toLowerCase() ?? base}`);
   }
-  const state = (await stateRes.json()) as {
-    name?: string;
-    tokens?: Array<{tokenId: string; lifecycle: TokenState['lifecycle']; fields?: MetadataField[]}>;
-  };
+  const state = (await stateRes.json()) as ProjectState;
   verifyReport.name = state.name ?? null;
   const onChainContent = (state.tokens ?? []).flatMap((token) => {
-    const representation = onChainImageSource(token.fields ?? []);
+    const representation = onChainImageSource(token.fields ?? [], state.collectionFields);
     return representation
       ? [{tokenId: token.tokenId, lifecycle: token.lifecycle, field: 'image' as const, representation}]
       : [];
@@ -984,6 +1008,15 @@ export async function cmdVerifyRemote(
     console.log(`    ${dim('watcher OFF — changes land only via explicit add/index or a manual render (ABX_WATCH_INTERVAL_MS=0)')}`);
   }
   const minted = (state.tokens ?? []).filter((t) => t.lifecycle === 'live');
+  const remoteIsCodeProject =
+    state.contractType === 'code' ||
+    state.contractType === 'edition-code' ||
+    fieldOf(state.collectionFields ?? [], 'code') !== null ||
+    (state.script?.chunkCount ?? 0) > 0;
+  const renderable = remoteIsCodeProject
+    ? minted.filter((t) => needsRenderEffect(t.fields ?? [], state.collectionFields))
+    : [];
+  const renderableIds = new Set(renderable.map((t) => t.tokenId));
   if (minted.length === 0) {
     info('no tokens minted yet — mint token #0, then re-run.');
     verifyReport.availability = jsonSafe({status: 'unknown', note: 'no tokens minted yet'});
@@ -1004,33 +1037,37 @@ export async function cmdVerifyRemote(
       counts: {upToDate: number; stale: number; rendering: number; failed: number};
       tokens: Array<{tokenId: string; effectKey: string; status: string; error?: string; attempts?: number}>;
     };
-    for (const t of report.tokens) {
+    const relevant = report.tokens.filter((t) => renderableIds.has(t.tokenId));
+    for (const t of relevant) {
       const label = `token #${t.tokenId} ${t.effectKey}`;
       if (t.status === 'up-to-date') ok(`${label}: up to date (real render at the current state)`);
       else if (t.status === 'rendering') info(`${label}: rendering — the effects runner is on it`);
       else if (t.status === 'failed') console.log(`    ${c.red}✗${c.reset} ${label}: FAILED${t.attempts ? ` after ${t.attempts} attempt(s)` : ''} — ${t.error ?? 'see runner logs'} ${dim(`(fix, then \`abx render ${address} ${t.tokenId} --force --remote ${base}\`)`)}`);
       else console.log(`    ${c.orange}⚠${c.reset} ${label}: stale — no render at the current state yet (the runner's next notify/sweep picks it up, or \`abx render ${address} --remote ${base}\`)`);
     }
-    const {upToDate, stale, rendering, failed} = report.counts;
+    const upToDate = relevant.filter((t) => t.status === 'up-to-date').length;
+    const stale = relevant.filter((t) => t.status === 'stale').length;
+    const rendering = relevant.filter((t) => t.status === 'rendering').length;
+    const failed = relevant.filter((t) => t.status === 'failed').length;
     // RENDERS ONLY — say so. This report answers "is there a current render for each token", never
     // "do the served bytes match the on-chain commitment"; those are different questions and this
     // command promises the second one too. A project with no renders at all (a 1/1, an image Series)
     // has nothing to be "up to date" ABOUT, so don't print a 0/N fraction — but don't let a green ✓
     // here read as "the image is verified" either. Byte integrity comes from the check below.
-    if (report.tokens.length === 0) {
-      info(`renders    ${dim('none for this project (a static image needs no off-chain render)')}`);
+    if (renderable.length === 0) {
+      info(`renders    ${dim('not required; explicit image and attributes fields are authoritative')}`);
     } else {
       // Lead with the count that carries the polarity: "N of M current" never inverts on a skim the
       // way "0/M up to date" does.
-      const summary = `${upToDate} of ${minted.length} token(s) current${rendering ? ` · ${rendering} rendering` : ''}${stale ? ` · ${stale} stale` : ''}${failed ? ` · ${failed} FAILED` : ''}`;
+      const summary = `${upToDate} of ${renderable.length} token(s) current${rendering ? ` · ${rendering} rendering` : ''}${stale ? ` · ${stale} stale` : ''}${failed ? ` · ${failed} FAILED` : ''}`;
       if (failed || stale) console.log(`  ${c.orange}⚠${c.reset} renders: ${summary} ${dim('— live view animates regardless; only the static thumbnail is affected.')}`);
       else ok(`renders: ${summary}`);
     }
-    verifyReport.renders = jsonSafe({minted: minted.length, upToDate, stale, rendering, failed, tokens: report.tokens});
+    verifyReport.renders = jsonSafe({minted: renderable.length, upToDate, stale, rendering, failed, tokens: relevant});
     verifyReport.availability = jsonSafe(
       computeAvailability({
-        isCode: report.tokens.length > 0,
-        minted: minted.length,
+        isCode: renderable.length > 0,
+        minted: renderable.length,
         present: upToDate,
         anyCheck: false,
         unrecomputablePointers: 0,
@@ -1048,7 +1085,7 @@ export async function cmdVerifyRemote(
   let gap = false;
   let present = 0;
   const missing: string[] = [];
-  for (const t of minted) {
+  for (const t of renderable) {
     const img = await fetch(`${base}/t/${chainId}/${address}/${t.tokenId}/image`, {redirect: 'manual'});
     const loc = img.headers.get('location');
     const ct = img.headers.get('content-type') ?? '';
@@ -1060,14 +1097,15 @@ export async function cmdVerifyRemote(
       console.log(`    ${c.orange}⚠${c.reset} token #${t.tokenId} image: PLACEHOLDER (${ct || 'svg'}) — run \`abx render ${address} --remote ${base}\`, or stand up the effects runner`);
     }
   }
-  console.log(
+  if (renderable.length === 0) info('render effect not required — explicit image and attributes fields are authoritative');
+  else console.log(
     gap
       ? `  ${dim('live view animates regardless; the placeholder only affects the static marketplace thumbnail.')}`
       : `  ${g('✓ thumbnails are real renders')} ${dim('— served straight from the resolver.')}`,
   );
-  verifyReport.renders = jsonSafe({minted: minted.length, present, missing, scope: 'the resolver (raw image probe — no /effects route)'});
+  verifyReport.renders = jsonSafe({minted: renderable.length, present, missing, scope: 'the resolver (raw image probe — no /effects route)'});
   verifyReport.availability = jsonSafe(
-    computeAvailability({isCode: true, minted: minted.length, present, anyCheck: false, unrecomputablePointers: 0, onChainContent: onChainContent.length}),
+    computeAvailability({isCode: renderable.length > 0, minted: renderable.length, present, anyCheck: false, unrecomputablePointers: 0, onChainContent: onChainContent.length}),
   );
   emit(verifyReport);
   const integrity = await reportRemoteByteIntegrity(address, remote, base, onChainContent.map((item) => item.representation));

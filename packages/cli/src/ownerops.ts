@@ -152,7 +152,7 @@ import {gatedSend, laneFromFlags} from './riskgate.js';
 import {withJson} from './jsonout.js';
 import {controlPlaneClient, resolveRemote} from './remote.js';
 import {isDryRun, positionalArgs, unknownFlags, warnStrayFlags} from './flags.js';
-import {parseSchemaSpecs, describeSchema, type ParsedSchema} from './schema.js';
+import {parseSchemaSpecs, describeParamAuthority, describeSchema, type ParsedSchema} from './schema.js';
 
 // Re-exported for main.ts (the on-chain-vs-off-chain cost model + the compression-mode type now
 // live in the SDK's staging.ts, layered on planChunks/planContentTxs — see the comment at their
@@ -434,7 +434,7 @@ export async function cmdConfigureParam(address: string | undefined, rest: strin
     functionName: 'paramSchema',
     args: [encodeTagSdk(key)],
   })) as [boolean, number, number, Address, number, Hex, Hex, string[]];
-  const [exists, paramTypeIdx, , , , , , selectOptions] = schema;
+  const [exists, paramTypeIdx, authIdx, authAddress, , , , selectOptions] = schema;
 
   // Contract scope (`-`): the raw owner setters (`setContractParam[Data]`) — the write path of
   // well-known contract params like `display.animation`. Schema-less keys only: a schema'd key closes
@@ -475,6 +475,7 @@ export async function cmdConfigureParam(address: string | undefined, rest: strin
     );
   }
   const typeName = (['Bool','Select','Uint256Range','Int256Range','DecimalRange','HexColor','Timestamp','String','Bytes'] as const)[paramTypeIdx] as ParamTypeName;
+  console.log(`  authority ${describeParamAuthority(authIdx, authAddress)} ${dim('(from the on-chain schema)')}`);
 
   let sent: SignResult | null;
   if (typeName === 'String' || typeName === 'Bytes') {

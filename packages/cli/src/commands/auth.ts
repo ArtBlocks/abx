@@ -20,6 +20,7 @@ import {
   type RemoteTarget
 } from '../remote.js'
 import { bold, dim, g, info, ok } from '../output.js'
+import { provisionCreatorWallet } from '../creator-signer.js'
 
 const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
 const DEVICE_CLIENT_ID = 'abx-cli'
@@ -456,7 +457,7 @@ export async function oauthLogout(
   return { status: 'revoked', local }
 }
 
-function targetForAuth(spec: string, action: 'login' | 'logout' | 'keys' | 'revoke-key'): RemoteTarget {
+function targetForAuth(spec: string, action: 'login' | 'logout' | 'keys' | 'revoke-key' | 'wallet'): RemoteTarget {
   const target = resolveRemote(spec)
   if (!target) throw new Error(`auth ${action} needs a remote`)
   if (target.source === 'url' || target.source === 'default') {
@@ -470,14 +471,14 @@ function targetForAuth(spec: string, action: 'login' | 'logout' | 'keys' | 'revo
 export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
   const positions = positionalArgs(args)
   const subcommand = positions[0]
-  if (!['login', 'logout', 'keys', 'revoke-key'].includes(subcommand ?? '')) {
-    throw new Error('usage: abx auth <login|logout|keys|revoke-key> ...')
+  if (!['login', 'logout', 'keys', 'revoke-key', 'wallet'].includes(subcommand ?? '')) {
+    throw new Error('usage: abx auth <login|logout|keys|revoke-key|wallet> ...')
   }
   if (subcommand === 'revoke-key' && (positions.length < 2 || positions.length > 3)) {
     throw new Error('usage: abx auth revoke-key <key-id> [<remote-name>]')
   }
   if (subcommand !== 'revoke-key' && positions.length > 2) {
-    throw new Error('usage: abx auth <login|logout|keys> [<remote-name>]')
+    throw new Error('usage: abx auth <login|logout|keys|wallet> [<remote-name>]')
   }
   if (flags.remote === 'true') throw new Error('--remote needs a named remote, for example `--remote abx`')
   const keyId = subcommand === 'revoke-key' ? positions[1] : undefined
@@ -485,7 +486,7 @@ export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
   const flagTarget = typeof flags.remote === 'string' && flags.remote !== 'true' ? flags.remote : undefined
   if (positionalTarget && flagTarget) throw new Error('choose a positional remote name or --remote, not both')
   const spec = positionalTarget ?? flagTarget ?? 'abx'
-  const target = targetForAuth(spec, subcommand as 'login' | 'logout' | 'keys' | 'revoke-key')
+  const target = targetForAuth(spec, subcommand as 'login' | 'logout' | 'keys' | 'revoke-key' | 'wallet')
   const envPath = resolvePath(process.cwd(), '.env')
 
   if (subcommand === 'keys' || subcommand === 'revoke-key') {
@@ -503,6 +504,16 @@ export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
       console.log(`  ${key.id}${current}  ${dim(`${key.label ?? 'unlabeled'} · ${key.createdAt}`)}`)
     }
     info(`${result.keys.length} of ${result.limit} active keys`)
+    return
+  }
+
+  if (subcommand === 'wallet') {
+    if (target.name?.toUpperCase() !== 'ABX') {
+      throw new Error('`abx auth wallet` currently provisions the first-party ABX creator wallet only.')
+    }
+    requireRemoteToken(target)
+    const wallet = await provisionCreatorWallet({env: {...process.env, ABX_SERVICES_API_KEY: target.token}})
+    ok(`${wallet.created ? 'created' : 'reusing'} creator wallet ${wallet.address}`)
     return
   }
 
@@ -571,4 +582,7 @@ export const AUTH_HELP = `
     ${g('abx auth keys')}              show key ids, labels, creation times, and the current key
 
   ${bold('abx auth revoke-key')} <key-id> [<remote-name>] ${dim('— revoke another active key')}
-    ${g('abx auth revoke-key <id>')}   free an unused key slot; use ${g('abx auth logout')} for the current key`
+    ${g('abx auth revoke-key <id>')}   free an unused key slot; use ${g('abx auth logout')} for the current key
+
+  ${bold('abx auth wallet')} ${dim('— provision or show the stable creator wallet for this ABX Services account')}
+    ${g('abx auth wallet')}            safe setup for sponsored dry runs; reuses the same wallet every time`
