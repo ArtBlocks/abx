@@ -14,7 +14,8 @@ abx add 0xYourContract --remote abx
 ```
 
 `abx auth login` opens a browser flow and saves `ABX_SERVICES_API_KEY` to an ignored `.env`. It does
-not print the key. A later login reuses the loaded key.
+not print the key. The same sign-in provisions or reuses the creator wallet; an active browser
+session can avoid another email code. A later CLI login reuses the loaded key.
 
 An account may have five active keys. The service cannot recover a lost key value.
 

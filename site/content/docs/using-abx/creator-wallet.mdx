@@ -16,6 +16,9 @@ abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --dry-run
 abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor
 ```
 
+Login provisions or reuses the account's stable creator wallet. To do that separately, or to show
+the address before a sponsored dry run, run `abx auth wallet`.
+
 The first sponsored command asks you to match a code and approve the agent. ABX stores the grant in
 your operating system's credential store and reuses it for up to 30 days, unless you revoke it first. You
 still review the network and transaction plan in your terminal before each send.

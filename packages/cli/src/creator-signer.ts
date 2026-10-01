@@ -90,7 +90,7 @@ export async function sponsoredWalletAddress(
       options.provision
         ? 'ABX Services did not return the creator wallet after provisioning.'
         : 'Sponsored dry run needs an existing ABX creator wallet, but this account has not provisioned one yet. ' +
-          'Provision the wallet through ABX Services first, then rerun; the preview will not create external state.',
+          'Run `abx auth wallet` once, then rerun; the preview will not create external state.',
     );
   }
   if (!account.capabilities.sponsorship || !account.capabilities.sponsoredChains.includes(chain.id)) {
@@ -161,6 +161,25 @@ export async function creatorApiUrl(chainId: number, env: NodeJS.ProcessEnv = pr
     throw new Error(`The ABX creator-wallet service does not support chain ${chainId}. Use --send, --sign, or --unsigned.`);
   }
   return endpoint.baseUrl;
+}
+
+/** Provision or reuse the stable first-party creator wallet without entering a sponsorship lane. */
+export async function provisionCreatorWallet(
+  options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch} = {},
+): Promise<{address: Address; created: boolean}> {
+  const env = options.env ?? process.env;
+  const apiKey = env.ABX_SERVICES_API_KEY;
+  if (!apiKey) throw new Error('Creator wallet setup needs ABX_SERVICES_API_KEY. Run `abx auth login` first.');
+  const baseUrl = env.ABX_CREATORS_API_URL
+    ? checkedCreatorApiUrl(env.ABX_CREATORS_API_URL)
+    : await (async () => {
+        const descriptor = await new AbxServiceClient({baseUrl: ABX_SERVICES_URL, timeoutMs: 10_000}).descriptor();
+        const endpoint = resolveServiceInterfaceEndpoint(ABX_SERVICES_URL, descriptor, CREATOR_WALLET_INTERFACE);
+        if (!endpoint) throw new Error('ABX Services does not advertise a creator-wallet service.');
+        return endpoint.baseUrl;
+      })();
+  const wallet = await new CreatorApiClient({baseUrl, token: apiKey, fetchImpl: options.fetchImpl}).provisionWallet();
+  return {address: wallet.address, created: wallet.created};
 }
 
 function openBrowser(url: string): void {

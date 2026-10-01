@@ -33,11 +33,12 @@ abx auth login
 ```
 
 The CLI starts the OAuth device flow and shows a verified browser URL plus a matching short code.
-The human completes name, email, one-time-code verification, and approval in that browser. The CLI
-polls at the provider-declared interval, receives the API key, and writes it directly to ignored
-`.env` without printing it. The browser never receives the key. Do not ask the human to paste an OTP
-or key into chat. `--no-open` leaves the browser handoff as a link; `--force` is required to replace
-an existing local credential, but does not revoke the displaced provider key. For normal rotation,
+The human signs in with the ABX account email and approves in that browser. An existing browser
+session avoids another email code. The same approval provisions or reuses the account's creator
+wallet. The CLI polls at the provider-declared interval, receives the API key, and writes it directly
+to ignored `.env` without printing it. The browser never receives the key. Do not ask the human to
+paste an OTP or key into chat. `--no-open` leaves the browser handoff as a link; `--force` is required
+to replace an existing local credential, but does not revoke the displaced provider key. For normal rotation,
 run `abx auth logout` and then `abx auth login`; reserve `--force` for recovery. The CLI refuses
 tracked or unignored `.env` files.
 
@@ -87,7 +88,8 @@ resolver and verify the resulting public surfaces as described in [hosting.md](h
 
 An account with a verified email can use one persistent ABX creator wallet. The
 `ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` discovers the provider's
-`abx-creator-wallet/v1` endpoint and provisions or reuses the wallet. The first sponsored command
+`abx-creator-wallet/v1` endpoint and reuses the wallet created during login. `abx auth wallet`
+provisions or shows it explicitly when needed. The first sponsored command
 asks the human to match one code and approve a Privy agent grant. The CLI keeps the rotating grant in
 the operating system's credential store and reuses it for up to 30 days, unless the creator revokes
 it first. The request-signing key remains memory-only. A reused grant removes another browser step; it does

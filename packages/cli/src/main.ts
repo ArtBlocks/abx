@@ -25,7 +25,7 @@
  *                            --copies <n|open> makes it an EditionCode (a generative drop, minted as copies)
  *   abx deploy-contract      deploy exact compiled EVM initcode (custom hooks/renderers; ABX does not compile)
  *   abx add <address>        register + index a project (--remote <name|url>: on a remote resolver, not this machine)
- *   abx auth login|logout    authorize in a browser, or revoke and remove the current API key
+ *   abx auth login|logout|wallet  authorize services, revoke access, or show the creator wallet
  *   abx remote [<name|url>]  inspect a remote service (descriptor · chains · managed rendering · your projects there)
  *   abx index [<address>]    re-index a project from chain (replay; --remote to nudge a remote resolver)
  *   abx verify <address>     re-hash served bytes vs the on-chain commitment (no server)
@@ -1331,6 +1331,7 @@ function help() {
                             ${g('--conformance')} self-certifies it against remote-services.md instead (exits non-zero on a failed assertion — see ${g('abx help remote')})
     ${g('abx auth login')}           authorize ABX Services in a browser; saves the key to ignored .env without printing it
     ${g('abx auth logout')}          revoke the current ABX Services key, then remove it from .env
+    ${g('abx auth wallet')}          provision or show this account's stable creator wallet
     ${g('abx feedback')}            preview/file core ABX feedback; ${g('--remote <provider>')} switches target (no report sends without --yes)
     ${g('abx index')} [<address>]   re-index from chain (incremental by default; ${g('--full')} forces a replay from deploy)
     ${g('abx verify')} <addr>       re-hash served bytes vs the on-chain commitment (no resolver needed; ${g('abx add')} it locally first)

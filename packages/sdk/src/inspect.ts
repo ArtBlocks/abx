@@ -157,10 +157,33 @@ function paramKeys(source: string): string[] {
   return [...keys];
 }
 
-/** Extract the key names from the first `abx.traits({ ... })` object literal (flat objects only). */
+/** Extract flat object-literal keys from the first `abx.traits(...)` argument.
+ *
+ * The argument may choose between object literals (`condition ? {A: 1} : {B: 2}`). Treat every
+ * branch as a possible reported shape instead of saying the call reports zero traits. This remains
+ * deliberately static and shallow: computed keys or objects built elsewhere are reported as
+ * dynamic/unknown by the CLI rather than guessed. */
 function traitKeys(source: string): string[] {
-  const m = source.match(/abx\s*\??\s*\.\s*traits\s*\(\s*\{([^}]*)\}/);
-  if (!m) return [];
+  const call = /abx\s*\??\s*\.\s*traits\s*\(/g.exec(source);
+  if (!call) return [];
+  const start = call.index + call[0].length;
+  let quote = '';
+  let escaped = false;
+  let depth = 1;
+  let end = source.length;
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '(') depth++;
+    else if (ch === ')' && --depth === 0) { end = i; break; }
+  }
+  const argument = source.slice(start, end);
   const keys: string[] = [];
   // A key sits at the start of the object or right after a comma (so a ternary VALUE like
   // `? 'Sparse' : 'Dense'` — a `:` not preceded by `,`/`{` — is never mistaken for a key). Allow
@@ -170,7 +193,7 @@ function traitKeys(source: string): string[] {
   // keys, and "believe inspect" then sent authors chasing a phantom missing trait.
   const re = /(?:^\s*|[,{]\s*)(?:(['"])([^'"]+)\1|([A-Za-z_$][\w$]*))\s*:/g;
   let k: RegExpExecArray | null;
-  while ((k = re.exec(m[1])) !== null) keys.push(k[2] ?? k[3]);
+  while ((k = re.exec(argument)) !== null) keys.push(k[2] ?? k[3]);
   return [...new Set(keys)];
 }
 
@@ -189,7 +212,9 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   const usesBareRandom = /(^|[^.\w])random\s*\(/.test(code);
   const seeded = /\brandomSeed\s*\(/.test(code);
   const usesNoise = /\bnoise\s*\(/.test(code);
-  const looksP5 = /\bcreateCanvas\s*\(|function\s+setup\s*\(|function\s+draw\s*\(|\bp5\b/.test(code);
+  // `setup` and `draw` are ordinary application names. Treating either as p5 made vanilla Canvas
+  // projects inherit a dependency they never used. Require a p5-specific call/constructor instead.
+  const looksP5 = /\bcreateCanvas\s*\(|\brandomSeed\s*\(|\bnew\s+p5\s*\(|\bp5\s*\(/.test(code);
   // A generator the author wrote themselves — the dominant shape for dependency-free work, and
   // invisible to `seeded` (which only knows p5's `randomSeed(`). Matches the arithmetic fingerprints
   // of the usual suspects: LCG multipliers/moduli, xorshift, and the uint32 coercions they need.
@@ -287,12 +312,13 @@ export function recommendLane(a: ScriptAnalysis): string {
     // resolver — maneuverable over time + marketplaces fetch a SMALL tokenURI reliably. Fully-on-chain
     // is the durability-max alternative, but its ~docKb tokenURI (whole doc per call) strains some
     // marketplace/indexer reads. Traits are NOT a free flag on the on-chain lane (deployed renderer).
+    const traitNames = a.traits.keys.length ? a.traits.keys.join(', ') : 'dynamic keys';
     const traits = a.traits.present
-      ? ` Traits (${a.traits.keys.join(', ')}): the resolver serves them from the render with no Solidity; on the on-chain lane they need a DEPLOYED --attributes-renderer (fork SeedTraitsRenderer.sol) or they're omitted.`
+      ? ` Traits (${traitNames}): the resolver serves them from the render with no Solidity; on the on-chain lane they need a DEPLOYED --attributes-renderer (fork SeedTraitsRenderer.sol) or they're omitted.`
       : ``;
     return (
-      `RECOMMENDED for a drop you'll sell — OFF-CHAIN RESOLVER (--public-base-url + an effects runner): maneuverable (metadata/serving can evolve without on-chain surgery) and marketplaces fetch a SMALL tokenURI reliably.${traits}\n` +
-      `  ALTERNATIVE — FULLY ON-CHAIN (--onchain-uri${dep} --image-base <bucket>): maximal durability / no server, but the tokenURI carries the whole ~${docKb}KB document per call (some marketplace + indexer reads choke on a doc this big), stills are MANUAL, and later changes are on-chain re-points. Pick it when permanence + zero-infra outweigh maneuverability.`
+      `DEFAULT WITHOUT DEPLOYMENT CONTEXT — OFF-CHAIN RESOLVER (--public-base-url + an effects runner): maneuverable (metadata/serving can evolve without on-chain surgery) and marketplaces fetch a SMALL tokenURI reliably.${traits}\n` +
+      `  FULLY ON-CHAIN IS ALSO VIABLE (--onchain-uri${dep}): supply authoritative on-chain image/attributes renderers where needed. The tokenURI carries the whole ~${docKb}KB document per call, so confirm marketplace/indexer compatibility before choosing it.`
     );
   }
   return (

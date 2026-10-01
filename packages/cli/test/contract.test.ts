@@ -8,7 +8,7 @@ import {
   create2CalldataFromSalt,
   predictCreate2AddressFromSalt,
 } from '@artblocks/abx-sdk';
-import {contractInitcode, sponsoredContractPlan} from '../src/commands/contract.js';
+import {contractInitcode, sponsoredContractPlan, sponsoredContractPreviewAddress} from '../src/commands/contract.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'abx-contract-command-'));
 after(() => rmSync(dir, {recursive: true, force: true}));
@@ -41,4 +41,6 @@ test('sponsored deploy-contract becomes an exact CREATE2 proxy call with a predi
   assert.equal(plan.transaction.value, '0x0');
   assert.equal(plan.transaction.chainId, 84532);
   assert.equal(plan.transaction.fields?.constructorCaller, CREATE2_PROXY);
+  assert.equal(sponsoredContractPreviewAddress(plan, false), null, 'a fresh dry-run salt must not expose an unreplayable address');
+  assert.equal(sponsoredContractPreviewAddress(plan, true), plan.address, 'a caller-pinned salt makes the address replayable');
 });

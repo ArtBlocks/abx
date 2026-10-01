@@ -11,7 +11,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {MetadataField} from '@artblocks/abx-sdk';
-import {computeAvailability, onChainImageSource, pointerOnlyImageCheck, verifyChainComplete} from '../src/commands/project.js';
+import {
+  computeAvailability,
+  needsDerivedRenderImage,
+  needsRenderEffect,
+  onChainImageSource,
+  pointerOnlyImageCheck,
+  verifyChainComplete,
+} from '../src/commands/project.js';
 
 const field = (representation: string): MetadataField => ({field: 'image', representation, value: '0x00' as MetadataField['value']});
 
@@ -41,12 +48,28 @@ test('pointerOnlyImageCheck: no image field at all is "no commitment", not "unre
 });
 
 test('onChainImageSource: inline and reader images are chain-resident, not hash checks or pointers', () => {
-  for (const representation of ['inline', 'inline-gzip', 'reader', 'reader-gzip']) {
+  for (const representation of ['inline', 'inline-gzip', 'reader', 'reader-gzip', 'renderer']) {
     assert.equal(onChainImageSource([field(representation)]), representation);
   }
   for (const representation of ['keccak256', 'sha256', 'ipfs', 'url']) {
     assert.equal(onChainImageSource([field(representation)]), null);
   }
+});
+
+test('collection-scope image fields suppress derived render requirements', () => {
+  assert.equal(needsDerivedRenderImage([], [field('renderer')]), false);
+  assert.equal(needsDerivedRenderImage([field('inline')], []), false);
+  assert.equal(needsDerivedRenderImage([], []), true);
+  assert.equal(onChainImageSource([], [field('renderer')]), 'renderer');
+
+  const image = field('renderer');
+  const attributes = {
+    field: 'attributes',
+    representation: 'inline',
+    value: '0x5b5d' as MetadataField['value'],
+  };
+  assert.equal(needsRenderEffect([], [image]), true);
+  assert.equal(needsRenderEffect([], [image, attributes]), false);
 });
 
 test('verifyChainComplete: static projects report not-applicable instead of a false failure signal', () => {

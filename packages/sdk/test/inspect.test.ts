@@ -39,10 +39,10 @@ test('analyzeScript: seeded p5 sketch — all four trait keys, p5 detected, exac
   assert.equal(a.prng.usesMathRandom, false);
   assert.equal(a.feasibility.verdict, 'exact-likely');
   assert.equal(a.doc.fitsSingleCall, true); // 1.7KB script + runtime + p5 ~200KB ≪ ceiling
-  // Owner call: a generative drop RECOMMENDS the off-chain resolver (maneuverable + small tokenURI);
-  // fully-on-chain remains the named ALTERNATIVE (durability-max).
-  assert.match(recommendLane(a), /RECOMMENDED[^\n]*RESOLVER/i);
-  assert.match(recommendLane(a), /ALTERNATIVE[^\n]*FULLY ON-CHAIN/i);
+  // Without deployment context, inspect names the tradeoff instead of pretending one lane is
+  // universally correct.
+  assert.match(recommendLane(a), /DEFAULT WITHOUT DEPLOYMENT CONTEXT[^\n]*RESOLVER/i);
+  assert.match(recommendLane(a), /FULLY ON-CHAIN IS ALSO VIABLE/i);
   // A ternary VALUE ('Sparse'/'Dense'/'Calm'/'Wild') must NOT be mistaken for a trait key.
   for (const bogus of ['Sparse', 'Dense', 'Calm', 'Wild']) assert.ok(!a.traits.keys.includes(bogus), `stray key ${bogus}`);
 });
@@ -93,8 +93,8 @@ test('analyzeScript: no traits reported → none, still fully-on-chain viable', 
   const a = analyzeScript(`function setup(){createCanvas(400,400);} function draw(){background(0);}`, ['p5@1.0.0']);
   assert.equal(a.traits.present, false);
   assert.equal(a.feasibility.verdict, 'none');
-  assert.match(recommendLane(a), /RECOMMENDED[^\n]*RESOLVER/i); // resolver-first even with no traits
-  assert.match(recommendLane(a), /FULLY ON-CHAIN/); // still named as the durability alternative
+  assert.match(recommendLane(a), /DEFAULT WITHOUT DEPLOYMENT CONTEXT[^\n]*RESOLVER/i);
+  assert.match(recommendLane(a), /FULLY ON-CHAIN IS ALSO VIABLE/);
 });
 
 test('analyzeScript: a document too large for one eth_call → directory-mode recommendation', () => {
@@ -179,6 +179,17 @@ test('inspect: real p5 usage is still detected (the fix must not blind the detec
   assert.deepEqual(a.depHints, ['p5']);
 });
 
+test('inspect: vanilla functions named setup/draw are not enough to infer p5', () => {
+  const a = analyzeScript(`
+function setup(){ return document.createElement('canvas').getContext('2d'); }
+function draw(ctx){ ctx.fillRect(0, 0, 10, 10); }
+const seed = abx.tokenData.seed;
+abx.traits({ Medium: 'Canvas' });
+`);
+  assert.deepEqual(a.depHints, []);
+  assert.equal(a.looksP5, false);
+});
+
 test('inspect: reserved coordinates are never reported as PostParams', () => {
   // `--schema tokenId:…` is advice that must NOT be followed — tokenId/chainId/contractAddress/seed
   // are injected by the runtime and cannot be declared.
@@ -213,6 +224,15 @@ const seed = abx.tokenData.seed;
 abx.traits({ 'Plant Count': 3, Palette: 'Newsprint' });
 `);
   assert.deepEqual(a.traits.keys.sort(), ['Palette', 'Plant Count']);
+});
+
+test('inspect: conditional trait object branches contribute their possible keys', () => {
+  const a = analyzeScript(`
+const day = abx.tokenData.day;
+abx.traits(day === null ? { Mode: 'Open', Phase: 0 } : { Mode: 'Dated', Day: day });
+`);
+  assert.equal(a.runtime.reportsTraits, true);
+  assert.deepEqual(a.traits.keys.sort(), ['Day', 'Mode', 'Phase']);
 });
 
 test('inspect: a hand-written seeded PRNG is not reported as "no PRNG"', () => {
