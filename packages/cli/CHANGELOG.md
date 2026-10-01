@@ -1,5 +1,16 @@
 # @artblocks/abx-cli
 
+## 0.4.1
+
+### Patch Changes
+
+- 997e44d: Improve project inspection, render verification, PostParam authority guidance, creator-wallet setup, and deterministic contract-deploy previews.
+- Updated dependencies [997e44d]
+  - @artblocks/abx-sdk@0.4.1
+  - @artblocks/abx-indexer@0.1.4
+  - @artblocks/abx-storage@0.1.4
+  - @artblocks/abx-token-api@0.2.3
+
 ## 0.4.0
 
 ### Minor Changes

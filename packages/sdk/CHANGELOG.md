@@ -1,5 +1,11 @@
 # @artblocks/abx-sdk
 
+## 0.4.1
+
+### Patch Changes
+
+- 997e44d: Improve project inspection, render verification, PostParam authority guidance, creator-wallet setup, and deterministic contract-deploy previews.
+
 ## 0.4.0
 
 ### Minor Changes
