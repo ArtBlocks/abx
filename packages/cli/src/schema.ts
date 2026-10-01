@@ -239,3 +239,13 @@ export function describeSchema(s: ParsedSchema): string {
   const lock = s.lockAfter ? `:lock=${new Date(s.lockAfter * 1000).toISOString().slice(0, 19)}Z` : '';
   return `${s.key}:${type}${detail}:${auth}${who}${lock}`;
 }
+
+/** Decode the on-chain auth enum for a transaction readout. The deployed custom error carries no
+ * arguments, so showing the schema before a send is the useful place to prevent a false owner-only
+ * diagnosis. */
+export function describeParamAuthority(authIndex: number, authAddress: Address): string {
+  const auth = AUTH_OPTIONS[authIndex] ?? `Unknown(${authIndex})`;
+  const address = auth.includes('Address') ? ` (${authAddress})` : '';
+  const delegate = auth.includes('TokenOwner') ? ' · delegate.xyz delegates accepted' : '';
+  return `${auth}${address}${delegate}`;
+}
