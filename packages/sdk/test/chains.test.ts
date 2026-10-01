@@ -24,8 +24,16 @@ test('chain registry separates recognized networks from selectable networks', ()
     'ethereum',
     'arbitrum',
   ]);
-  assert.deepEqual(KNOWN_CHAIN_KEYS, ['base-sepolia', 'sepolia', 'robinhood-testnet', 'arbitrum-sepolia', 'base', 'robinhood']);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 6);
+  assert.deepEqual(KNOWN_CHAIN_KEYS, [
+    'base-sepolia',
+    'sepolia',
+    'robinhood-testnet',
+    'arbitrum-sepolia',
+    'base',
+    'robinhood',
+    'arbitrum',
+  ]);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 7);
   assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
@@ -35,7 +43,8 @@ test('chain registry separates recognized networks from selectable networks', ()
   assert.equal(chainSupportByKey('robinhood')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'disabled');
-  assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'disabled');
+  assert.equal(chainSupportByKey('arbitrum')?.contractStatus, 'deployed');
+  assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'beta');
 });
 
 test('registry ids agree with viem chain metadata, including disabled production networks', () => {
