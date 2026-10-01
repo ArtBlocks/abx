@@ -71,8 +71,8 @@
       "name": "Arbitrum",
       "environment": "production",
       "pairedChain": "arbitrum-sepolia",
-      "contractStatus": "not-deployed",
-      "supportLevel": "disabled"
+      "contractStatus": "deployed",
+      "supportLevel": "beta"
     }
   ]
 }
