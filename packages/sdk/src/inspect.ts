@@ -163,10 +163,35 @@ function paramKeys(source: string): string[] {
  * branch as a possible reported shape instead of saying the call reports zero traits. This remains
  * deliberately static and shallow: computed keys or objects built elsewhere are reported as
  * dynamic/unknown by the CLI rather than guessed. */
+function traitsCallArgumentStart(source: string): number | null {
+  const whitespace = (ch: string | undefined) => ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n';
+  const identifier = (ch: string | undefined) => ch !== undefined && /[A-Za-z0-9_$]/.test(ch);
+  let from = 0;
+  while (from < source.length) {
+    const found = source.indexOf('abx', from);
+    if (found === -1) return null;
+    from = found + 3;
+    if (identifier(source[found - 1]) || identifier(source[from])) continue;
+    let i = from;
+    while (whitespace(source[i])) i++;
+    if (source[i] === '?') {
+      i++;
+      while (whitespace(source[i])) i++;
+    }
+    if (source[i] !== '.') continue;
+    i++;
+    while (whitespace(source[i])) i++;
+    if (source.slice(i, i + 6) !== 'traits' || identifier(source[i + 6])) continue;
+    i += 6;
+    while (whitespace(source[i])) i++;
+    if (source[i] === '(') return i + 1;
+  }
+  return null;
+}
+
 function traitKeys(source: string): string[] {
-  const call = /abx\s*\??\s*\.\s*traits\s*\(/g.exec(source);
-  if (!call) return [];
-  const start = call.index + call[0].length;
+  const start = traitsCallArgumentStart(source);
+  if (start === null) return [];
   let quote = '';
   let escaped = false;
   let depth = 1;
@@ -231,7 +256,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   // toolkit injects/captures them? A near-miss global deploys fine but is silently broken.
   // `\??\s*\.` tolerates optional chaining (`abx?.tokenData`) — a common, correct way to read it.
   const readsTokenData = /abx\s*\??\s*\.\s*tokenData\b/.test(code) || /window\s*\??\s*\.\s*abxTokenData\b/.test(code);
-  const reportsTraits = /abx\s*\??\s*\.\s*traits\s*\(/.test(code);
+  const reportsTraits = traitsCallArgumentStart(code) !== null;
   const keys = reportsTraits ? traitKeys(noComments) : [];
   let wrongGlobal: string | null = null;
   if (!readsTokenData) {
