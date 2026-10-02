@@ -46,6 +46,8 @@ export const CREATOR_TOKEN_EXTENSION_ID =
  * future chain may recommend a different validator.
  */
 export const RECOMMENDED_TRANSFER_VALIDATOR: Record<number, Address> = {
+  // Ethereum (mainnet)
+  1: '0xA000027A9B2802E1ddf7000061001e5c005A0000',
   // Sepolia (testnet)
   11155111: '0xA000027A9B2802E1ddf7000061001e5c005A0000',
   // Base Sepolia (testnet)
