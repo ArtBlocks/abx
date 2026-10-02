@@ -2490,6 +2490,13 @@ export async function assertGeneratorRepointable(
 // for --value). `--text "…"` stores literal UTF-8; `--value 0x..` stores raw bytes.
 // `--collection` targets the collection scope; otherwise token `--token` (default 0).
 // The resolver prefers on-chain over off-chain. Owner-only.
+export function collectionImageWarning(): string {
+  return (
+    'A collection-scope `image` becomes every token\'s image and takes precedence over its render. ' +
+    'It cannot be cleared with an empty write. For collection artwork that should not replace token art, use `featured_image` instead.'
+  );
+}
+
 export async function cmdSetField(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(
     address,
@@ -2499,6 +2506,7 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   assertSettableField(field); // `artifacts`/`abx_provenance` are computed, not settable → point at `abx attach`
   await assertChainId(CHAIN); // verify network up front — this op may stage on-chain content before the field tx
   const collection = !!flags.collection;
+  if (collection && field === F.image) console.error(`  ${yellow('⚠')} ${collectionImageWarning()}`);
   const lane = laneFromFlags(flags);
   const owner = await read<Address>(contract, 'owner');
   await assertGeneratorRepointable(contract, field, flags); // legacy impl + the current generator = params silently invisible

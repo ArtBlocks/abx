@@ -9,7 +9,7 @@ import {resolveRecommendedTransferValidator} from '@artblocks/abx-sdk';
 
 const SEPOLIA = {chainId: 11155111, chainLabel: 'sepolia'};
 const BASE_SEPOLIA = {chainId: 84532, chainLabel: 'base-sepolia'};
-const UNSHIPPED = {chainId: 8453, chainLabel: 'base'};
+const UNSHIPPED = {chainId: 42161, chainLabel: 'arbitrum'};
 
 test('recommended (and a bare --721c, which parses as "true") resolve the per-chain constant', () => {
   const rec = resolveRecommendedTransferValidator(SEPOLIA.chainId)!;
@@ -24,7 +24,7 @@ test('recommended on a chain with no entry: refused, naming the chains that have
   assert.throws(
     () => parseTransferValidatorValue('recommended', UNSHIPPED),
     (e: Error) => {
-      assert.match(e.message, /no recommended transfer validator .* 'base'/);
+      assert.match(e.message, /no recommended transfer validator .* 'arbitrum'/);
       assert.match(e.message, /sepolia/); // names at least one chain that DOES have an entry
       assert.match(e.message, /explicit validator address/); // …and the way out
       return true;

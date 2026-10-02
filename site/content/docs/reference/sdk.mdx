@@ -41,6 +41,10 @@ Pass explicit options when possible. SDK fallbacks include:
 
 The SDK never loads `.env` through its main entry. A host may call `loadDotEnv()` from the Node subpath.
 
+ABX ships independent keyless RPC fallbacks where they are available. Set a comma-separated
+`ABX_RPC_URLS_<CHAIN>` list for production workloads or your own provider. A submitted transaction
+hash is durable evidence: if a receipt read fails, check that hash before sending again.
+
 ## Transactions
 
 Write helpers return `PreparedTx`. The object contains the destination, calldata, value, chain ID, and

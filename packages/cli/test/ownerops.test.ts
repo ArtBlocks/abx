@@ -3,7 +3,14 @@
 // a cryptic ABI read), and the representation/reserved-key guards for the data plane.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseRoyaltyBps} from '../src/ownerops.js';
+import {collectionImageWarning, parseRoyaltyBps} from '../src/ownerops.js';
+
+test('collection image warning names both the precedence trap and the safe display field', () => {
+  const message = collectionImageWarning();
+  assert.match(message, /every token's image/);
+  assert.match(message, /cannot be cleared/);
+  assert.match(message, /featured_image/);
+});
 
 test('parseRoyaltyBps accepts 0 up to the on-chain cap (1000 bps = 10%)', () => {
   assert.equal(parseRoyaltyBps('0'), 0);

@@ -15,6 +15,10 @@ Fields live at two scopes:
 
 A token field overrides a collection field with the same name.
 
+A collection `image` is therefore the fallback image for every token and can mask a computed render.
+Empty field writes are not allowed. Use `featured_image` for collection artwork that should not
+replace token images.
+
 Common token fields are `name`, `description`, `image`, `animation_url`, `external_url`, `attributes`,
 `background_color`, and `youtube_url`. Common collection fields include `name`, `description`,
 `banner_image`, `featured_image`, `external_link`, `creator`, `creator_links`, `display_notes`, and

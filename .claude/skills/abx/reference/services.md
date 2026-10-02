@@ -120,6 +120,9 @@ keyless CREATE2 proxy because provider-backed raw creation is unsupported. The c
 sees the proxy as `msg.sender`; use explicit constructor arguments for ownership. ABX does not
 compile or audit it. Never add retries around a sponsored write. An `unknown` outcome means the
 provider may have submitted it: preserve the operation ID and reconcile status before any new send.
+Use `abx auth operation <operation-id>` for that read-only reconciliation. If Services has confirmed
+an operation but a public RPC cannot return its receipt, the confirmation and transaction hash still
+stand; switch RPCs or inspect the hash, never replay the write.
 
 Sponsorship is optional service policy, not protocol support. `--send`, `--sign`, and `--unsigned`
 remain first-class bring-your-own alternatives. Honor an explicit choice of any of them. If the

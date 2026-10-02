@@ -130,6 +130,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   'auth keys': set(['remote']),
   'auth revoke-key': set(['remote']),
   'auth wallet': set([]),
+  'auth operation': set([]),
 
   // ── rendering / effects ──
   render: set(['force', 'effects-url'], REMOTE, STORAGE_OVERRIDE),

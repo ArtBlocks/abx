@@ -23,6 +23,7 @@
 import type {Account, Address, Hex, PublicClient, TransactionReceipt, WalletClient} from 'viem';
 import type {PreparedTx} from './ops.js';
 import {GasEstimateBelowFloorError, TxRevertedError} from './errors.js';
+import {waitForTransactionReceiptResilient} from './clients.js';
 
 /**
  * Wait until `address` has code from THIS client's point of view. A deploy receipt proves the
@@ -109,6 +110,7 @@ export type SendTx = (tx: PreparedTx) => Promise<TransactionReceipt>;
  *  `onEvent` pattern). */
 export type SendEvent =
   | {kind: 'sending'; tx: PreparedTx}
+  | {kind: 'submitted'; hash: Hex; tx: PreparedTx}
   | {kind: 'mined'; receipt: TransactionReceipt; tx: PreparedTx};
 
 /**
@@ -186,8 +188,18 @@ export function makeHotSender(args: {
     });
     nonce += 1;
     sent += 1;
+    notify({kind: 'submitted', hash, tx});
 
-    const receipt = await publicClient.waitForTransactionReceipt({hash});
+    let receipt: TransactionReceipt;
+    try {
+      receipt = await waitForTransactionReceiptResilient(publicClient, {hash});
+    } catch (cause) {
+      throw new Error(
+        `Transaction ${hash} was submitted, but the configured RPCs could not read its receipt. ` +
+          `Do not retry it until you check that hash in a block explorer or another RPC.`,
+        {cause},
+      );
+    }
     if (receipt.status !== 'success') throw new TxRevertedError(tx.op, hash);
     notify({kind: 'mined', receipt, tx});
     return receipt;

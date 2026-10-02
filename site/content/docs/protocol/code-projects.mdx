@@ -111,6 +111,10 @@ A program produces the live `animation_url`. A still image normally comes from t
 [effect](/docs/protocol/effects). Until that effect lands, the resolver returns a deterministic
 placeholder.
 
+Set the collection parameters `render.imageWidth` and `render.aspectRatio` (width divided by height)
+to frame hosted and self-hosted captures consistently. They are part of token data, so a change
+creates a new render input rather than mutating an existing output.
+
 A script reports traits with `abx.traits()`. A project may also compute `attributes` with a Solidity
 [field renderer](/docs/protocol/renderers). When both exist, onchain traits win when the same trait name
 appears twice.

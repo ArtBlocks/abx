@@ -55,20 +55,32 @@ test('registry ids agree with viem chain metadata, including disabled production
 });
 
 test('Robinhood Chain Testnet has a keyless default RPC ready for qualification', () => {
-  assert.deepEqual(resolveRpcUrls('robinhood-testnet'), ['https://rpc.testnet.chain.robinhood.com']);
+  assert.deepEqual(resolveRpcUrls('robinhood-testnet'), [
+    'https://rpc.testnet.chain.robinhood.com',
+    'https://robinhood-sepolia-rpc.publicnode.com',
+  ]);
 });
 
 test('Arbitrum networks have keyless default RPCs', () => {
-  assert.deepEqual(resolveRpcUrls('arbitrum-sepolia'), ['https://sepolia-rollup.arbitrum.io/rpc']);
-  assert.deepEqual(resolveRpcUrls('arbitrum'), ['https://arb1.arbitrum.io/rpc']);
+  assert.deepEqual(resolveRpcUrls('arbitrum-sepolia'), [
+    'https://sepolia-rollup.arbitrum.io/rpc',
+    'https://arbitrum-sepolia-rpc.publicnode.com',
+  ]);
+  assert.deepEqual(resolveRpcUrls('arbitrum'), [
+    'https://arb1.arbitrum.io/rpc',
+    'https://arbitrum-one-rpc.publicnode.com',
+  ]);
 });
 
 test('Base has a keyless default RPC for beta access', () => {
-  assert.deepEqual(resolveRpcUrls('base'), ['https://mainnet.base.org']);
+  assert.deepEqual(resolveRpcUrls('base'), ['https://mainnet.base.org', 'https://base-rpc.publicnode.com']);
 });
 
 test('Robinhood Chain has a keyless default RPC for beta access', () => {
-  assert.deepEqual(resolveRpcUrls('robinhood'), ['https://rpc.mainnet.chain.robinhood.com']);
+  assert.deepEqual(resolveRpcUrls('robinhood'), [
+    'https://rpc.mainnet.chain.robinhood.com',
+    'https://robinhood-rpc.publicnode.com',
+  ]);
 });
 
 test('redactRpcUrlsInText removes credential-bearing configured endpoints from upstream errors', () => {

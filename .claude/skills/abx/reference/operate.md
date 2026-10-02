@@ -112,6 +112,8 @@ contract actually returns. A correct-looking URL constructed from memory is not 
 `abx set-field` writes one metadata field representation at token or collection scope. Representations
 include inline data, reader/chunk pointers, hashes, public locators, and renderer pointers as supported
 by the contract. Collection-scope values act as shared defaults; token-scope values override them.
+Do not use collection-scope `image` as a project thumbnail: it becomes every token's fallback image,
+masks computed renders, and cannot be cleared with an empty write. Use `featured_image` instead.
 
 Use reserved fields such as description, attributes, creator, license, display notes, and links
 according to command help. Verify the resulting provenance in decoded metadata. On-chain-wins means a

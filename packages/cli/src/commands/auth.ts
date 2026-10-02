@@ -20,7 +20,8 @@ import {
   type RemoteTarget
 } from '../remote.js'
 import { bold, dim, g, info, ok } from '../output.js'
-import { provisionCreatorWallet } from '../creator-signer.js'
+import { provisionCreatorWallet, sponsoredOperationStatus } from '../creator-signer.js'
+import { CHAIN } from '../config.js'
 
 const DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code'
 const DEVICE_CLIENT_ID = 'abx-cli'
@@ -471,8 +472,20 @@ function targetForAuth(spec: string, action: 'login' | 'logout' | 'keys' | 'revo
 export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
   const positions = positionalArgs(args)
   const subcommand = positions[0]
-  if (!['login', 'logout', 'keys', 'revoke-key', 'wallet'].includes(subcommand ?? '')) {
-    throw new Error('usage: abx auth <login|logout|keys|revoke-key|wallet> ...')
+  if (!['login', 'logout', 'keys', 'revoke-key', 'wallet', 'operation'].includes(subcommand ?? '')) {
+    throw new Error('usage: abx auth <login|logout|keys|revoke-key|wallet|operation> ...')
+  }
+  if (subcommand === 'operation') {
+    if (positions.length !== 2) throw new Error('usage: abx auth operation <operation-id>')
+    if (flags.remote !== undefined) throw new Error('`abx auth operation` currently reads the first-party ABX creator service only.')
+    const operation = await sponsoredOperationStatus(CHAIN, positions[1])
+    console.log(`\n  ${bold('Sponsored operation')} ${operation.operationId}`)
+    info(`state          ${operation.state}`)
+    info(`chain          ${operation.chainId}`)
+    info(`transaction    ${operation.transactionHash ?? dim('not assigned')}`)
+    info(`user operation ${operation.userOperationHash ?? dim('not assigned')}`)
+    if (operation.errorCode) info(`error           ${operation.errorCode}`)
+    return
   }
   if (subcommand === 'revoke-key' && (positions.length < 2 || positions.length > 3)) {
     throw new Error('usage: abx auth revoke-key <key-id> [<remote-name>]')
@@ -585,4 +598,7 @@ export const AUTH_HELP = `
     ${g('abx auth revoke-key <id>')}   free an unused key slot; use ${g('abx auth logout')} for the current key
 
   ${bold('abx auth wallet')} ${dim('— provision or show the stable creator wallet for this ABX Services account')}
-    ${g('abx auth wallet')}            safe setup for sponsored dry runs; reuses the same wallet every time`
+    ${g('abx auth wallet')}            safe setup for sponsored dry runs; reuses the same wallet every time
+
+  ${bold('abx auth operation')} <operation-id> ${dim('— read durable status after an uncertain local RPC result')}
+    ${g('abx auth operation op_…')}    read-only; never submits or retries the transaction`

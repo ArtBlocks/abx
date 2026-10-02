@@ -20,6 +20,7 @@ import {
 
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
+const BASE = 8453;
 // OpenSea's StrictAuthorizedTransferSecurityRegistry.
 const VALIDATOR = '0xA000027A9B2802E1ddf7000061001e5c005A0000';
 const OWNER = '0x2222222222222222222222222222222222222222' as const;
@@ -30,12 +31,14 @@ const SALT = `0x${'00'.repeat(32)}` as const;
 // The manifest of recommended validators: both shipped chains carry OpenSea's Strict registry;
 // an unshipped chain resolves to nothing (the CLI refuses `--721c recommended` there, naming
 // the chains that have one — never guessing an address).
-test('recommended transfer validator: shipped chains resolve, unshipped do not', () => {
+test('recommended transfer validator: qualified chains resolve, unqualified chains do not', () => {
   assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[SEPOLIA], VALIDATOR);
   assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[BASE_SEPOLIA], VALIDATOR);
+  assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[BASE], VALIDATOR);
   assert.equal(resolveRecommendedTransferValidator(SEPOLIA), VALIDATOR);
   assert.equal(resolveRecommendedTransferValidator(BASE_SEPOLIA), VALIDATOR);
-  assert.equal(resolveRecommendedTransferValidator(8453), undefined);
+  assert.equal(resolveRecommendedTransferValidator(BASE), VALIDATOR);
+  assert.equal(resolveRecommendedTransferValidator(42161), undefined);
 });
 
 // The identity constants marketplaces probe by. The interface ids come from ICreatorToken /

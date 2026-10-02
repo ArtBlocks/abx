@@ -235,6 +235,7 @@ export async function signHotSequence(txs: PreparedTx[], opts: {chainKey: string
     publicClient,
     onEvent: (e) => {
       if (e.kind === 'sending') console.log(`  ${purple('◆')} ${bold(e.tx.summary)}`);
+      else if (e.kind === 'submitted') console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${e.hash}  ${dim('submitted')}`);
       else console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${e.receipt.transactionHash}  ${green('✓')} confirmed`);
     },
   });
