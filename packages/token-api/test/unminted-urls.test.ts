@@ -161,3 +161,15 @@ test('out-of-range token IDs remain not_registered 404s', async () => {
     }
   });
 });
+
+test('numeric aliases never resolve as minted or unminted token IDs', async () => {
+  await withNode(async (base) => {
+    for (const tokenId of ['00', '01', '0x0', '+0', '0b0', '-0']) {
+      for (const route of ['t', 'a']) {
+        const res = await fetch(`${base}/${route}/${CHAIN_ID}/${ADDR}/${tokenId}`);
+        assert.equal(res.status, 404, `${route}/${tokenId} should not name a token`);
+        assert.equal(((await res.json()) as {code?: string}).code, 'not_registered');
+      }
+    }
+  });
+});

@@ -114,9 +114,9 @@ test('a live token answers with the manifest shape the remote lane consumes', as
   });
 });
 
-test('artifacts is per-token: a missing or non-numeric ?token is a 400 about the SHAPE, not a 404', async () => {
+test('artifacts is per-token: a missing or non-canonical ?token is a 400 about the SHAPE, not a 404', async () => {
   await withProject(async (base) => {
-    for (const q of ['', '?token=', '?token=abc', '?token=1.5', '?token=-1']) {
+    for (const q of ['', '?token=', '?token=abc', '?token=1.5', '?token=-1', '?token=00', '?token=0x0', '?token=%2B0']) {
       const res = await fetch(`${base}/api/project/${ADDR}/artifacts${q}`);
       assert.equal(res.status, 400, `"${q}" should be 400, not 404 — the route exists, the call was malformed`);
       const body = (await res.json()) as {code?: string};
