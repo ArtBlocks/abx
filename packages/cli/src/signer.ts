@@ -84,6 +84,22 @@ export function envKeyRequiresYes(chainKey: string): boolean {
   return chainSupportByKey(chainKey)?.environment !== 'testnet';
 }
 
+/** Funding copy for the browser-wallet lane. Unknown networks stay on the production-safe side:
+ * never describe gas as free unless the shared chain registry explicitly marks the network testnet. */
+export function walletFundingGuidance(chainKey: string): string[] {
+  const chain = resolveChain(chainKey);
+  if (chainSupportByKey(chainKey)?.environment === 'testnet') {
+    return [
+      `Use a wallet holding a little ${chain.name} ETH for gas — this is free test ETH, not real money.`,
+      `None yet? ${faucetHint(chainKey)}.`,
+    ];
+  }
+  return [
+    `Use a wallet holding enough ${chain.name} ETH for gas. This spends real funds.`,
+    'Review the transaction group and estimated cost in your terminal before approving.',
+  ];
+}
+
 // ── tiny ANSI (kept local so this module stands alone) ───────────────────────
 const C = {reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[38;5;115m', purple: '\x1b[38;5;141m', orange: '\x1b[38;5;215m'};
 const dim = (s: string) => `${C.dim}${s}${C.reset}`;
@@ -476,8 +492,7 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   // wallet lane without --for we don't know the address until the browser connects, so an empty
   // wallet's first and only signal used to be a failed transaction. Name the requirement and the
   // fix BEFORE they go pick a wallet, not after it reverts.
-  console.log(`  ${dim(`Use a wallet holding a little ${chain.name} ETH — it pays gas, and it's free test ETH, not real money.`)}`);
-  console.log(`  ${dim(`None yet? ${faucetHint(opts.chainKey)}.`)}`);
+  for (const line of walletFundingGuidance(opts.chainKey)) console.log(`  ${dim(line)}`);
   announceSignUrl(signUrl, opts.signUrlFile);
   console.log(`  ${dim('The key never touches this process — only signed tx hashes come back. Ctrl-C to cancel.')}\n`);
 
