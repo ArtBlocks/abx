@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync, mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {envKeyRequiresYes, openWalletSession} from '../src/signer.js';
+import {envKeyRequiresYes, openWalletSession, walletFundingGuidance} from '../src/signer.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -17,6 +17,16 @@ test('env-key consent follows the shared chain environment registry', () => {
   assert.equal(envKeyRequiresYes('ethereum'), true);
   assert.equal(envKeyRequiresYes('arbitrum'), true);
   assert.equal(envKeyRequiresYes('unknown-chain'), true);
+});
+
+test('wallet funding guidance distinguishes testnet gas from real production funds', () => {
+  const testnet = walletFundingGuidance('base-sepolia').join(' ');
+  assert.match(testnet, /free test ETH/);
+  assert.match(testnet, /faucet/);
+
+  const production = walletFundingGuidance('base').join(' ');
+  assert.match(production, /spends real funds/);
+  assert.doesNotMatch(production, /free test ETH|faucet/i);
 });
 
 /** Read the actual bound URL a session announced (via signUrlFile) — the port may differ from
