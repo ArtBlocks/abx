@@ -10,8 +10,8 @@ import {assertChainId} from '../src/clients.js';
 // reachable-but-WRONG-network endpoint with the clear message even in preview, yet (b)
 // tolerate a genuinely unreachable RPC so an offline dry-run can still preview.
 //
-// All cases use `base-sepolia` (expected id 84532) and never succeed, so the module-level
-// success memo is never populated — no cross-case interference.
+// All cases use `base-sepolia` (expected id 84532). Successful checks are cached by both chain and
+// exact endpoint list, so each test's unique local URLs remain independent.
 
 const KEY = 'base-sepolia';
 const ENV = 'ABX_RPC_URLS_BASE_SEPOLIA';
@@ -47,12 +47,39 @@ test('assertChainId: a reachable but WRONG-network RPC throws the clear mismatch
   try {
     await assert.rejects(
       () => assertChainId(KEY, {allowUnreachable: true}),
-      /RPC network mismatch: the configured endpoint reports chain 1, but ABX_CHAIN='base-sepolia' expects 84532/,
+      /RPC network mismatch: the configured endpoint \(127\.0\.0\.1:\d+\) reports chain 1, but ABX_CHAIN='base-sepolia' expects 84532/,
     );
   } finally {
     if (before === undefined) delete process.env[ENV];
     else process.env[ENV] = before;
     await stub.close();
+  }
+});
+
+test('assertChainId: an unavailable primary and correct backup are accepted', async () => {
+  const correct = await stubRpc('0x14a34'); // Base Sepolia (84532)
+  const before = process.env[ENV];
+  process.env[ENV] = `http://127.0.0.1:1,${correct.url}`;
+  try {
+    await assert.doesNotReject(() => assertChainId(KEY));
+  } finally {
+    if (before === undefined) delete process.env[ENV];
+    else process.env[ENV] = before;
+    await correct.close();
+  }
+});
+
+test('assertChainId: any reachable wrong-network backup fails the write preflight', async () => {
+  const correct = await stubRpc('0x14a34');
+  const wrong = await stubRpc('0x1');
+  const before = process.env[ENV];
+  process.env[ENV] = `${correct.url},${wrong.url}`;
+  try {
+    await assert.rejects(() => assertChainId(KEY), /reports chain 1/);
+  } finally {
+    if (before === undefined) delete process.env[ENV];
+    else process.env[ENV] = before;
+    await Promise.all([correct.close(), wrong.close()]);
   }
 });
 
