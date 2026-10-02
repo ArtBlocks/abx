@@ -192,10 +192,7 @@ export function makeHotSender(args: {
 
     let receipt: TransactionReceipt;
     try {
-      receipt = await waitForTransactionReceiptResilient(publicClient, {
-        hash,
-        requirePreferred: tx.receiptPolicy === 'dependent-logs',
-      });
+      receipt = await waitForTransactionReceiptResilient(publicClient, {hash});
     } catch (cause) {
       throw new Error(
         `Transaction ${hash} was submitted, but the configured RPCs could not read its receipt. ` +

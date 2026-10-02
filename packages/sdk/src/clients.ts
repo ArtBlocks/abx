@@ -99,28 +99,22 @@ async function checkedReceipt(
   return receipt;
 }
 
-/** One receipt probe across independent readers. Exported so the stale-not-found behavior can be
- * regression-tested without binding sockets; callers normally use the polling wrapper below. */
+/** One receipt probe across configured readers. Every URL in the configured set is inside the
+ * same JSON-RPC trust boundary; list order is an operational preference, not a security tier. */
 export async function firstAvailableReceipt(
   readers: readonly ReceiptReader[],
   hash: Hex,
-  options: {expectedChainId?: number; allowStalePrimaryFallback?: boolean; requirePreferred?: boolean} = {},
+  options: {expectedChainId?: number; allowStaleFirstFallback?: boolean} = {},
 ): Promise<{receipt?: TransactionReceipt; error?: unknown}> {
   if (readers.length === 0) return {error: new Error('No receipt RPC is configured.')};
   try {
-    // The first endpoint remains the trust preference used by every other fallback read. A healthy
-    // primary saying "not found" is ordinary propagation lag; a secondary must not overrule it with
-    // receipt logs that a later transaction may consume. Poll until the primary catches up.
+    // Give the first configured endpoint a short propagation window to keep ordinary behavior
+    // deterministic. This is preference ordering only; every configured endpoint is a trusted peer.
     return {receipt: await checkedReceipt(readers[0], hash, options.expectedChainId)};
-  } catch (primaryError) {
-    if (options.requirePreferred || primaryError instanceof ReceiptValidationError || readers.length === 1) {
-      return {error: primaryError};
-    }
-    if (receiptMissing(primaryError) && !options.allowStalePrimaryFallback) return {error: primaryError};
+  } catch (firstError) {
+    if (firstError instanceof ReceiptValidationError || readers.length === 1) return {error: firstError};
+    if (receiptMissing(firstError) && !options.allowStaleFirstFallback) return {error: firstError};
     try {
-      // The primary could not answer (transport, rate limit, or method policy), so fail over exactly
-      // as the ordered viem transport already does. After a grace period, a repeatedly not-found
-      // primary is also treated as stale. Every candidate verifies chain + receipt shape.
       return {
         receipt: await Promise.any(
           readers.slice(1).map((reader) => checkedReceipt(reader, hash, options.expectedChainId)),
@@ -128,7 +122,7 @@ export async function firstAvailableReceipt(
       };
     } catch (fallbackError) {
       const reasons = fallbackError instanceof AggregateError ? fallbackError.errors : [fallbackError];
-      return {error: reasons.find((reason) => reason !== undefined) ?? primaryError};
+      return {error: reasons.find((reason) => reason !== undefined) ?? firstError};
     }
   }
 }
@@ -141,13 +135,12 @@ export function makePublicClient(opts: ClientOptions = {}): PublicClient {
   return client;
 }
 
-/** Wait for a mined receipt across every endpoint behind an ABX client. A stale node commonly
- * answers "not found" as a successful JSON-RPC response, which a normal fallback transport cannot
- * distinguish from an authoritative absence and therefore will not fail over. Querying each
- * independent endpoint fixes that exact read-after-write boundary. */
+/** Wait for a mined receipt across the trusted RPC peers configured for this client. A short grace
+ * period preserves deterministic preference ordering; after it, a stale first endpoint must not
+ * hold an available receipt hostage. Every accepted peer verifies chain and receipt identity. */
 export async function waitForTransactionReceiptResilient(
   client: PublicClient,
-  args: {hash: Hex; timeoutMs?: number; pollingIntervalMs?: number; requirePreferred?: boolean},
+  args: {hash: Hex; timeoutMs?: number; pollingIntervalMs?: number},
 ): Promise<TransactionReceipt> {
   const urls = rpcLists.get(client) ?? [];
   if (urls.length <= 1) {
@@ -172,10 +165,7 @@ export async function waitForTransactionReceiptResilient(
   for (;;) {
     const result = await firstAvailableReceipt(readers, args.hash, {
       expectedChainId: client.chain?.id,
-      requirePreferred: args.requirePreferred,
-      // Give the preferred provider a short propagation window. Beyond that, repeated not-found
-      // responses while another configured provider has the receipt are evidence of staleness.
-      allowStalePrimaryFallback: !args.requirePreferred && Date.now() - startedAt >= 6_000,
+      allowStaleFirstFallback: Date.now() - startedAt >= 6_000,
     });
     if (result.receipt) return result.receipt;
     lastError = result.error;

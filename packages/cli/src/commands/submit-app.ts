@@ -323,7 +323,7 @@ export function batchParamOps(ops: PreparedTx[]): PreparedTx[] {
   });
 }
 
-export function prepareSubmitCollection(args: {
+function prepareSubmitCollection(args: {
   minter: Address;
   collection: Address;
   chainId: number;
@@ -340,7 +340,6 @@ export function prepareSubmitCollection(args: {
     chainId: args.chainId,
     summary: `List ${args.collection} in the ABX App Store`,
     fields: {minter: args.minter, collection: args.collection},
-    receiptPolicy: 'dependent-logs',
   };
 }
 
@@ -635,10 +634,7 @@ export async function cmdSubmitApp(address: string | undefined, flags: Flags): P
         if (!minted) throw new Error('Mint was not sent.');
         results.push(minted);
         mintHash = minted.txHash;
-        const receipt = await waitForTransactionReceiptResilient(publicClient, {
-          hash: minted.txHash,
-          requirePreferred: true,
-        });
+        const receipt = await waitForTransactionReceiptResilient(publicClient, {hash: minted.txHash});
         listedId = tokenIdFromMintLogs(receipt.logs);
         if (listedId === null) {
           throw new Error(

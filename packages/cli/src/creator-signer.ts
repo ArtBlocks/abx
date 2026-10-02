@@ -139,16 +139,12 @@ export async function confirmedSponsoredReceipt(
   operation: CreatorOperation & {transactionHash: Hex},
   op: string,
   line: (message: string) => void = console.log,
-  options: {requirePreferred?: boolean} = {},
 ): Promise<SponsoredReceipt> {
   line(`  Sponsored operation ${operation.operationId} confirmed by ABX Services.`);
   line(`  Transaction: ${operation.transactionHash}`);
   let receipt: TransactionReceipt;
   try {
-    receipt = await waitForTransactionReceiptResilient(publicClient, {
-      hash: operation.transactionHash,
-      requirePreferred: options.requirePreferred,
-    });
+    receipt = await waitForTransactionReceiptResilient(publicClient, {hash: operation.transactionHash});
   } catch (cause) {
     throw new Error(
       `Sponsored operation ${operation.operationId} was submitted as ${operation.transactionHash}, but the configured RPCs ` +
@@ -376,8 +372,6 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           publicClient,
           operation as CreatorOperation & {transactionHash: Hex},
           tx.op,
-          console.log,
-          {requirePreferred: tx.receiptPolicy === 'dependent-logs'},
         );
       },
       close() {

@@ -57,9 +57,6 @@ export interface PreparedTx {
   chainId: number;
   summary: string; // one-line plain-language description
   fields: Record<string, string>; // decoded args, for a sign-page table
-  /** This transaction's receipt logs become inputs to another signed transaction. ABX senders
-   * must read such receipts from the preferred RPC rather than a failover endpoint acting alone. */
-  receiptPolicy?: 'dependent-logs';
   /**
    * A **provable** lower bound on this tx's gas — a value the real cost cannot possibly be below.
    *
@@ -142,7 +139,6 @@ export function prepareMulticall(args: {
     chainId: args.chainId ?? ops[0].chainId,
     summary: args.summary ?? `Batch ${ops.length} ops in one tx (${ops.map((o) => o.op).join(', ')})`,
     fields: {contract: to, batched: String(ops.length), ops: ops.map((o) => o.op).join(',')},
-    ...(ops.some((o) => o.receiptPolicy === 'dependent-logs') ? {receiptPolicy: 'dependent-logs'} : {}),
   };
 }
 

@@ -80,12 +80,6 @@ test('prepareMulticall rejects mixed targets and value-bearing ops', () => {
   assert.throws(() => prepareMulticall({ops: [valued]}), /value-free/);
 });
 
-test('prepareMulticall preserves a dependent-log receipt policy', () => {
-  const dependent = {...fieldOp('a', '0xaa'), receiptPolicy: 'dependent-logs' as const};
-  const tx = prepareMulticall({ops: [dependent, fieldOp('b', '0xbb')]});
-  assert.equal(tx.receiptPolicy, 'dependent-logs');
-});
-
 test('lock + set in one batch round-trips through the multicall', () => {
   const ops = [fieldOp('image', '0xcc'), prepareLockTokenField({contract: TOKEN, tokenId: 0, field: 'image', chainId: CHAIN})];
   const out = batchOps(ops);

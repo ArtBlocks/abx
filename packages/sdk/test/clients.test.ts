@@ -25,42 +25,42 @@ function reader(
   return {getTransactionReceipt, getChainId: async () => chainId} as ReceiptReader;
 }
 
-test('receipt probing gives a not-found primary a propagation grace period', async () => {
+test('receipt probing gives the first configured RPC a propagation grace period', async () => {
   const calls: string[] = [];
   const stale = reader(async () => {
-    calls.push('primary');
+    calls.push('first');
     throw new Error('Transaction receipt could not be found');
   });
   const current = reader(async () => {
-    calls.push('backup');
+    calls.push('peer');
     return expected;
   });
 
   const result = await firstAvailableReceipt([stale, current], HASH, {expectedChainId: CHAIN_ID});
   assert.equal(result.receipt, undefined);
-  assert.deepEqual(calls, ['primary']);
+  assert.deepEqual(calls, ['first']);
 });
 
-test('receipt probing accepts a validated backup after the stale-primary grace period', async () => {
+test('receipt probing accepts a validated peer after the first RPC stays stale', async () => {
   const calls: string[] = [];
   const stale = reader(async () => {
-    calls.push('primary');
+    calls.push('first');
     throw new Error('Transaction receipt could not be found');
   });
   const current = reader(async () => {
-    calls.push('backup');
+    calls.push('peer');
     return expected;
   });
 
   const result = await firstAvailableReceipt([stale, current], HASH, {
     expectedChainId: CHAIN_ID,
-    allowStalePrimaryFallback: true,
+    allowStaleFirstFallback: true,
   });
   assert.equal(result.receipt, expected);
-  assert.deepEqual(calls, ['primary', 'backup']);
+  assert.deepEqual(calls, ['first', 'peer']);
 });
 
-test('receipt probing immediately fails over when the primary is unavailable', async () => {
+test('receipt probing immediately uses a peer when the first RPC is unavailable', async () => {
   const unavailable = reader(async () => {
     throw new Error('rate limited');
   });
@@ -68,26 +68,6 @@ test('receipt probing immediately fails over when the primary is unavailable', a
     expectedChainId: CHAIN_ID,
   });
   assert.equal(result.receipt, expected);
-});
-
-test('dependent-log receipts never let an uncorroborated backup replace the preferred RPC', async () => {
-  let backupCalled = false;
-  const result = await firstAvailableReceipt(
-    [
-      reader(async () => {
-        throw new Error('rate limited');
-      }),
-      reader(async () => {
-        backupCalled = true;
-        return expected;
-      }),
-    ],
-    HASH,
-    {expectedChainId: CHAIN_ID, requirePreferred: true},
-  );
-  assert.equal(result.receipt, undefined);
-  assert.equal(backupCalled, false);
-  assert.match(String(result.error), /rate limited/);
 });
 
 test('receipt probing rejects a receipt for the wrong hash without consulting a backup', async () => {
