@@ -27,6 +27,13 @@ Common token fields are `name`, `description`, `image`, `animation_url`, `extern
 Other field names appear in the token's [artifact manifest](/docs/protocol/data-plane). The generated
 keys `artifacts` and `abx_provenance` cannot be set as fields.
 
+## Resolver routes
+
+Conforming resolvers expose token metadata at `/t/{chainId}/{contract}/{tokenId}`. Inline or computed
+field bytes use the stable `/t/{chainId}/{contract}/{tokenId}/data/{field}` route. Code projects also
+have `/a/{chainId}/{contract}/{tokenId}` as their canonical live application view; an
+`animation_url` may point to either route when they serve the same document.
+
 Parameters are separate. Read them from the contract rather than `tokenURI`. See
 [Parameters](/docs/protocol/params).
 
