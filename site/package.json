@@ -19,7 +19,7 @@
     "fumadocs-mdx": "^15.4.0",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.15.7",
     "lucide-react": "file:./phosphor-lucide",
-    "mermaid": "^11.16.1",
+    "mermaid": "^12.0.0",
     "next": "16.3.6",
     "next-themes": "^0.4.6",
     "posthog-js": "^1.434.17",
