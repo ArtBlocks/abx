@@ -140,6 +140,11 @@ function withinCap(tokenId: string, maxInvocations: string | null | undefined): 
   }
 }
 
+/** Token ids in ABX URLs use the contract's canonical unsigned-decimal spelling. */
+function isCanonicalTokenId(tokenId: string): boolean {
+  return /^(0|[1-9]\d*)$/.test(tokenId);
+}
+
 /**
  * A destroyed token gets `410 Gone`, and every token route answers it before doing any other work.
  *
@@ -188,6 +193,7 @@ function unavailableIfUnminted(res: ServerResponse, token: TokenState): boolean 
  * unknown (→ 404).
  */
 export function resolveTokenView(state: ProjectState, tokenId: string): TokenState | null {
+  if (!isCanonicalTokenId(tokenId)) return null;
   const issued = state.tokens.find((t) => t.tokenId === tokenId);
   if (!issued && !withinCap(tokenId, state.maxInvocations)) return null;
   return {
@@ -461,8 +467,8 @@ async function route(
         const state = indexer.getProject(address);
         if (!state) return unknownProject(res);
         const tokenId = url.searchParams.get('token');
-        if (tokenId === null || !/^\d+$/.test(tokenId)) {
-          return sendError(res, 400, 'invalid_request', 'artifacts is a per-token read — pass ?token=<decimal id>');
+        if (tokenId === null || !isCanonicalTokenId(tokenId)) {
+          return sendError(res, 400, 'invalid_request', 'artifacts is a per-token read — pass ?token=<canonical decimal id>');
         }
         const token = state.tokens.find((t) => t.tokenId === tokenId);
         // Same code + wording the metadata routes already use for this exact condition, so a client
