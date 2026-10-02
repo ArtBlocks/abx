@@ -31,9 +31,10 @@ test('chain registry separates recognized networks from selectable networks', ()
     'arbitrum-sepolia',
     'base',
     'robinhood',
+    'ethereum',
     'arbitrum',
   ]);
-  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 7);
+  assert.equal(CHAIN_SUPPORT.filter(isChainSelectable).length, 8);
   assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
@@ -42,7 +43,8 @@ test('chain registry separates recognized networks from selectable networks', ()
   assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('robinhood')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'beta');
-  assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'disabled');
+  assert.equal(chainSupportByKey('ethereum')?.contractStatus, 'deployed');
+  assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('arbitrum')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'beta');
 });
@@ -69,6 +71,13 @@ test('Arbitrum networks have keyless default RPCs', () => {
   assert.deepEqual(resolveRpcUrls('arbitrum'), [
     'https://arb1.arbitrum.io/rpc',
     'https://arbitrum-one-rpc.publicnode.com',
+  ]);
+});
+
+test('Ethereum has independent keyless default RPCs', () => {
+  assert.deepEqual(resolveRpcUrls('ethereum'), [
+    'https://ethereum-rpc.publicnode.com',
+    'https://eth.drpc.org',
   ]);
 });
 

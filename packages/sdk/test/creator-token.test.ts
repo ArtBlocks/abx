@@ -19,6 +19,7 @@ import {
 } from '../src/abi/index.ts';
 
 const SEPOLIA = 11155111;
+const ETHEREUM = 1;
 const BASE_SEPOLIA = 84532;
 const BASE = 8453;
 // OpenSea's StrictAuthorizedTransferSecurityRegistry.
@@ -28,13 +29,15 @@ const FACTORY = '0x3333333333333333333333333333333333333333' as const;
 const CLONE = '0x4444444444444444444444444444444444444444' as const;
 const SALT = `0x${'00'.repeat(32)}` as const;
 
-// The manifest of recommended validators: both shipped chains carry OpenSea's Strict registry;
+// The manifest of recommended validators: qualified chains carry OpenSea's Strict registry;
 // an unshipped chain resolves to nothing (the CLI refuses `--721c recommended` there, naming
 // the chains that have one — never guessing an address).
 test('recommended transfer validator: qualified chains resolve, unqualified chains do not', () => {
+  assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[ETHEREUM], VALIDATOR);
   assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[SEPOLIA], VALIDATOR);
   assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[BASE_SEPOLIA], VALIDATOR);
   assert.equal(RECOMMENDED_TRANSFER_VALIDATOR[BASE], VALIDATOR);
+  assert.equal(resolveRecommendedTransferValidator(ETHEREUM), VALIDATOR);
   assert.equal(resolveRecommendedTransferValidator(SEPOLIA), VALIDATOR);
   assert.equal(resolveRecommendedTransferValidator(BASE_SEPOLIA), VALIDATOR);
   assert.equal(resolveRecommendedTransferValidator(BASE), VALIDATOR);

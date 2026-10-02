@@ -62,8 +62,8 @@
       "name": "Ethereum",
       "environment": "production",
       "pairedChain": "sepolia",
-      "contractStatus": "not-deployed",
-      "supportLevel": "disabled"
+      "contractStatus": "deployed",
+      "supportLevel": "beta"
     },
     {
       "key": "arbitrum",
