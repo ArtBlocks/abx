@@ -1,5 +1,15 @@
 # @artblocks/abx-token-api
 
+## 0.2.4
+
+### Patch Changes
+
+- 7639408: Reject non-canonical token ids across metadata, live-view, and artifact routes instead of treating numeric aliases as unminted tokens.
+- Updated dependencies [f4e091e]
+  - @artblocks/abx-sdk@0.4.2
+  - @artblocks/abx-indexer@0.1.5
+  - @artblocks/abx-storage@0.1.5
+
 ## 0.2.3
 
 ### Patch Changes
