@@ -11,6 +11,7 @@ import {
   runPrepared,
   sleep,
   waitForCodeAt,
+  waitForTransactionReceiptResilient,
   type Address,
   type Hex,
   type PreparedTx,
@@ -504,7 +505,10 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
       pendingResolve = null;
       pendingReject = null;
       console.log(`  ${dim('tx')} ${explorer}/tx/${txHash}  ${dim('— confirming …')}`);
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const receipt = await waitForTransactionReceiptResilient(publicClient, {
+        hash: txHash,
+        requirePreferred: tx.receiptPolicy === 'dependent-logs',
+      });
       console.log(`  ${green('✓')} confirmed`);
       current = null; // back to idle until the next send()
       return {txHash, receipt};

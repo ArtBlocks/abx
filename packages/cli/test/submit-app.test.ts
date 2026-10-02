@@ -15,6 +15,7 @@ import {
   chunkItems,
   parseSubmitAppEntry,
   paramValues,
+  prepareSubmitCollection,
   resolveAppStoreAddresses,
   resumableConfigError,
   withFirstMetadataWriteRetry,
@@ -153,6 +154,15 @@ test('submit-app success guidance does not promise when a hosted catalog will re
   assert.match(SUBMIT_APP_CATALOG_NOTE, /on-chain listing is updated/);
   assert.match(SUBMIT_APP_CATALOG_NOTE, /refresh timing is provider-owned/);
   assert.doesNotMatch(SUBMIT_APP_CATALOG_NOTE, /picks it up on the next read/);
+});
+
+test('the listing mint requires a preferred-RPC receipt before its token id feeds metadata writes', () => {
+  const tx = prepareSubmitCollection({
+    minter: '0x0000000000000000000000000000000000000123',
+    collection: '0x0000000000000000000000000000000000000456',
+    chainId: 84532,
+  });
+  assert.equal(tx.receiptPolicy, 'dependent-logs');
 });
 
 // ── RPC catch-up after mint ───────────────────────────────────────────────────

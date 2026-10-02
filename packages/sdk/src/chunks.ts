@@ -245,6 +245,7 @@ export async function writeChunk(
     chainId: args.chainId,
     summary: 'Stage one on-chain content chunk',
     fields: {store: args.store, bytes: String(args.data.length)},
+    receiptPolicy: 'dependent-logs',
   });
   const ev = parseEventLogs({abi: abxChunkStoreAbi, eventName: 'ChunkWritten', logs: receipt.logs});
   const pointer = (ev[0] as {args: {pointer: Address}} | undefined)?.args.pointer;
@@ -274,6 +275,7 @@ export async function writeContent(
     chainId: args.chainId,
     summary: `Stage on-chain content (${args.chunks.length} chunk${args.chunks.length === 1 ? '' : 's'}, atomic)`,
     fields: {store: args.store, chunks: String(args.chunks.length)},
+    receiptPolicy: 'dependent-logs',
   });
   const ev = parseEventLogs({abi: abxChunkStoreAbi, eventName: 'ManifestWritten', logs: receipt.logs});
   const manifest = (ev[0] as {args: {manifest: Address}} | undefined)?.args.manifest;
@@ -303,6 +305,7 @@ export async function writeChunkBatch(
     chainId: args.chainId,
     summary: `Stage ${args.chunks.length} on-chain content chunk${args.chunks.length === 1 ? '' : 's'} (batch)`,
     fields: {store: args.store, chunks: String(args.chunks.length)},
+    receiptPolicy: 'dependent-logs',
   });
   const txHash = receipt.transactionHash;
   const evs = parseEventLogs({abi: abxChunkStoreAbi, eventName: 'ChunkWritten', logs: receipt.logs});
@@ -369,6 +372,7 @@ export async function writeManifest(
     chainId: args.chainId,
     summary: `Write the on-chain content manifest (${args.chunks.length} chunk${args.chunks.length === 1 ? '' : 's'})`,
     fields: {store: args.store, chunks: String(args.chunks.length)},
+    receiptPolicy: 'dependent-logs',
   });
   const ev = parseEventLogs({abi: abxChunkStoreAbi, eventName: 'ManifestWritten', logs: receipt.logs});
   const manifest = (ev[0] as {args: {manifest: Address}} | undefined)?.args.manifest;

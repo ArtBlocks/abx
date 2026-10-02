@@ -70,6 +70,26 @@ test('receipt probing immediately fails over when the primary is unavailable', a
   assert.equal(result.receipt, expected);
 });
 
+test('dependent-log receipts never let an uncorroborated backup replace the preferred RPC', async () => {
+  let backupCalled = false;
+  const result = await firstAvailableReceipt(
+    [
+      reader(async () => {
+        throw new Error('rate limited');
+      }),
+      reader(async () => {
+        backupCalled = true;
+        return expected;
+      }),
+    ],
+    HASH,
+    {expectedChainId: CHAIN_ID, requirePreferred: true},
+  );
+  assert.equal(result.receipt, undefined);
+  assert.equal(backupCalled, false);
+  assert.match(String(result.error), /rate limited/);
+});
+
 test('receipt probing rejects a receipt for the wrong hash without consulting a backup', async () => {
   let backupCalled = false;
   const mismatched = {...expected, transactionHash: OTHER_HASH} as TransactionReceipt;

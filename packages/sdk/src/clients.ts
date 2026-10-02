@@ -104,7 +104,7 @@ async function checkedReceipt(
 export async function firstAvailableReceipt(
   readers: readonly ReceiptReader[],
   hash: Hex,
-  options: {expectedChainId?: number; allowStalePrimaryFallback?: boolean} = {},
+  options: {expectedChainId?: number; allowStalePrimaryFallback?: boolean; requirePreferred?: boolean} = {},
 ): Promise<{receipt?: TransactionReceipt; error?: unknown}> {
   if (readers.length === 0) return {error: new Error('No receipt RPC is configured.')};
   try {
@@ -113,7 +113,9 @@ export async function firstAvailableReceipt(
     // receipt logs that a later transaction may consume. Poll until the primary catches up.
     return {receipt: await checkedReceipt(readers[0], hash, options.expectedChainId)};
   } catch (primaryError) {
-    if (primaryError instanceof ReceiptValidationError || readers.length === 1) return {error: primaryError};
+    if (options.requirePreferred || primaryError instanceof ReceiptValidationError || readers.length === 1) {
+      return {error: primaryError};
+    }
     if (receiptMissing(primaryError) && !options.allowStalePrimaryFallback) return {error: primaryError};
     try {
       // The primary could not answer (transport, rate limit, or method policy), so fail over exactly
@@ -145,7 +147,7 @@ export function makePublicClient(opts: ClientOptions = {}): PublicClient {
  * independent endpoint fixes that exact read-after-write boundary. */
 export async function waitForTransactionReceiptResilient(
   client: PublicClient,
-  args: {hash: Hex; timeoutMs?: number; pollingIntervalMs?: number},
+  args: {hash: Hex; timeoutMs?: number; pollingIntervalMs?: number; requirePreferred?: boolean},
 ): Promise<TransactionReceipt> {
   const urls = rpcLists.get(client) ?? [];
   if (urls.length <= 1) {
@@ -170,9 +172,10 @@ export async function waitForTransactionReceiptResilient(
   for (;;) {
     const result = await firstAvailableReceipt(readers, args.hash, {
       expectedChainId: client.chain?.id,
+      requirePreferred: args.requirePreferred,
       // Give the preferred provider a short propagation window. Beyond that, repeated not-found
       // responses while another configured provider has the receipt are evidence of staleness.
-      allowStalePrimaryFallback: Date.now() - startedAt >= 6_000,
+      allowStalePrimaryFallback: !args.requirePreferred && Date.now() - startedAt >= 6_000,
     });
     if (result.receipt) return result.receipt;
     lastError = result.error;
