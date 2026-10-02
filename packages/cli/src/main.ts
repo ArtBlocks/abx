@@ -1015,6 +1015,7 @@ const COMMAND_HELP: Record<string, string> = {
                           ${dim('off-chain, verified:')} keccak256 · sha256   ${dim('· locators:')} arweave · ipfs · url · url-template ${dim('({id} → tokenId, so one field addresses a whole directory)')}
     ${g('--dry-run')}             preview the tx, send nothing
     --collection          target collection (ERC-7572) scope · else --token <id> (default 0)
+    ${c.orange}⚠${c.reset} ${dim('A collection `image` replaces every token image and cannot be cleared empty; use `featured_image` for collection artwork.')}
     ${dim('Every write pings ERC-4906 —')} ${g('MetadataUpdate(tokenId)')} ${dim('for a token-scope write,')} ${g('BatchMetadataUpdate')} ${dim('for --collection.')}
     ${dim('4906-aware marketplaces (OpenSea included) self-refresh on it; nudge directly with')} ${g('abx refresh <address>')}${dim(' if one lags.')}`,
   'lock-field': `

@@ -9,10 +9,12 @@ import {CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorA
 import {
   assertSponsorConfigured,
   assertSponsoredPreparedTx,
+  confirmedSponsoredReceipt,
   creatorApiUrl,
   provisionCreatorWallet,
   sponsoredGasLimit,
   sponsoredPreviewAddress,
+  sponsoredOperationStatus,
   sponsoredWalletAddress,
 } from '../src/creator-signer.js';
 import {warnUnfunded} from '../src/commands/deploy.js';
@@ -258,6 +260,62 @@ test('sponsored transactions preserve large network gas estimates without an ABX
   assert.equal(sponsoredGasLimit(4_933_890n), 4_933_890);
   assert.equal(sponsoredGasLimit(30_000_000n), 30_000_000);
   assert.throws(() => sponsoredGasLimit(BigInt(Number.MAX_SAFE_INTEGER) + 1n), /cannot be represented safely/);
+});
+
+test('confirmed sponsored receipt announces durable ids before a local RPC failure', async () => {
+  const hash = `0x${'12'.repeat(32)}` as const;
+  const lines: string[] = [];
+  const client = {
+    waitForTransactionReceipt: async () => {
+      throw new Error('rate limited');
+    },
+  } as unknown as PublicClient;
+  const operation = {
+    operationId: 'op_receipt123',
+    chainId: 84532,
+    walletId: 'wallet_123',
+    state: 'confirmed' as const,
+    providerTransactionId: 'provider_123',
+    transactionHash: hash,
+    userOperationHash: null,
+    errorCode: null,
+    updatedAt: new Date(0).toISOString(),
+  };
+  await assert.rejects(
+    () => confirmedSponsoredReceipt(client, operation, 'test-op', (line) => lines.push(line)),
+    (error: Error) => {
+      assert.match(error.message, new RegExp(hash));
+      assert.match(error.message, /Do not retry/);
+      assert.match(error.message, /abx auth operation op_receipt123/);
+      return true;
+    },
+  );
+  assert.match(lines.join('\n'), /op_receipt123/);
+  assert.match(lines.join('\n'), new RegExp(hash));
+});
+
+test('sponsored operation status is account-scoped and read-only', async () => {
+  const requests: Array<{url: string; method: string}> = [];
+  const operation = {
+    operationId: 'op_status123',
+    chainId: 84532,
+    walletId: 'wallet_123',
+    state: 'confirmed',
+    providerTransactionId: 'provider_123',
+    transactionHash: `0x${'34'.repeat(32)}`,
+    userOperationHash: null,
+    errorCode: null,
+    updatedAt: new Date(0).toISOString(),
+  };
+  const result = await sponsoredOperationStatus('base-sepolia', 'op_status123', {
+    env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+    fetchImpl: (async (input, init) => {
+      requests.push({url: String(input), method: init?.method ?? 'GET'});
+      return json({operation});
+    }) as typeof fetch,
+  });
+  assert.equal(result.transactionHash, operation.transactionHash);
+  assert.deepEqual(requests, [{url: 'https://api.example/v1/operations/op_status123', method: 'GET'}]);
 });
 
 test('sponsored transaction boundary requires a target and still pins chain and zero value', () => {

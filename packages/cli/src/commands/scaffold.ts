@@ -233,16 +233,23 @@ export async function cmdDoctor(flags: Flags) {
   let signingOpt: string | null = null;
   let minter1155Opt: string | null = null;
   let forOpt: string | null = null;
+  let rpcFailureReported = false;
   try {
     const publicClient = makePublicClient({chainKey: CHAIN});
-    const bn = await publicClient.getBlockNumber();
     // Collapse the RPC report to one line (best endpoint + head), and only add a ⚠ when there is a
     // genuine problem — a range-capped-only set that will grind a resolver under load.
     const probes = await probeRpcEndpoints({chainKey: CHAIN});
     const usable = probes.filter((pr) => pr.verdict !== 'unusable');
     const best = probes.find((pr) => pr.verdict === 'best') ?? usable[0];
     if (usable.length > 0) {
+      const bn = usable.reduce((latest, pr) => {
+        const head = BigInt(pr.headBlock ?? '0');
+        return head > latest ? head : latest;
+      }, 0n);
       check('RPC', true, `${best.label} · head ${bn} · ${best.verdict === 'best' ? 'wide range + archive' : 'range-capped'}`);
+      for (const pr of probes) {
+        if (!pr.reachable) console.log(`${CONT}${c.orange}⚠${c.reset}${dim(` ${pr.label} is unavailable — continuing through another configured endpoint`)}`);
+      }
       if (!probes.some((pr) => pr.verdict === 'best')) {
         console.log(`${CONT}${c.orange}⚠${c.reset}${dim(' every endpoint is getLogs-range-capped — add a wide-range archive RPC to ABX_RPC_URLS before running a resolver under load')}`);
       }
@@ -264,6 +271,11 @@ export async function cmdDoctor(flags: Flags) {
       }
     } else {
       check('RPC', false, `${CHAIN} — no endpoint usable for reconstruction; add a wide-range archive RPC to ABX_RPC_URLS`);
+      for (const pr of probes) {
+        if (!pr.reachable) console.log(`${CONT}${dim(` ${pr.label} is unavailable`)}`);
+      }
+      rpcFailureReported = true;
+      throw new Error('No usable RPC endpoint.');
     }
 
     const factory = factoryAddress();
@@ -310,7 +322,7 @@ export async function cmdDoctor(flags: Flags) {
       forOpt = `${flags.for} · ${await describeBalance(publicClient, flags.for as Address)}`;
     }
   } catch (err) {
-    check('RPC', false, (err as Error).message);
+    if (!rpcFailureReported) check('RPC', false, (err as Error).message);
   }
 
   // Storage backend — resolve it (catches missing config), then probe liveness/creds. The probe

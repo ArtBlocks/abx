@@ -37,16 +37,24 @@ export const KNOWN_CHAIN_KEYS = SUPPORTED_CHAIN_KEYS;
 
 export const DEFAULT_CHAIN_KEY = CHAIN_SUPPORT_REGISTRY.defaultChain;
 
-// Public, keyless endpoints per chain — overridable. A self-hoster points these at
-// their own node; nothing about resolution depends on a particular provider.
-const DEFAULT_RPC_URLS: Record<string, string> = {
-  'base-sepolia': 'https://sepolia.base.org',
-  sepolia: 'https://ethereum-sepolia-rpc.publicnode.com',
-  'robinhood-testnet': 'https://rpc.testnet.chain.robinhood.com',
-  'arbitrum-sepolia': 'https://sepolia-rollup.arbitrum.io/rpc',
-  robinhood: 'https://rpc.mainnet.chain.robinhood.com',
-  base: 'https://mainnet.base.org',
-  arbitrum: 'https://arb1.arbitrum.io/rpc',
+// Public, keyless endpoints per chain — overridable. Each supported chain has independent
+// providers where the network offers them: a public RPC is a convenience, not an availability
+// guarantee, and rate limits / lag / method policy differ between providers. A self-hoster can
+// replace the list outright through ABX_RPC_URLS_<CHAIN>; nothing depends on either provider.
+const DEFAULT_RPC_URLS: Record<string, readonly string[]> = {
+  'base-sepolia': ['https://sepolia.base.org', 'https://base-sepolia-rpc.publicnode.com'],
+  sepolia: ['https://ethereum-sepolia-rpc.publicnode.com'],
+  'robinhood-testnet': [
+    'https://rpc.testnet.chain.robinhood.com',
+    'https://robinhood-sepolia-rpc.publicnode.com',
+  ],
+  'arbitrum-sepolia': [
+    'https://sepolia-rollup.arbitrum.io/rpc',
+    'https://arbitrum-sepolia-rpc.publicnode.com',
+  ],
+  robinhood: ['https://rpc.mainnet.chain.robinhood.com', 'https://robinhood-rpc.publicnode.com'],
+  base: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'],
+  arbitrum: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'],
 };
 
 export function resolveChain(key: string = DEFAULT_CHAIN_KEY): Chain {
@@ -100,7 +108,7 @@ export function rpcEnvVar(chainKey: string): string {
  *     (e.g. widest `eth_getLogs` range). The bare and per-chain vars are never mixed, so a list for
  *     one network can't leak into another; a chainId guard (see `assertChainId`) then verifies the
  *     endpoints actually ARE `chainKey`.
- *   - manifest: the built-in keyless default for `chainKey`.
+ *   - manifest: the built-in keyless defaults for `chainKey`, normally independent providers.
  */
 export function resolveRpcUrls(chainKey: string = DEFAULT_CHAIN_KEY, override?: string | string[]): string[] {
   const overrideList = override === undefined ? undefined : Array.isArray(override) ? override.join(',') : override;
@@ -110,7 +118,7 @@ export function resolveRpcUrls(chainKey: string = DEFAULT_CHAIN_KEY, override?: 
     .split(/[\s,]+/)
     .map((u) => u.trim())
     .filter((u) => u && !seen.has(u) && seen.add(u));
-  if (urls.length === 0 && DEFAULT_RPC_URLS[chainKey]) urls.push(DEFAULT_RPC_URLS[chainKey]);
+  if (urls.length === 0 && DEFAULT_RPC_URLS[chainKey]) urls.push(...DEFAULT_RPC_URLS[chainKey]);
   return urls;
 }
 

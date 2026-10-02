@@ -111,6 +111,7 @@ function mockChain(opts: {
   /** A node whose `pending` view has fallen behind its own head answers LOWER here than `latest`. */
   pendingNonce?: number;
   codeAtTarget?: boolean;
+  receiptError?: Error;
 }): MockChain {
   const sent: MockChain['sent'] = [];
   const estimateResults = opts.estimateGasResults ?? [100_000n];
@@ -134,12 +135,15 @@ function mockChain(opts: {
       getCodeCalls++;
       return opts.codeAtTarget === false ? '0x' : '0x1234';
     },
-    waitForTransactionReceipt: async ({hash}: {hash: Hex}) => ({
-      transactionHash: hash,
-      blockNumber: 100n,
-      status: opts.receiptStatus ?? 'success',
-      logs: [],
-    }),
+    waitForTransactionReceipt: async ({hash}: {hash: Hex}) => {
+      if (opts.receiptError) throw opts.receiptError;
+      return {
+        transactionHash: hash,
+        blockNumber: 100n,
+        status: opts.receiptStatus ?? 'success',
+        logs: [],
+      };
+    },
   } as unknown as PublicClient;
 
   const wallet = {
@@ -178,9 +182,22 @@ test('makeHotSender: happy path — pins gas, sends, waits for the receipt, and 
   assert.equal(receipt.status, 'success');
   assert.equal(m.sent.length, 1);
   assert.equal(m.sent[0].gas, 125_000n); // pinGas headroom: 100_000 * 1.25
-  assert.equal(events.length, 2);
+  assert.equal(events.length, 3);
   assert.equal(events[0].kind, 'sending');
-  assert.equal(events[1].kind, 'mined');
+  assert.equal(events[1].kind, 'submitted');
+  assert.equal(events[2].kind, 'mined');
+});
+
+test('makeHotSender: a receipt RPC failure preserves the submitted hash and forbids blind retry', async () => {
+  const m = mockChain({estimateGasResults: [100_000n], receiptError: new Error('rate limited')});
+  const events: SendEvent[] = [];
+  const send = makeHotSender({wallet: m.wallet, account: m.account, publicClient: m.publicClient, onEvent: (e) => events.push(e)});
+  await assert.rejects(() => send(tx()), (error: Error) => {
+    assert.match(error.message, /Transaction 0x0{63}1 was submitted/);
+    assert.match(error.message, /Do not retry/);
+    return true;
+  });
+  assert.equal(events.at(-1)?.kind, 'submitted');
 });
 
 test('makeHotSender: pins the nonce ONCE and increments it locally — no re-fetch per send', async () => {

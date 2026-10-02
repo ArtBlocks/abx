@@ -11,6 +11,7 @@ import {
   runPrepared,
   sleep,
   waitForCodeAt,
+  waitForTransactionReceiptResilient,
   type Address,
   type Hex,
   type PreparedTx,
@@ -235,6 +236,7 @@ export async function signHotSequence(txs: PreparedTx[], opts: {chainKey: string
     publicClient,
     onEvent: (e) => {
       if (e.kind === 'sending') console.log(`  ${purple('◆')} ${bold(e.tx.summary)}`);
+      else if (e.kind === 'submitted') console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${e.hash}  ${dim('submitted')}`);
       else console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${e.receipt.transactionHash}  ${green('✓')} confirmed`);
     },
   });
@@ -503,7 +505,7 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
       pendingResolve = null;
       pendingReject = null;
       console.log(`  ${dim('tx')} ${explorer}/tx/${txHash}  ${dim('— confirming …')}`);
-      const receipt = await publicClient.waitForTransactionReceipt({hash: txHash});
+      const receipt = await waitForTransactionReceiptResilient(publicClient, {hash: txHash});
       console.log(`  ${green('✓')} confirmed`);
       current = null; // back to idle until the next send()
       return {txHash, receipt};

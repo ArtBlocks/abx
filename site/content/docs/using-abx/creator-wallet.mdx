@@ -27,5 +27,8 @@ still review the network and transaction plan in your terminal before each send.
 Sponsored operations cannot send ETH. If the operation is not eligible, use `--send`, `--sign`, or
 `--unsigned`.
 
+If a local RPC fails after submission, do not repeat the transaction. The CLI prints the transaction
+hash and operation ID. Check the hash, or run `abx auth operation <operation-id>`.
+
 Run the same flow on the paired testnet before using a production network. Check the network, value,
 and permanent settings before approval.

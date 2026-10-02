@@ -109,7 +109,14 @@ and read `tokenURI` on the target chain for a production measurement.
 
 ## Wiring and locks
 
-Set a renderer during deployment or later with `set-field`. The field lock freezes the renderer
+Set a renderer during deployment or later:
+
+```bash
+abx set-field <contract> --collection --field image --representation renderer --value <renderer-address>
+abx set-field <contract> --collection --field attributes --representation renderer --value <renderer-address>
+```
+
+Omit `--collection` and pass `--token <id>` for one token. The field lock freezes the renderer
 address, not code behind it.
 
 For a fully onchain metadata path, also set the contract's metadata renderer and lock URI configuration

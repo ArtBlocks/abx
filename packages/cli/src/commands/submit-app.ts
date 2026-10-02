@@ -17,6 +17,7 @@ import {
   prepareConfigureTokenParam,
   prepareConfigureTokenParamData,
   prepareMulticall,
+  waitForTransactionReceiptResilient,
   type Address,
   type Hex,
   type PreparedTx,
@@ -633,7 +634,7 @@ export async function cmdSubmitApp(address: string | undefined, flags: Flags): P
         if (!minted) throw new Error('Mint was not sent.');
         results.push(minted);
         mintHash = minted.txHash;
-        const receipt = await publicClient.getTransactionReceipt({hash: minted.txHash});
+        const receipt = await waitForTransactionReceiptResilient(publicClient, {hash: minted.txHash});
         listedId = tokenIdFromMintLogs(receipt.logs);
         if (listedId === null) {
           throw new Error(

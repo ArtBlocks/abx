@@ -41,7 +41,7 @@ export const CREATOR_TOKEN_EXTENSION_ID =
  * an owner-initiated (OTC) transfer succeeds; an unauthorized operator reverts
  * `StrictAuthorizedTransferSecurityRegistry__UnauthorizedTransfer()`.
  *
- * CREATE2-style vanity address, identical on both shipped chains — kept per-chain anyway
+ * CREATE2-style vanity address, identical on the shipped chains — kept per-chain anyway
  * (keyed like `deployments.ts`) because presence-on-chain is the fact that matters, and a
  * future chain may recommend a different validator.
  */
@@ -50,6 +50,8 @@ export const RECOMMENDED_TRANSFER_VALIDATOR: Record<number, Address> = {
   11155111: '0xA000027A9B2802E1ddf7000061001e5c005A0000',
   // Base Sepolia (testnet)
   84532: '0xA000027A9B2802E1ddf7000061001e5c005A0000',
+  // Base (mainnet) — same deployed runtime bytecode as Base Sepolia, verified before inclusion.
+  8453: '0xA000027A9B2802E1ddf7000061001e5c005A0000',
 };
 
 /** The recommended validator for a chain (undefined if none is known — never guess one). */

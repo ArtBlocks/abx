@@ -11,9 +11,12 @@ import {
   sleep,
   TxRevertedError,
   waitForCodeAt,
+  waitForTransactionReceiptResilient,
   type Address,
+  type CreatorOperation,
   type Hex,
   type PreparedTx,
+  type PublicClient,
 } from '@artblocks/abx-sdk';
 import type {TransactionReceipt} from 'viem';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from './creator-agent.js';
@@ -108,6 +111,49 @@ export interface SponsoredSession {
   address: Address;
   send(tx: PreparedTx): Promise<SponsoredReceipt>;
   close(): void;
+}
+
+/** Read the durable provider-side state of one account-scoped sponsored operation. This is the
+ * recovery path for an RPC that disappears after submission: status reads never submit or replay. */
+export async function sponsoredOperationStatus(
+  chainKey: string,
+  operationId: string,
+  options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch} = {},
+): Promise<CreatorOperation> {
+  const env = options.env ?? process.env;
+  assertSponsorConfiguredWithEnv(chainKey, env);
+  if (!/^op_[a-zA-Z0-9]+$/.test(operationId)) throw new Error('Invalid sponsored operation id.');
+  const chain = resolveChain(chainKey);
+  return new CreatorApiClient({
+    baseUrl: await creatorApiUrl(chain.id, env),
+    token: env.ABX_SERVICES_API_KEY!,
+    fetchImpl: options.fetchImpl,
+  }).getOperation(operationId);
+}
+
+/** A provider-confirmed operation is monotonic: a local RPC miss cannot turn it back into a failed
+ * submission. Announce the durable identifiers before reading the receipt, then give a read-only
+ * recovery command instead of an error that might invite a duplicate transaction. */
+export async function confirmedSponsoredReceipt(
+  publicClient: PublicClient,
+  operation: CreatorOperation & {transactionHash: Hex},
+  op: string,
+  line: (message: string) => void = console.log,
+): Promise<SponsoredReceipt> {
+  line(`  Sponsored operation ${operation.operationId} confirmed by ABX Services.`);
+  line(`  Transaction: ${operation.transactionHash}`);
+  let receipt: TransactionReceipt;
+  try {
+    receipt = await waitForTransactionReceiptResilient(publicClient, {hash: operation.transactionHash});
+  } catch (cause) {
+    throw new Error(
+      `Sponsored operation ${operation.operationId} was submitted as ${operation.transactionHash}, but the configured RPCs ` +
+        `could not read its receipt. Do not retry it. Run \`abx auth operation ${operation.operationId}\` or check the transaction in a block explorer.`,
+      {cause},
+    );
+  }
+  if (receipt.status !== 'success') throw new TxRevertedError(op, operation.transactionHash);
+  return {txHash: operation.transactionHash, receipt};
 }
 
 /** Pure boundary check shared by every sponsored operation. Privy's sponsored relay requires a
@@ -322,9 +368,11 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
         if (operation.state !== 'confirmed' || !operation.transactionHash) {
           throw new Error(`Sponsored operation ${operationId} failed${operation.errorCode ? ` (${operation.errorCode})` : ''}.`);
         }
-        const receipt = await publicClient.waitForTransactionReceipt({hash: operation.transactionHash});
-        if (receipt.status !== 'success') throw new TxRevertedError(tx.op, operation.transactionHash);
-        return {txHash: operation.transactionHash, receipt};
+        return confirmedSponsoredReceipt(
+          publicClient,
+          operation as CreatorOperation & {transactionHash: Hex},
+          tx.op,
+        );
       },
       close() {
         closed = true;

@@ -8,9 +8,10 @@ import {
   type WalletClient,
   type Account,
   type Hex,
+  type TransactionReceipt,
 } from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
-import {DEFAULT_CHAIN_KEY, resolveChain, resolveRpcUrls, rpcEnvVar} from './chains.js';
+import {DEFAULT_CHAIN_KEY, redactRpcUrl, resolveChain, resolveRpcUrls, rpcEnvVar} from './chains.js';
 import {readEnv} from './util.js';
 import {MissingSigningKeyError} from './errors.js';
 
@@ -30,16 +31,149 @@ export interface ClientOptions {
  * is retried on the next, which is how the toolkit "finds the endpoint fit for the
  * job" at request time. `retryCount: 0` makes that failover immediate.
  */
-function makeTransport(opts: ClientOptions): Transport {
-  if (opts.rpcUrl) return http(opts.rpcUrl);
-  const urls = resolveRpcUrls(opts.chainKey, opts.rpcUrls);
+function clientRpcList(opts: ClientOptions): string[] {
+  return opts.rpcUrl ? [opts.rpcUrl] : resolveRpcUrls(opts.chainKey, opts.rpcUrls);
+}
+
+function makeTransport(urls: readonly string[]): Transport {
   if (urls.length <= 1) return http(urls[0]);
+  // Keep operator preference deterministic. Receipt reads separately query every endpoint because
+  // "not found" from a stale node is a successful JSON-RPC response, not a fallback-triggering error.
   return fallback(urls.map((u) => http(u, {retryCount: 0})));
+}
+
+const rpcLists = new WeakMap<object, readonly string[]>();
+
+type ReceiptReader = Pick<PublicClient, 'getTransactionReceipt'> & Partial<Pick<PublicClient, 'getChainId'>>;
+
+class ReceiptValidationError extends Error {}
+
+function receiptMissing(error: unknown): boolean {
+  const name = typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
+  const message = error instanceof Error ? error.message : String(error);
+  return name === 'TransactionReceiptNotFoundError' || /receipt.{0,40}(not found|could not be found)/i.test(message);
+}
+
+/** Validate the untrusted JSON-RPC object before it can drive a dependent transaction. Viem formats
+ * normal receipts, but the queried hash and each log's receipt identity are cross-field invariants
+ * a provider response must not be allowed to contradict. */
+export function assertReceiptIdentity(receipt: TransactionReceipt, hash: Hex): void {
+  const expected = hash.toLowerCase();
+  if (receipt.transactionHash?.toLowerCase() !== expected) {
+    throw new ReceiptValidationError(
+      `RPC returned receipt ${receipt.transactionHash ?? '(missing hash)'} for requested transaction ${hash}.`,
+    );
+  }
+  if (receipt.status !== 'success' && receipt.status !== 'reverted') {
+    throw new ReceiptValidationError(`RPC returned an invalid receipt status for transaction ${hash}.`);
+  }
+  for (const log of receipt.logs ?? []) {
+    if (log.transactionHash?.toLowerCase() !== expected) {
+      throw new ReceiptValidationError(
+        `RPC returned a log from ${log.transactionHash ?? '(missing transaction hash)'} in receipt ${hash}.`,
+      );
+    }
+    if (log.blockHash?.toLowerCase() !== receipt.blockHash?.toLowerCase()) {
+      throw new ReceiptValidationError(`RPC returned a log from a different block in receipt ${hash}.`);
+    }
+    if (log.blockNumber !== receipt.blockNumber) {
+      throw new ReceiptValidationError(`RPC returned a log from a different block number in receipt ${hash}.`);
+    }
+  }
+}
+
+async function checkedReceipt(
+  reader: ReceiptReader,
+  hash: Hex,
+  expectedChainId?: number,
+): Promise<TransactionReceipt> {
+  const receipt = await reader.getTransactionReceipt({hash});
+  assertReceiptIdentity(receipt, hash);
+  if (expectedChainId !== undefined) {
+    if (!reader.getChainId) throw new ReceiptValidationError('Receipt reader cannot verify its chain id.');
+    const actual = await reader.getChainId();
+    if (actual !== expectedChainId) {
+      throw new ReceiptValidationError(`Receipt RPC reports chain ${actual}, expected ${expectedChainId}.`);
+    }
+  }
+  return receipt;
+}
+
+/** One receipt probe across configured readers. Every URL in the configured set is inside the
+ * same JSON-RPC trust boundary; list order is an operational preference, not a security tier. */
+export async function firstAvailableReceipt(
+  readers: readonly ReceiptReader[],
+  hash: Hex,
+  options: {expectedChainId?: number; allowStaleFirstFallback?: boolean} = {},
+): Promise<{receipt?: TransactionReceipt; error?: unknown}> {
+  if (readers.length === 0) return {error: new Error('No receipt RPC is configured.')};
+  try {
+    // Give the first configured endpoint a short propagation window to keep ordinary behavior
+    // deterministic. This is preference ordering only; every configured endpoint is a trusted peer.
+    return {receipt: await checkedReceipt(readers[0], hash, options.expectedChainId)};
+  } catch (firstError) {
+    if (firstError instanceof ReceiptValidationError || readers.length === 1) return {error: firstError};
+    if (receiptMissing(firstError) && !options.allowStaleFirstFallback) return {error: firstError};
+    try {
+      return {
+        receipt: await Promise.any(
+          readers.slice(1).map((reader) => checkedReceipt(reader, hash, options.expectedChainId)),
+        ),
+      };
+    } catch (fallbackError) {
+      const reasons = fallbackError instanceof AggregateError ? fallbackError.errors : [fallbackError];
+      return {error: reasons.find((reason) => reason !== undefined) ?? firstError};
+    }
+  }
 }
 
 /** A read-only client — all the indexer and token API ever need. */
 export function makePublicClient(opts: ClientOptions = {}): PublicClient {
-  return createPublicClient({chain: resolveChain(opts.chainKey), transport: makeTransport(opts)});
+  const urls = clientRpcList(opts);
+  const client = createPublicClient({chain: resolveChain(opts.chainKey), transport: makeTransport(urls)});
+  rpcLists.set(client, urls);
+  return client;
+}
+
+/** Wait for a mined receipt across the trusted RPC peers configured for this client. A short grace
+ * period preserves deterministic preference ordering; after it, a stale first endpoint must not
+ * hold an available receipt hostage. Every accepted peer verifies chain and receipt identity. */
+export async function waitForTransactionReceiptResilient(
+  client: PublicClient,
+  args: {hash: Hex; timeoutMs?: number; pollingIntervalMs?: number},
+): Promise<TransactionReceipt> {
+  const urls = rpcLists.get(client) ?? [];
+  if (urls.length <= 1) {
+    const receipt = await client.waitForTransactionReceipt({hash: args.hash, timeout: args.timeoutMs});
+    assertReceiptIdentity(receipt, args.hash);
+    if (client.chain) {
+      const actualChainId = await client.getChainId();
+      if (actualChainId !== client.chain.id) {
+        throw new ReceiptValidationError(
+          `Receipt RPC reports chain ${actualChainId}, expected ${client.chain.id}.`,
+        );
+      }
+    }
+    return receipt;
+  }
+  const readers = urls.map((rpcUrl) =>
+    createPublicClient({chain: client.chain, transport: http(rpcUrl, {retryCount: 0})}),
+  );
+  const deadline = Date.now() + (args.timeoutMs ?? 180_000);
+  const startedAt = Date.now();
+  let lastError: unknown;
+  for (;;) {
+    const result = await firstAvailableReceipt(readers, args.hash, {
+      expectedChainId: client.chain?.id,
+      allowStaleFirstFallback: Date.now() - startedAt >= 6_000,
+    });
+    if (result.receipt) return result.receipt;
+    lastError = result.error;
+    if (Date.now() >= deadline) {
+      throw lastError instanceof Error ? lastError : new Error(`Receipt ${args.hash} was not available before timeout.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, args.pollingIntervalMs ?? 1_000));
+  }
 }
 
 const verifiedChains = new Set<string>();
@@ -61,25 +195,32 @@ export async function assertChainId(
   chainKey: string = DEFAULT_CHAIN_KEY,
   opts: {allowUnreachable?: boolean} = {},
 ): Promise<void> {
-  if (verifiedChains.has(chainKey)) return;
+  const urls = resolveRpcUrls(chainKey);
+  const verificationKey = `${chainKey}\0${urls.join('\0')}`;
+  if (verifiedChains.has(verificationKey)) return;
   const expected = resolveChain(chainKey).id;
-  let actual: number;
-  try {
-    actual = await makePublicClient({chainKey}).getChainId();
-  } catch (err) {
-    if (opts.allowUnreachable) return; // offline dry-run: preview what we can, don't block
+  const checks = await Promise.allSettled(
+    urls.map((url) =>
+      createPublicClient({chain: resolveChain(chainKey), transport: http(url, {retryCount: 0})}).getChainId(),
+    ),
+  );
+  const reachable = checks.flatMap((result, index) =>
+    result.status === 'fulfilled' ? [{actual: result.value, url: urls[index]}] : [],
+  );
+  const wrong = reachable.find(({actual}) => actual !== expected);
+  if (wrong) {
     throw new Error(
-      `Could not reach an RPC for '${chainKey}' to verify the network: ${(err as Error).message}. ` +
-        `Check ${rpcEnvVar(chainKey)} / ABX_RPC_URLS in your .env.`,
-    );
-  }
-  if (actual !== expected) {
-    throw new Error(
-      `RPC network mismatch: the configured endpoint reports chain ${actual}, but ABX_CHAIN='${chainKey}' ` +
+      `RPC network mismatch: the configured endpoint (${redactRpcUrl(wrong.url)}) reports chain ${wrong.actual}, but ABX_CHAIN='${chainKey}' ` +
         `expects ${expected}. Point ${rpcEnvVar(chainKey)} (or ABX_RPC_URLS) at a '${chainKey}' endpoint.`,
     );
   }
-  verifiedChains.add(chainKey);
+  if (reachable.length === 0) {
+    if (opts.allowUnreachable) return; // offline dry-run: preview what we can, don't block
+    throw new Error(
+      `Could not reach an RPC for '${chainKey}' to verify the network. Check ${rpcEnvVar(chainKey)} / ABX_RPC_URLS in your .env.`,
+    );
+  }
+  verifiedChains.add(verificationKey);
 }
 
 export interface WalletClientOptions extends ClientOptions {
@@ -105,7 +246,7 @@ export function makeWalletClient(opts: WalletClientOptions = {}): {
   if (!pk) throw new MissingSigningKeyError();
   const account = privateKeyToAccount(normalizePk(pk));
   const chain = resolveChain(opts.chainKey);
-  const wallet = createWalletClient({account, chain, transport: makeTransport(opts)});
+  const wallet = createWalletClient({account, chain, transport: makeTransport(clientRpcList(opts))});
   return {wallet, account};
 }
 
