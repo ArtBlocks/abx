@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-token-api",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "license": "MIT",
   "description": "Reference ABX metadata, image, status, and provider control-plane service.",
   "type": "module",
