@@ -209,8 +209,15 @@ export interface ServiceDescriptor {
   /** Contract generations this implementation understands, with operation-specific policy. */
   contractGenerations?: ContractGenerationSummary[];
   /** Present iff the control plane is enabled. `signupUrl` is provider-specific human
-   * onboarding/recovery and `docsUrl` is provider documentation; OAuth discovery is separate. */
-  auth?: {scheme: 'bearer'; signupUrl?: string; docsUrl?: string};
+   * onboarding/recovery, `docsUrl` is provider documentation, and `termsUrl` identifies the
+   * terms accepted during key issuance. OAuth discovery is separate. */
+  auth?: {
+    scheme: 'bearer';
+    signupUrl?: string;
+    docsUrl?: string;
+    termsUrl?: string;
+    termsVersion?: string;
+  };
   /** Present when rendering runs behind this service (the resolver fronts its runner).
    *  `effects: null` = attached but unverified (the health probe didn't answer). */
   render?: {attached: boolean; effects: Array<{key: string; outputs: Array<{key: string; mimeType: string}>}> | null};

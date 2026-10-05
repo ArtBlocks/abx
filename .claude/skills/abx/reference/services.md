@@ -37,7 +37,8 @@ The human signs in with the ABX account email and approves in that browser. An e
 session avoids another email code. The same approval provisions or reuses the account's creator
 wallet. The CLI polls at the provider-declared interval, receives the API key, and writes it directly
 to ignored `.env` without printing it. The browser never receives the key. Do not ask the human to
-paste an OTP or key into chat. `--no-open` leaves the browser handoff as a link; `--force` is required
+paste an OTP or key into chat. Key issuance requires the human to accept the provider terms shown in
+the browser; do not accept them on the human's behalf. `--no-open` leaves the browser handoff as a link; `--force` is required
 to replace an existing local credential, but does not revoke the displaced provider key. For normal rotation,
 run `abx auth logout` and then `abx auth login`; reserve `--force` for recovery. The CLI refuses
 tracked or unignored `.env` files.
