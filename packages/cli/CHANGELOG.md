@@ -1,5 +1,21 @@
 # @artblocks/abx-cli
 
+## 0.5.0
+
+### Minor Changes
+
+- 9cd961f: Drop-in for existing consumers; Ethereum is a new opt-in production-beta network.
+
+  Add canonical Ethereum deployments, public RPC fallbacks, the recommended transfer validator, and the standard production warning.
+
+### Patch Changes
+
+- Updated dependencies [9cd961f]
+  - @artblocks/abx-sdk@0.5.0
+  - @artblocks/abx-indexer@0.1.6
+  - @artblocks/abx-storage@0.1.6
+  - @artblocks/abx-token-api@0.2.5
+
 ## 0.4.2
 
 ### Patch Changes
