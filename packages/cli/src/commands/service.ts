@@ -414,9 +414,6 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
           ? ` · provider onboarding/recovery: ${d.auth.signupUrl}`
           : '';
     info(`auth       bearer${onboarding}${d.auth.docsUrl ? ` · docs: ${d.auth.docsUrl}` : ''}`);
-    if (d.auth.termsUrl) {
-      info(`terms      ${d.auth.termsUrl}${d.auth.termsVersion ? dim(` · version ${d.auth.termsVersion}`) : ''}`);
-    }
   } else {
     info(`auth       none advertised ${dim('(control plane disabled on this node)')}`);
   }
