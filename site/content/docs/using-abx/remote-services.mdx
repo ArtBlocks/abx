@@ -15,7 +15,9 @@ abx add 0xYourContract --remote abx
 
 `abx auth login` opens a browser flow and saves `ABX_SERVICES_API_KEY` to an ignored `.env`. It does
 not print the key. The same sign-in provisions or reuses the creator wallet; an active browser
-session can avoid another email code. A later CLI login reuses the loaded key.
+session can avoid another email code. A later CLI login reuses the loaded key. Creating a key
+requires agreement to the [Art Blocks User Terms](https://www.artblocks.io/user-terms.pdf). Existing
+keys continue to work; acceptance is checked only when a new key is created.
 
 An account may have five active keys. The service cannot recover a lost key value.
 
@@ -27,6 +29,11 @@ abx auth logout
 
 The built-in `abx` remote points to `https://services.abx.io`. Other providers can implement the
 same interfaces.
+
+To report illegal, infringing, or otherwise prohibited content served by ABX Services, email
+[`legal@artblocks.io`](mailto:legal@artblocks.io) with the chain, contract address, exact service URL,
+and supporting information. Art Blocks can stop its services from indexing, rendering, or serving a
+project; it cannot remove blockchain data or copies held elsewhere.
 
 ## Another provider
 
