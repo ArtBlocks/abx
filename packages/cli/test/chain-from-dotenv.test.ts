@@ -78,8 +78,7 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
     }
   });
   assert.match(out, /is not a recognized chain/);
-  assert.match(out, /Selectable production networks: Base \(base, beta\), Robinhood Chain \(robinhood, beta\), Arbitrum \(arbitrum, beta\)/);
-  assert.match(out, /Disabled: Ethereum/);
+  assert.match(out, /Selectable production networks: Base \(base, beta\), Robinhood Chain \(robinhood, beta\), Ethereum \(ethereum, beta\), Arbitrum \(arbitrum, beta\)/);
 });
 
 test('Base is selectable but every substantive invocation prints the production-beta warning', () => {
@@ -162,4 +161,21 @@ test('Arbitrum is selectable but every substantive invocation prints the product
   assert.match(result.stderr, /Prove the flow on arbitrum-sepolia/);
   const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
   assert.equal(capabilities.chains.find((chain) => chain.key === 'arbitrum')?.supportLevel, 'beta');
+});
+
+test('Ethereum is selectable but every substantive invocation prints the production-beta warning', () => {
+  const result = withDotEnv('ABX_CHAIN=ethereum\n', (dir) =>
+    spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: {...process.env, ABX_CHAIN: undefined, ABX_NO_UPDATE_CHECK: '1'} as NodeJS.ProcessEnv,
+      timeout: 60_000,
+    }),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Ethereum production beta \(chain 1\)/);
+  assert.match(result.stderr, /Real funds and irreversible state are at risk/);
+  assert.match(result.stderr, /Prove the flow on sepolia/);
+  const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'ethereum')?.supportLevel, 'beta');
 });

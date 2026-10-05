@@ -54,6 +54,7 @@ const DEFAULT_RPC_URLS: Record<string, readonly string[]> = {
   ],
   robinhood: ['https://rpc.mainnet.chain.robinhood.com', 'https://robinhood-rpc.publicnode.com'],
   base: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'],
+  ethereum: ['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'],
   arbitrum: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'],
 };
 
