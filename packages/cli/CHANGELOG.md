@@ -1,5 +1,12 @@
 # @artblocks/abx-cli
 
+## 0.5.1
+
+### Patch Changes
+
+- 3ffd838: Drop-in for all users. Tell agents that a person accepts the Art Blocks User Terms only when creating
+  a new first-party API key.
+
 ## 0.5.0
 
 ### Minor Changes
