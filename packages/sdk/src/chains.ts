@@ -75,7 +75,7 @@ export function configureRuntimeRpcEndpoint(chainKey: string, endpoint: RuntimeR
     throw new Error('runtime RPC endpoint must use http or https');
   }
   RUNTIME_RPC_ENDPOINTS.set(chainKey, {
-    url: endpoint.url.replace(/\/+$/, ''),
+    url: endpoint.url,
     headers: {...endpoint.headers},
   });
 }
