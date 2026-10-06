@@ -11,7 +11,14 @@ import {
   type TransactionReceipt,
 } from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
-import {DEFAULT_CHAIN_KEY, redactRpcUrl, resolveChain, resolveRpcUrls, rpcEnvVar} from './chains.js';
+import {
+  DEFAULT_CHAIN_KEY,
+  redactRpcUrl,
+  resolveChain,
+  resolveRpcUrls,
+  rpcEnvVar,
+  runtimeRpcHeaders,
+} from './chains.js';
 import {readEnv} from './util.js';
 import {MissingSigningKeyError} from './errors.js';
 
@@ -35,11 +42,19 @@ function clientRpcList(opts: ClientOptions): string[] {
   return opts.rpcUrl ? [opts.rpcUrl] : resolveRpcUrls(opts.chainKey, opts.rpcUrls);
 }
 
+function rpcHttp(url: string | undefined, retryCount?: number): ReturnType<typeof http> {
+  const headers = url ? runtimeRpcHeaders(url) : {};
+  return http(url, {
+    ...(retryCount === undefined ? {} : {retryCount}),
+    ...(Object.keys(headers).length > 0 ? {fetchOptions: {headers}} : {}),
+  });
+}
+
 function makeTransport(urls: readonly string[]): Transport {
-  if (urls.length <= 1) return http(urls[0]);
+  if (urls.length <= 1) return rpcHttp(urls[0]);
   // Keep operator preference deterministic. Receipt reads separately query every endpoint because
   // "not found" from a stale node is a successful JSON-RPC response, not a fallback-triggering error.
-  return fallback(urls.map((u) => http(u, {retryCount: 0})));
+  return fallback(urls.map((u) => rpcHttp(u, 0)));
 }
 
 const rpcLists = new WeakMap<object, readonly string[]>();
@@ -157,7 +172,7 @@ export async function waitForTransactionReceiptResilient(
     return receipt;
   }
   const readers = urls.map((rpcUrl) =>
-    createPublicClient({chain: client.chain, transport: http(rpcUrl, {retryCount: 0})}),
+    createPublicClient({chain: client.chain, transport: rpcHttp(rpcUrl, 0)}),
   );
   const deadline = Date.now() + (args.timeoutMs ?? 180_000);
   const startedAt = Date.now();
@@ -201,7 +216,7 @@ export async function assertChainId(
   const expected = resolveChain(chainKey).id;
   const checks = await Promise.allSettled(
     urls.map((url) =>
-      createPublicClient({chain: resolveChain(chainKey), transport: http(url, {retryCount: 0})}).getChainId(),
+      createPublicClient({chain: resolveChain(chainKey), transport: rpcHttp(url, 0)}).getChainId(),
     ),
   );
   const reachable = checks.flatMap((result, index) =>

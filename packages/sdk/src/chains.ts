@@ -58,6 +58,41 @@ const DEFAULT_RPC_URLS: Record<string, readonly string[]> = {
   arbitrum: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'],
 };
 
+export interface RuntimeRpcEndpoint {
+  url: string;
+  /** Headers sent only to this exact endpoint. Credentials never follow a fallback URL. */
+  headers?: Readonly<Record<string, string>>;
+}
+
+/** Process-local provider injection for an embedding CLI. The SDK remains provider-neutral;
+ * explicit options and ABX_RPC_URLS* always take precedence over this runtime default. */
+const RUNTIME_RPC_ENDPOINTS = new Map<string, RuntimeRpcEndpoint>();
+
+export function configureRuntimeRpcEndpoint(chainKey: string, endpoint: RuntimeRpcEndpoint): void {
+  resolveChain(chainKey);
+  const parsed = new URL(endpoint.url);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('runtime RPC endpoint must use http or https');
+  }
+  RUNTIME_RPC_ENDPOINTS.set(chainKey, {
+    url: endpoint.url,
+    headers: {...endpoint.headers},
+  });
+}
+
+/** Primarily for isolated tests and embedders replacing their process-local configuration. */
+export function clearRuntimeRpcEndpoint(chainKey: string): void {
+  RUNTIME_RPC_ENDPOINTS.delete(chainKey);
+}
+
+/** Headers registered for exactly this URL. Public and creator-selected fallbacks receive none. */
+export function runtimeRpcHeaders(url: string): Record<string, string> {
+  for (const endpoint of RUNTIME_RPC_ENDPOINTS.values()) {
+    if (endpoint.url === url) return {...endpoint.headers};
+  }
+  return {};
+}
+
 export function resolveChain(key: string = DEFAULT_CHAIN_KEY): Chain {
   const chain = CHAINS[key];
   if (!chain) throw new Error(`Unknown chain "${key}". Known: ${Object.keys(CHAINS).join(', ')}`);
@@ -100,7 +135,7 @@ export function rpcEnvVar(chainKey: string): string {
 
 /**
  * The ordered, de-duplicated RPC endpoints for `chainKey`. Precedence is **override → env →
- * manifest default**, the same `pick()` shape `deployments.ts` uses for every other address:
+ * runtime provider → manifest default**, while explicit caller configuration always wins:
  *   - `override` (a `ClientOptions.rpcUrls`, or a single `rpcUrl` the caller already joined) —
  *     explicit config wins outright, no env involved.
  *   - env: a per-chain `ABX_RPC_URLS_<CHAIN>` wins when set; otherwise the bare `ABX_RPC_URLS`
@@ -109,11 +144,20 @@ export function rpcEnvVar(chainKey: string): string {
  *     (e.g. widest `eth_getLogs` range). The bare and per-chain vars are never mixed, so a list for
  *     one network can't leak into another; a chainId guard (see `assertChainId`) then verifies the
  *     endpoints actually ARE `chainKey`.
- *   - manifest: the built-in keyless defaults for `chainKey`, normally independent providers.
+ *   - runtime provider: an embedding CLI may inject a credentialed default for this process. It is
+ *     used only when neither explicit nor env configuration exists; its headers are URL-scoped.
+ *   - manifest: the built-in keyless defaults for `chainKey`, normally independent providers. They
+ *     remain after a runtime provider as credential-free failover.
  */
 export function resolveRpcUrls(chainKey: string = DEFAULT_CHAIN_KEY, override?: string | string[]): string[] {
   const overrideList = override === undefined ? undefined : Array.isArray(override) ? override.join(',') : override;
-  const list = overrideList ?? readEnv(rpcEnvVar(chainKey)) ?? readEnv('ABX_RPC_URLS') ?? '';
+  const configured = overrideList ?? readEnv(rpcEnvVar(chainKey)) ?? readEnv('ABX_RPC_URLS');
+  const runtime = RUNTIME_RPC_ENDPOINTS.get(chainKey);
+  const list = configured?.trim()
+    ? configured
+    : [runtime?.url, ...(DEFAULT_RPC_URLS[chainKey] ?? [])]
+        .filter((url): url is string => Boolean(url))
+        .join(',');
   const seen = new Set<string>();
   const urls = list
     .split(/[\s,]+/)

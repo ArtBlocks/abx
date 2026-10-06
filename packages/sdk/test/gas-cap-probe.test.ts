@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {clearRuntimeRpcEndpoint, configureRuntimeRpcEndpoint} from '../src/chains.ts';
 import {probeEthCallGasCap} from '../src/probe.ts';
 
 // The cap is measured. An endpoint that rejects state overrides must produce
@@ -35,6 +36,29 @@ test('reports the gas the node actually provisioned, not what we asked for', asy
   const addr = callObj.to as string;
   assert.equal(overrides[addr].code, '0x5a60005260206000f3');
   assert.ok(Number(BigInt(callObj.gas)) > 600_000_000, 'must ask for more than any node grants, so the answer is the cap');
+});
+
+test('the raw gas-cap probe sends a runtime credential only to its exact URL', async () => {
+  const url = 'https://services.example/v1/rpc/84532';
+  configureRuntimeRpcEndpoint('base-sepolia', {
+    url,
+    headers: {authorization: 'Bearer creator-secret'},
+  });
+  try {
+    let sentHeaders: HeadersInit | undefined;
+    await withFetch(async (_u, init) => {
+      sentHeaders = init?.headers;
+      return json({jsonrpc: '2.0', id: 1, result: '0x' + (600_000_000).toString(16)});
+    }, () => probeEthCallGasCap(url));
+    assert.equal(new Headers(sentHeaders).get('authorization'), 'Bearer creator-secret');
+
+    await withFetch(async (_u, init) => {
+      assert.equal(new Headers(init?.headers).get('authorization'), null);
+      return json({jsonrpc: '2.0', id: 1, result: '0x' + (600_000_000).toString(16)});
+    }, () => probeEthCallGasCap('https://public.example'));
+  } finally {
+    clearRuntimeRpcEndpoint('base-sepolia');
+  }
 });
 
 test('an endpoint that ignores state overrides is UNKNOWN, never a wrong number', async () => {

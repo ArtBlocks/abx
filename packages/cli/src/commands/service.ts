@@ -20,6 +20,7 @@ import {createInterface} from 'node:readline';
 import {SqliteStore} from '@artblocks/abx-indexer';
 import {
   AbxServiceError,
+  CREATOR_RPC_INTERFACE,
   SERVICE_FEEDBACK_INTERFACE,
   TOKEN_API_INTERFACE,
   type Address,
@@ -405,6 +406,14 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
   }
   if (d.interfaces?.includes(SERVICE_FEEDBACK_INTERFACE)) {
     info(`feedback   provider reports supported · preview with abx feedback --remote ${target.name?.toLowerCase() ?? target.url}`);
+  }
+  if (d.interfaces?.includes(CREATOR_RPC_INTERFACE)) {
+    const endpoint = d.endpoints?.[CREATOR_RPC_INTERFACE];
+    const chains = endpoint?.chains ?? d.chains ?? [];
+    info(
+      `creator RPC authenticated CLI transport${chains.length > 0 ? ` · chains ${chains.join(', ')}` : ''}` +
+        dim(' · private creator use only; never put this endpoint or key in a public site'),
+    );
   }
   if (d.auth) {
     const onboarding =

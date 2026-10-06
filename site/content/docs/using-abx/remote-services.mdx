@@ -30,6 +30,30 @@ abx auth logout
 The built-in `abx` remote points to `https://services.abx.io`. Other providers can implement the
 same interfaces.
 
+### Creator RPC
+
+When `ABX_SERVICES_API_KEY` is available and you have not configured `ABX_RPC_URLS_<CHAIN>` or
+`ABX_RPC_URLS`, the CLI treats the built-in `abx` remote as its default creator-RPC provider. It
+fetches that remote's public descriptor and uses the endpoint only when it advertises
+`abx-creator-rpc/v1`, bearer authentication, a route template, and the active chain. The existing
+public endpoints remain failovers, and your API key is sent only in the authorization header to the
+exact advertised URL.
+
+This is a provider interface, not an ABX Services-only URL convention. Set `ABX_RPC_REMOTE` to any
+named remote or catalog URL to select another compatible provider; named remotes use their matching
+`ABX_REMOTE_<NAME>_TOKEN`, while an ad-hoc catalog URL follows the existing
+`ABX_REMOTE_SELF_TOKEN` convention. If its descriptor is unavailable, invalid, or does not
+advertise the active chain, ABX does not guess a route and continues with the public fallbacks. Run
+`abx remote <name-or-url>` to inspect the live advertisement. Rate limits and availability are
+service policy, not protocol guarantees.
+
+The creator RPC is private CLI infrastructure for tasks such as deploying and checking project
+state. **Do not publish its endpoint or API key, put either in browser code, or use it for a project
+website.** Public applications should use their own Alchemy, QuickNode, Infura, or equivalent
+provider account. Excessive traffic or public-site use may result in suspension of the API key or
+account. To use your own RPC in the CLI, set `ABX_RPC_URLS_<CHAIN>` or `ABX_RPC_URLS`; explicit
+configuration always wins.
+
 To report illegal, infringing, or otherwise prohibited content served by ABX Services, email
 [`legal@artblocks.io`](mailto:legal@artblocks.io) with the chain, contract address, exact service URL,
 and supporting information. Art Blocks can stop its services from indexing, rendering, or serving a
@@ -67,6 +91,30 @@ abx remote <name-or-url>
 The first-party catalog, accounts, and project control live at `services.abx.io`. Public token data
 lives at `resolver.abx.io`. The CLI follows the descriptor instead of inferring behavior from a
 hostname.
+
+A compatible creator-RPC provider advertises the interface and its route rather than relying on a
+well-known hostname or path:
+
+```json
+{
+  "interfaces": ["abx-creator-rpc/v1"],
+  "chains": [8453, 84532],
+  "endpoints": {
+    "abx-creator-rpc/v1": {
+      "baseUrl": "https://rpc.provider.example",
+      "chains": [8453, 84532],
+      "auth": "bearer",
+      "pathTemplate": "/v1/rpc/{chainId}"
+    }
+  }
+}
+```
+
+The resolved route accepts JSON-RPC over `POST` with the remote's bearer token. The chain list must
+be a subset of the catalog's chains, and a bearer-authenticated origin must use HTTPS (except
+loopback HTTP during local development). A fixed path is valid for a single-chain endpoint; a
+multi-chain endpoint normally uses the percent-encoded `{chainId}` substitution. Clients must not
+infer a route for an unadvertised interface or chain.
 
 The version 1 control plane uses bearer authentication:
 

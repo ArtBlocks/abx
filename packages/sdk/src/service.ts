@@ -4,9 +4,9 @@
  * endpoint + an injected bearer token, never to a brand: the reference CLI, the effects runner,
  * and any hosted agent drive a self-hosted node and a managed provider through this same class.
  *
- * The token authorizes index/metadata control only — never on-chain signing. No env reads here;
- * credential resolution is the caller's concern (the CLI's named-remote convention lives in
- * packages/cli/src/remote.ts).
+ * A token authorizes only the HTTP interfaces granted by its provider — never on-chain signing.
+ * No env reads here; credential resolution is the caller's concern (the CLI's named-remote
+ * convention lives in packages/cli/src/remote.ts).
  */
 
 import type {Hex} from 'viem';
@@ -36,6 +36,8 @@ export const SERVICE_FEEDBACK_INTERFACE = 'abx-service-feedback/v1';
 export const ACCOUNT_API_INTERFACE = 'abx-account/v1';
 /** Account-bound creator wallet and sponsored-operation surface. */
 export const CREATOR_WALLET_INTERFACE = 'abx-creator-wallet/v1';
+/** Authenticated JSON-RPC for private creator tooling, not public website traffic. */
+export const CREATOR_RPC_INTERFACE = 'abx-creator-rpc/v1';
 
 /**
  * Why this locator can't be accepted for a referenced artifact, or `null` if it passes.
@@ -233,10 +235,16 @@ export interface ServiceInterfaceEndpoint {
   supportLevel?: ServiceInterfaceSupportLevel;
   /** HTTP authentication expected by the interface. Wallet authorization remains a separate act. */
   auth?: 'none' | 'bearer';
+  /** Interface-specific path shape, such as `/v1/rpc/{chainId}`. */
+  pathTemplate?: string;
 }
 
 export interface ResolvedServiceInterfaceEndpoint extends ServiceInterfaceEndpoint {
   chains: number[];
+}
+
+export interface ResolvedServiceInterfaceUrl extends ResolvedServiceInterfaceEndpoint {
+  url: string;
 }
 
 const SERVICE_INTERFACE_SUPPORT_LEVELS = new Set<ServiceInterfaceSupportLevel>(['experimental', 'beta', 'supported']);
@@ -295,12 +303,56 @@ export function resolveServiceInterfaceEndpoint(
   if (declared?.auth && declared.auth !== 'none' && declared.auth !== 'bearer') {
     throw new Error(`ABX service interface ${interfaceId} advertises an invalid authentication scheme`);
   }
+  if (declared?.auth === 'bearer') {
+    const authenticatedBase = new URL(baseUrl);
+    if (authenticatedBase.protocol !== 'https:' && !loopbackHost(authenticatedBase.hostname)) {
+      throw new Error(`Bearer-authenticated ABX service interface ${interfaceId} must use HTTPS`);
+    }
+  }
+  if (declared?.pathTemplate && !declared.pathTemplate.startsWith('/')) {
+    throw new Error(`ABX service interface ${interfaceId} advertises an invalid path template`);
+  }
   return {
     baseUrl,
     chains: [...chains],
     ...(declared?.supportLevel ? {supportLevel: declared.supportLevel} : {}),
     ...(declared?.auth ? {auth: declared.auth} : {}),
+    ...(declared?.pathTemplate ? {pathTemplate: declared.pathTemplate} : {}),
   };
+}
+
+/** Resolve an advertised interface's templated route without guessing a provider path. The
+ * catalog remains the trust root; path parameters are encoded as single path segments, and a
+ * template cannot smuggle a query or fragment into the credentialed request URL. */
+export function resolveServiceInterfaceUrl(
+  catalogBaseUrl: string,
+  descriptor: ServiceDescriptor,
+  interfaceId: string,
+  params: Readonly<Record<string, string | number>>,
+): ResolvedServiceInterfaceUrl | undefined {
+  const endpoint = resolveServiceInterfaceEndpoint(catalogBaseUrl, descriptor, interfaceId);
+  if (!endpoint) return undefined;
+  const template = endpoint.pathTemplate;
+  if (!template) throw new Error(`ABX service interface ${interfaceId} does not advertise a path template`);
+  if (template.includes('?') || template.includes('#')) {
+    throw new Error(`ABX service interface ${interfaceId} advertises an invalid path template`);
+  }
+  const names = [...template.matchAll(/\{([A-Za-z][A-Za-z0-9]*)\}/g)].map((match) => match[1]!);
+  if (/[{}]/.test(template.replace(/\{[A-Za-z][A-Za-z0-9]*\}/g, ''))) {
+    throw new Error(`ABX service interface ${interfaceId} advertises an invalid path template`);
+  }
+  for (const name of new Set(names)) {
+    if (!Object.hasOwn(params, name)) {
+      throw new Error(`ABX service interface ${interfaceId} path template requires ${name}`);
+    }
+  }
+  const path = template.replace(/\{([A-Za-z][A-Za-z0-9]*)\}/g, (_match, name: string) =>
+    encodeURIComponent(String(params[name])),
+  );
+  const url = `${endpoint.baseUrl.replace(/\/+$/, '')}${path}`;
+  // Reparse the complete value as a final structural assertion after substitution.
+  new URL(url);
+  return {...endpoint, url};
 }
 
 export const FEEDBACK_KINDS = ['bug', 'friction', 'gap', 'confusion', 'praise', 'other'] as const;

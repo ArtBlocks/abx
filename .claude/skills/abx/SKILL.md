@@ -22,6 +22,9 @@ typed errors outrank remembered prose.
 - Never read or print `.env`, private keys, RPC URLs, provider tokens, storage credentials, wallet
   session URLs, or Arweave JWK contents. Use `abx doctor`, `abx remote`, and `abx storage show` to
   inspect configuration safely.
+- Treat any advertised authenticated creator RPC as private CLI infrastructure. Never publish its
+  endpoint or API key, put either in browser code, or use it for a project website. Public apps need
+  their own Alchemy, QuickNode, Infura, or equivalent account; misuse may suspend the API key/account.
 - Use `pnpm abx …` inside the ABX source repository. Use `abx …` in a creator project or installed
   environment. Run `abx version` if provenance is uncertain.
 - Treat an available CLI update as an action item. Recommend upgrading before further planning or

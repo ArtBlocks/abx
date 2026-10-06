@@ -1,5 +1,5 @@
 import {createPublicClient, http, zeroAddress, type Address, type Chain, type Hash, type PublicClient} from 'viem';
-import {resolveChain, resolveRpcUrls, redactRpcUrl} from './chains.js';
+import {resolveChain, resolveRpcUrls, redactRpcUrl, runtimeRpcHeaders} from './chains.js';
 import {isGetLogsRangeError} from './reconstruct.js';
 
 /**
@@ -52,7 +52,14 @@ export async function probeRpcEndpoints(
 
 async function probeOne(chain: Chain, url: string): Promise<RpcProbe> {
   const probe: RpcProbe = {url, label: redactRpcUrl(url), reachable: false, wideRange: false, archive: false, verdict: 'unusable'};
-  const client = createPublicClient({chain, transport: http(url, {retryCount: 0})});
+  const headers = runtimeRpcHeaders(url);
+  const client = createPublicClient({
+    chain,
+    transport: http(url, {
+      retryCount: 0,
+      ...(Object.keys(headers).length > 0 ? {fetchOptions: {headers}} : {}),
+    }),
+  });
 
   let head: bigint;
   try {
@@ -241,7 +248,7 @@ export async function probeEthCallGasCap(url: string, timeoutMs = 6_000): Promis
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: {'content-type': 'application/json'},
+      headers: {'content-type': 'application/json', ...runtimeRpcHeaders(url)},
       signal,
       body: JSON.stringify({
         jsonrpc: '2.0',
