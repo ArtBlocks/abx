@@ -16,9 +16,9 @@
  *   --remote          bare: the self-host default — ABX_PUBLIC_BASE_URL (the URL baked on-chain,
  *                     else ABX_RESOLVER_URL) + ABX_REMOTE_SELF_TOKEN.
  *
- * Every token here authorizes indexing/metadata control only — never on-chain signing — so the
- * "no signing key on the host" rule is intact. (`--remote-token`, not `--token`: `--token` already
- * means a token ID across the owner ops.)
+ * Every token here authorizes only the HTTP interfaces granted by that provider — never on-chain
+ * signing — so the "no signing key on the host" rule is intact. (`--remote-token`, not `--token`:
+ * `--token` already means a token ID across the owner ops.)
  *
  * The RESOLVER's own env var — what gates ITS control plane, server-side (packages/token-api/src/
  * control-plane.ts) — is unchanged: still `ABX_RESOLVER_ADMIN_TOKEN`. Only the CLIENT-side lookup

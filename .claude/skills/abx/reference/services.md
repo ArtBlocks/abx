@@ -90,10 +90,17 @@ resolver and verify the resulting public surfaces as described in [hosting.md](h
 ## Creator RPC
 
 When `ABX_SERVICES_API_KEY` is present and the creator has not set `ABX_RPC_URLS_<CHAIN>` or
-`ABX_RPC_URLS`, the CLI automatically prefers the authenticated ABX Services creator RPC for the
-active chain. The shipped public endpoints remain failovers. The bearer key is sent only to the
-exact Services endpoint and is never placed in its URL. Inspect `abx remote abx` for the live
-`abx-creator-rpc/v1` chain list and current service policy; quotas and availability are not protocol
+`ABX_RPC_URLS`, the CLI selects the built-in `abx` remote as its default creator-RPC provider. It
+uses the endpoint only when the remote's public descriptor advertises `abx-creator-rpc/v1`, bearer
+authentication, a route template, and the active chain. The shipped public endpoints remain
+failovers. The bearer key is sent only to the exact advertised endpoint and is never placed in its
+URL.
+
+This is provider-neutral discovery. `ABX_RPC_REMOTE=<name-or-url>` selects another compatible
+catalog; a named remote uses its matching `ABX_REMOTE_<NAME>_TOKEN`, while a catalog URL uses
+`ABX_REMOTE_SELF_TOKEN`. If discovery fails or the interface does not cover the active chain, ABX
+never guesses a route and keeps the public fallbacks. Inspect `abx remote <name-or-url>` for the
+live advertisement and current service policy; quotas and availability are not protocol
 guarantees.
 
 This endpoint exists for private creator workflows such as deploying, verifying, and checking

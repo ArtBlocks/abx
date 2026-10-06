@@ -3,5 +3,6 @@
 '@artblocks/abx-sdk': minor
 ---
 
-Prefer an authenticated, rate-limited ABX Services creator RPC when an account key is present,
-while preserving explicit creator RPC configuration and the shipped public endpoints as failover.
+Discover an authenticated creator RPC through a remote's `abx-creator-rpc/v1` service interface,
+using ABX Services as the zero-config provider while preserving explicit RPC configuration and the
+shipped public endpoints as failover.

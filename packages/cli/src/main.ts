@@ -76,10 +76,14 @@ import {
   type Address,
   CHAIN_SUPPORT,
   chainSupportByKey,
+  CREATOR_RPC_INTERFACE,
   DEFAULT_CHAIN_KEY,
   KNOWN_CHAIN_KEYS,
+  redactRpcUrl,
   redactRpcUrlsInText,
+  resolveChain,
   resolveRpcUrls,
+  rpcEnvVar,
 } from '@artblocks/abx-sdk';
 import {DEFAULT_PORT} from '@artblocks/abx-token-api';
 import {
@@ -122,7 +126,7 @@ import {CHAIN} from './config.js';
 import {CliError} from './errors.js';
 import {allowlistFor} from './flag-allowlists.js';
 import {type Flags, parseFlags, positionalArgs, warnStrayFlags} from './flags.js';
-import {bold, c, dim, ensureRenderer, g, ok} from './output.js';
+import {bold, c, dim, ensureRenderer, g, ok, warn} from './output.js';
 import {
   cmdAttach,
   cmdConfigureParam,
@@ -164,6 +168,8 @@ import {
 } from './ownerops.js';
 import {DEFAULT_PREVIEW_PORT} from './preview.js';
 import {checkForCliUpdate, compareVersions, installedLegacySkillCopies, installedSkillCopies, readCliVersion, skillRefreshCommands} from './update-check.js';
+import {ABX_RPC_REMOTE_VAR, configureCreatorRpcFromRemote, creatorRpcRemoteSpec} from './creator-rpc.js';
+import {resolveRemote} from './remote.js';
 
 
 /**
@@ -293,6 +299,37 @@ async function maybeNotifyUpdate(flags: Flags): Promise<void> {
 
 
 
+async function configureAdvertisedCreatorRpc(): Promise<void> {
+  if (process.env[rpcEnvVar(CHAIN)]?.trim() || process.env.ABX_RPC_URLS?.trim()) return;
+  const spec = creatorRpcRemoteSpec();
+  if (!spec) return;
+  const explicit = Boolean(process.env[ABX_RPC_REMOTE_VAR]?.trim());
+  const remote = resolveRemote(spec);
+  if (!remote) return;
+  if (!remote.token?.trim()) {
+    if (explicit) {
+      warn(
+        `${ABX_RPC_REMOTE_VAR} selected ${remote.name?.toLowerCase() ?? redactRpcUrl(remote.url)}, but no bearer token resolved from ${remote.tokenVar}; using public RPC fallbacks.`,
+      );
+    }
+    return;
+  }
+  try {
+    const configured = await configureCreatorRpcFromRemote(CHAIN, remote);
+    if (!configured && explicit) {
+      warn(
+        `${ABX_RPC_REMOTE_VAR} selected ${remote.name?.toLowerCase() ?? redactRpcUrl(remote.url)}, but it does not advertise a bearer-authenticated ${CREATOR_RPC_INTERFACE} endpoint for chain ${resolveChain(CHAIN).id}; using public RPC fallbacks.`,
+      );
+    }
+  } catch {
+    if (explicit) {
+      warn(
+        `${ABX_RPC_REMOTE_VAR} selected ${remote.name?.toLowerCase() ?? redactRpcUrl(remote.url)}, but its public service descriptor is unavailable or invalid; using public RPC fallbacks.`,
+      );
+    }
+  }
+}
+
 async function main() {
   loadDotEnv();
 
@@ -336,6 +373,7 @@ async function main() {
     return printCommandHelp(cmd, positionalArgs(rest)[0]);
   }
 
+  await configureAdvertisedCreatorRpc();
   warnActiveChainRisk(cmd);
 
   // One unknown-flag notice for every listed command. Centralized here rather than added to ~45

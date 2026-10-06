@@ -36,7 +36,6 @@ import {
 import {SelfHostIndexer, SqliteStore} from '@artblocks/abx-indexer';
 import {type Flags} from './flags.js';
 import {bold, dim, g, info, warn} from './output.js';
-import {configureFirstPartyCreatorRpc} from './creator-rpc.js';
 
 /**
  * Runtime resolution for the CLI — deliberately **stateless about decisions**. There is no
@@ -77,7 +76,6 @@ loadDotEnv();
  * from here now.
  */
 export const CHAIN = process.env.ABX_CHAIN ?? DEFAULT_CHAIN_KEY;
-configureFirstPartyCreatorRpc(CHAIN);
 export const chainId = (): number => resolveChain(CHAIN).id;
 
 // Block explorer base for the tx/address links the CLI prints. Derived from viem's chain metadata via

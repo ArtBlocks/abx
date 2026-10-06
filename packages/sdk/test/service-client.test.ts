@@ -16,6 +16,7 @@ import {
   CREATOR_WALLET_INTERFACE,
   CONTROL_PLANE_INTERFACE,
   resolveServiceInterfaceEndpoint,
+  resolveServiceInterfaceUrl,
   type RegisterProjectAccepted,
   type RegisterProjectSummary,
 } from '../src/service.js';
@@ -70,6 +71,93 @@ test('interface discovery keeps old descriptors on the catalog origin and permit
     pathTemplate: '/v1/rpc/{chainId}',
   });
   assert.equal(resolveServiceInterfaceEndpoint('https://services.example', split, 'abx-unadvertised/v1'), undefined);
+  assert.deepEqual(
+    resolveServiceInterfaceUrl('https://services.example', split, CREATOR_RPC_INTERFACE, {chainId: 84532}),
+    {
+      baseUrl: 'https://api.example',
+      chains: [84532],
+      supportLevel: 'beta',
+      auth: 'bearer',
+      pathTemplate: '/v1/rpc/{chainId}',
+      url: 'https://api.example/v1/rpc/84532',
+    },
+  );
+});
+
+test('templated interface routes reject missing parameters and URL suffixes', () => {
+  const descriptor = {
+    interfaces: [CREATOR_RPC_INTERFACE],
+    chains: [84532],
+    endpoints: {
+      [CREATOR_RPC_INTERFACE]: {
+        baseUrl: 'https://api.example/root',
+        pathTemplate: '/v1/rpc/{chainId}',
+      },
+    },
+  };
+  assert.equal(
+    resolveServiceInterfaceUrl('https://catalog.example', descriptor, CREATOR_RPC_INTERFACE, {chainId: '84532/x'})
+      ?.url,
+    'https://api.example/root/v1/rpc/84532%2Fx',
+  );
+  assert.equal(
+    resolveServiceInterfaceUrl(
+      'https://catalog.example',
+      {
+        ...descriptor,
+        endpoints: {
+          [CREATOR_RPC_INTERFACE]: {
+            baseUrl: 'https://single-chain.example',
+            chains: [84532],
+            pathTemplate: '/rpc',
+          },
+        },
+      },
+      CREATOR_RPC_INTERFACE,
+      {chainId: 84532},
+    )?.url,
+    'https://single-chain.example/rpc',
+  );
+  assert.throws(
+    () => resolveServiceInterfaceUrl('https://catalog.example', descriptor, CREATOR_RPC_INTERFACE, {}),
+    /requires chainId/,
+  );
+  assert.throws(
+    () =>
+      resolveServiceInterfaceUrl(
+        'https://catalog.example',
+        {
+          ...descriptor,
+          endpoints: {
+            [CREATOR_RPC_INTERFACE]: {
+              baseUrl: 'https://api.example',
+              pathTemplate: '/v1/rpc/{toString}',
+            },
+          },
+        },
+        CREATOR_RPC_INTERFACE,
+        {},
+      ),
+    /requires toString/,
+  );
+  assert.throws(
+    () =>
+      resolveServiceInterfaceUrl(
+        'https://catalog.example',
+        {
+          ...descriptor,
+          endpoints: {
+            [CREATOR_RPC_INTERFACE]: {
+              baseUrl: 'https://api.example',
+              pathTemplate: '/v1/rpc/{chainId}?key=wrong',
+            },
+          },
+        },
+        CREATOR_RPC_INTERFACE,
+        {chainId: 84532},
+      ),
+    /invalid path template/,
+  );
 });
 
 test('interface discovery will not forward credentials to an unsafe or contradictory endpoint', () => {
@@ -120,6 +208,25 @@ test('interface discovery will not forward credentials to an unsafe or contradic
         CREATOR_WALLET_INTERFACE,
       ),
     /must not contain credentials/,
+  );
+  assert.throws(
+    () =>
+      resolveServiceInterfaceEndpoint(
+        'http://catalog.example',
+        {
+          interfaces: [CREATOR_RPC_INTERFACE],
+          chains: [84532],
+          endpoints: {
+            [CREATOR_RPC_INTERFACE]: {
+              baseUrl: 'http://catalog.example',
+              auth: 'bearer',
+              pathTemplate: '/v1/rpc/{chainId}',
+            },
+          },
+        },
+        CREATOR_RPC_INTERFACE,
+      ),
+    /must use HTTPS/,
   );
 });
 
