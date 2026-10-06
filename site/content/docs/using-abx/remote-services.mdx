@@ -30,6 +30,22 @@ abx auth logout
 The built-in `abx` remote points to `https://services.abx.io`. Other providers can implement the
 same interfaces.
 
+### Creator RPC
+
+When `ABX_SERVICES_API_KEY` is available and you have not configured `ABX_RPC_URLS_<CHAIN>` or
+`ABX_RPC_URLS`, the CLI automatically prefers the authenticated ABX Services creator RPC for the
+active chain. The existing public endpoints remain failovers, and your API key is sent only in the
+authorization header to the exact Services endpoint. Run `abx remote abx` to see whether the live
+service advertises `abx-creator-rpc/v1` for your chain. Rate limits and availability are service
+policy, not protocol guarantees.
+
+The creator RPC is private CLI infrastructure for tasks such as deploying and checking project
+state. **Do not publish its endpoint or API key, put either in browser code, or use it for a project
+website.** Public applications should use their own Alchemy, QuickNode, Infura, or equivalent
+provider account. Excessive traffic or public-site use may result in suspension of the API key or
+account. To use your own RPC in the CLI, set `ABX_RPC_URLS_<CHAIN>` or `ABX_RPC_URLS`; explicit
+configuration always wins.
+
 To report illegal, infringing, or otherwise prohibited content served by ABX Services, email
 [`legal@artblocks.io`](mailto:legal@artblocks.io) with the chain, contract address, exact service URL,
 and supporting information. Art Blocks can stop its services from indexing, rendering, or serving a

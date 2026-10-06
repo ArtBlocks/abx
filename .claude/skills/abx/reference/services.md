@@ -6,6 +6,7 @@ For provider-independent hosting and migration, also read [hosting.md](hosting.m
 ## Contents
 
 - [First-party service](#first-party-service)
+- [Creator RPC](#creator-rpc)
 - [Creator wallet and sponsorship](#creator-wallet-and-sponsorship)
 - [Feedback targets](#feedback-targets)
 
@@ -85,6 +86,22 @@ capabilities from this file. A remote is a provider catalog and may advertise di
 origins for token resolution, control, account operations, and creator wallets. Trust the advertised
 interface endpoint, not a guessed hostname. Use `--remote abx` on commands that accept a managed
 resolver and verify the resulting public surfaces as described in [hosting.md](hosting.md).
+
+## Creator RPC
+
+When `ABX_SERVICES_API_KEY` is present and the creator has not set `ABX_RPC_URLS_<CHAIN>` or
+`ABX_RPC_URLS`, the CLI automatically prefers the authenticated ABX Services creator RPC for the
+active chain. The shipped public endpoints remain failovers. The bearer key is sent only to the
+exact Services endpoint and is never placed in its URL. Inspect `abx remote abx` for the live
+`abx-creator-rpc/v1` chain list and current service policy; quotas and availability are not protocol
+guarantees.
+
+This endpoint exists for private creator workflows such as deploying, verifying, and checking
+project state. **Never publish the endpoint or API key, embed either in browser code, or use it as a
+project website's RPC.** A public application must use its own account with Alchemy, QuickNode,
+Infura, or an equivalent provider. Excessive traffic or public-site use may result in suspension of
+the API key or account. A creator can always opt out by setting their own `ABX_RPC_URLS_<CHAIN>` or
+`ABX_RPC_URLS`; that explicit choice wins outright.
 
 ## Creator wallet and sponsorship
 

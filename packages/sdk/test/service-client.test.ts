@@ -12,6 +12,7 @@ import {
   AbxServiceClient,
   AbxServiceError,
   ACCOUNT_API_INTERFACE,
+  CREATOR_RPC_INTERFACE,
   CREATOR_WALLET_INTERFACE,
   CONTROL_PLANE_INTERFACE,
   resolveServiceInterfaceEndpoint,
@@ -48,23 +49,25 @@ test('interface discovery keeps old descriptors on the catalog origin and permit
   });
 
   const split = {
-    interfaces: [ACCOUNT_API_INTERFACE, CREATOR_WALLET_INTERFACE],
+    interfaces: [ACCOUNT_API_INTERFACE, CREATOR_WALLET_INTERFACE, CREATOR_RPC_INTERFACE],
     chains: [8453, 84532],
     baseUrl: 'https://services.example',
     endpoints: {
-      [CREATOR_WALLET_INTERFACE]: {
+      [CREATOR_RPC_INTERFACE]: {
         baseUrl: 'https://api.example///',
         chains: [84532],
         supportLevel: 'beta' as const,
         auth: 'bearer' as const,
+        pathTemplate: '/v1/rpc/{chainId}',
       },
     },
   };
-  assert.deepEqual(resolveServiceInterfaceEndpoint('https://services.example', split, CREATOR_WALLET_INTERFACE), {
+  assert.deepEqual(resolveServiceInterfaceEndpoint('https://services.example', split, CREATOR_RPC_INTERFACE), {
     baseUrl: 'https://api.example',
     chains: [84532],
     supportLevel: 'beta',
     auth: 'bearer',
+    pathTemplate: '/v1/rpc/{chainId}',
   });
   assert.equal(resolveServiceInterfaceEndpoint('https://services.example', split, 'abx-unadvertised/v1'), undefined);
 });
@@ -93,6 +96,18 @@ test('interface discovery will not forward credentials to an unsafe or contradic
         CREATOR_WALLET_INTERFACE,
       ),
     /subset of the service chains/,
+  );
+  assert.throws(
+    () =>
+      resolveServiceInterfaceEndpoint(
+        'https://services.example',
+        {
+          ...descriptor,
+          endpoints: {[CREATOR_WALLET_INTERFACE]: {baseUrl: 'https://api.example', pathTemplate: 'v1/rpc/{chainId}'}},
+        },
+        CREATOR_WALLET_INTERFACE,
+      ),
+    /invalid path template/,
   );
   assert.throws(
     () =>

@@ -36,6 +36,8 @@ export const SERVICE_FEEDBACK_INTERFACE = 'abx-service-feedback/v1';
 export const ACCOUNT_API_INTERFACE = 'abx-account/v1';
 /** Account-bound creator wallet and sponsored-operation surface. */
 export const CREATOR_WALLET_INTERFACE = 'abx-creator-wallet/v1';
+/** Authenticated JSON-RPC for private creator tooling, not public website traffic. */
+export const CREATOR_RPC_INTERFACE = 'abx-creator-rpc/v1';
 
 /**
  * Why this locator can't be accepted for a referenced artifact, or `null` if it passes.
@@ -233,6 +235,8 @@ export interface ServiceInterfaceEndpoint {
   supportLevel?: ServiceInterfaceSupportLevel;
   /** HTTP authentication expected by the interface. Wallet authorization remains a separate act. */
   auth?: 'none' | 'bearer';
+  /** Interface-specific path shape, such as `/v1/rpc/{chainId}`. */
+  pathTemplate?: string;
 }
 
 export interface ResolvedServiceInterfaceEndpoint extends ServiceInterfaceEndpoint {
@@ -295,11 +299,15 @@ export function resolveServiceInterfaceEndpoint(
   if (declared?.auth && declared.auth !== 'none' && declared.auth !== 'bearer') {
     throw new Error(`ABX service interface ${interfaceId} advertises an invalid authentication scheme`);
   }
+  if (declared?.pathTemplate && !declared.pathTemplate.startsWith('/')) {
+    throw new Error(`ABX service interface ${interfaceId} advertises an invalid path template`);
+  }
   return {
     baseUrl,
     chains: [...chains],
     ...(declared?.supportLevel ? {supportLevel: declared.supportLevel} : {}),
     ...(declared?.auth ? {auth: declared.auth} : {}),
+    ...(declared?.pathTemplate ? {pathTemplate: declared.pathTemplate} : {}),
   };
 }
 

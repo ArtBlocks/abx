@@ -47,9 +47,8 @@ import {
 import {CHAIN} from './config.js';
 import {type Flags} from './flags.js';
 import {bold, c, dim, g, info, ok, warn} from './output.js';
-
-export const ABX_SERVICES_URL = 'https://services.abx.io';
-export const ABX_SERVICES_API_KEY_VAR = 'ABX_SERVICES_API_KEY';
+export {ABX_SERVICES_API_KEY_VAR, ABX_SERVICES_URL} from './creator-rpc.js';
+import {ABX_SERVICES_API_KEY_VAR, ABX_SERVICES_URL} from './creator-rpc.js';
 
 export type RemoteSource = 'url' | 'named' | 'builtin' | 'default';
 
