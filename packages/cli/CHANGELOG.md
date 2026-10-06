@@ -1,5 +1,21 @@
 # @artblocks/abx-cli
 
+## 0.6.0
+
+### Minor Changes
+
+- 347f196: Discover an authenticated creator RPC through a remote's `abx-creator-rpc/v1` service interface,
+  using ABX Services as the zero-config provider while preserving explicit RPC configuration and the
+  shipped public endpoints as failover.
+
+### Patch Changes
+
+- Updated dependencies [347f196]
+  - @artblocks/abx-sdk@0.6.0
+  - @artblocks/abx-indexer@0.1.7
+  - @artblocks/abx-storage@0.1.7
+  - @artblocks/abx-token-api@0.2.6
+
 ## 0.5.1
 
 ### Patch Changes
