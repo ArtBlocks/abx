@@ -1,0 +1,204 @@
+# First-party services and feedback
+
+Use this reference for the public ABX service, API-key login, hosted resolver/rendering, or feedback.
+For provider-independent hosting and migration, also read [hosting.md](hosting.md).
+
+## Contents
+
+- [First-party service](#first-party-service)
+- [Creator RPC](#creator-rpc)
+- [Creator wallet and sponsorship](#creator-wallet-and-sponsorship)
+- [Feedback targets](#feedback-targets)
+
+## First-party service
+
+The documented endpoints are:
+
+- documentation: `https://docs.abx.io`
+- service catalog, account, and control: `https://services.abx.io`
+- public token data: `https://resolver.abx.io` (discover it from the catalog; do not hardcode it)
+- OAuth discovery: `https://services.abx.io/.well-known/oauth-authorization-server`
+- manual signup fallback: `https://services.abx.io/signup`
+
+The first-party provider has the built-in remote name `abx`:
+
+```bash
+abx remote abx
+```
+
+It needs `ABX_SERVICES_API_KEY` in the project's ignored `.env`; it does not need
+`ABX_REMOTE_ABX_URL`. When the key is absent, use:
+
+```bash
+abx auth login
+```
+
+The CLI starts the OAuth device flow and shows a verified browser URL plus a matching short code.
+The human signs in with the ABX account email and approves in that browser. An existing browser
+session avoids another email code. The same approval provisions or reuses the account's creator
+wallet. The CLI polls at the provider-declared interval, receives the API key, and writes it directly
+to ignored `.env` without printing it. The browser never receives the key. Do not ask the human to
+paste an OTP or key into chat. A new first-party key requires the human to accept the current Art
+Blocks User Terms in the browser; do not accept them on the human's behalf. Existing keys do not
+require re-acceptance. `--no-open` leaves the browser handoff as a link; `--force` is required
+to replace an existing local credential, but does not revoke the displaced provider key. For normal rotation,
+run `abx auth logout` and then `abx auth login`; reserve `--force` for recovery. The CLI refuses
+tracked or unignored `.env` files.
+
+The issued API key is long-lived and remains valid until it is revoked. Reuse the stored key across
+tasks and agent sessions; do not start a new login merely because a task or conversation ended. If
+`abx remote abx` authenticates successfully, no login is needed. `abx auth login` also detects an
+already loaded credential and reuses it instead of issuing another.
+
+In an agent runner, start `abx auth login --no-open` with a short initial yield or a resumable
+background session. Relay the printed URL and code immediately while that same process keeps polling,
+then resume it after human approval. Do not start another login or add an outer retry loop. If the
+runner cannot yield control while a command waits, ask the human to run the command in their terminal.
+
+Logout only for intentional teardown, suspected compromise, deliberate rotation, or to free an
+active-key slot. When revoking, do not only delete the local value:
+
+```bash
+abx auth logout          # first-party service
+abx auth logout <name>   # another OAuth-capable named remote
+```
+
+Logout discovers the provider's RFC 7009 endpoint, revokes the current key, and only then removes the
+matching `.env` assignment. If the key came from a shell or another environment source, the CLI
+revokes it and tells the human where it still needs to be unset. A repeated logout with no active
+local credential is safe.
+
+An account may have up to five active keys. The service stores hashes, so it can list key metadata
+but cannot recover a lost secret. Use `abx auth keys` to inspect active keys and
+`abx auth revoke-key <key-id>` to revoke an unused non-current key. Use `abx auth logout` for the
+current key. Only create another key when a separate environment actually needs its own credential.
+
+Use `/signup` only as the manual recovery path. It shows the raw key once, so the human—not the
+agent—must place it in `.env`. An already verified email reuses its account and may receive another
+key, subject to the same limit.
+
+Availability, pricing, and quotas are service policy rather than protocol guarantees. Confirm current
+terms before making a durable hosting choice and keep the exit route explicit: the same remote-service
+contract supports another provider or a creator-operated resolver/effects deployment.
+
+Before depending on hosted behavior, inspect the live descriptor with `abx remote abx`; do not infer
+capabilities from this file. A remote is a provider catalog and may advertise different HTTPS
+origins for token resolution, control, account operations, and creator wallets. Trust the advertised
+interface endpoint, not a guessed hostname. Use `--remote abx` on commands that accept a managed
+resolver and verify the resulting public surfaces as described in [hosting.md](hosting.md).
+
+## Creator RPC
+
+When `ABX_SERVICES_API_KEY` is present and the creator has not set `ABX_RPC_URLS_<CHAIN>` or
+`ABX_RPC_URLS`, the CLI selects the built-in `abx` remote as its default creator-RPC provider. It
+uses the endpoint only when the remote's public descriptor advertises `abx-creator-rpc/v1`, bearer
+authentication, a route template, and the active chain. The shipped public endpoints remain
+failovers. The bearer key is sent only to the exact advertised endpoint and is never placed in its
+URL.
+
+This is provider-neutral discovery. `ABX_RPC_REMOTE=<name-or-url>` selects another compatible
+catalog; a named remote uses its matching `ABX_REMOTE_<NAME>_TOKEN`, while a catalog URL uses
+`ABX_REMOTE_SELF_TOKEN`. If discovery fails or the interface does not cover the active chain, ABX
+never guesses a route and keeps the public fallbacks. Inspect `abx remote <name-or-url>` for the
+live advertisement and current service policy; quotas and availability are not protocol
+guarantees.
+
+This endpoint exists for private creator workflows such as deploying, verifying, and checking
+project state. **Never publish the endpoint or API key, embed either in browser code, or use it as a
+project website's RPC.** A public application must use its own account with Alchemy, QuickNode,
+Infura, or an equivalent provider. Excessive traffic or public-site use may result in suspension of
+the API key or account. A creator can always opt out by setting their own `ABX_RPC_URLS_<CHAIN>` or
+`ABX_RPC_URLS`; that explicit choice wins outright.
+
+## Creator wallet and sponsorship
+
+An account with a verified email can use one persistent ABX creator wallet. The
+`ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` discovers the provider's
+`abx-creator-wallet/v1` endpoint and reuses the wallet created during login. `abx auth wallet`
+provisions or shows it explicitly when needed. The first sponsored command
+asks the human to match one code and approve a Privy agent grant. The CLI keeps the rotating grant in
+the operating system's credential store and reuses it for up to 30 days, unless the creator revokes
+it first. The request-signing key remains memory-only. A reused grant removes another browser step; it does
+not remove the dry run, transaction summary, or production confirmation.
+
+The approval is authority for the agent to use the creator wallet, not approval of one displayed
+transaction. Review each exact network and transaction plan in the terminal. The creator can inspect
+and revoke active grants at `https://services.abx.io/authorize`.
+
+Treat the live descriptor and account capabilities as the authority for sponsored networks. The
+public [network table](https://docs.abx.io/docs/reference/deployments) is the human-readable summary,
+but it does not guarantee sponsorship for an account or moment. When the creator has not selected
+another signer, prefer this lane for an eligible testnet operation. For production, prove the flow on
+the paired testnet and repeat the production warning before confirmation. Before using it:
+
+1. run `abx auth login` if the account has no API key;
+2. inspect `abx capabilities --json` and the command help;
+3. run the same command with `--dry-run --json`;
+4. summarize the network, creator-wallet address, transaction group, zero value, permanent choices,
+   and any experimental or beta status;
+5. repeat with `--sponsor`; if no usable grant exists, give the human the verified URL and code and
+   resume the same command after approval.
+
+The lane accepts zero-value calls and receipt-dependent staged content groups up to the live network
+and provider policy. ABX does not impose an additional per-transaction gas ceiling. Use
+`abx deploy-contract` for exact already-compiled creation bytecode; its sponsored path calls the
+keyless CREATE2 proxy because provider-backed raw creation is unsupported. The constructor therefore
+sees the proxy as `msg.sender`; use explicit constructor arguments for ownership. ABX does not
+compile or audit it. Never add retries around a sponsored write. An `unknown` outcome means the
+provider may have submitted it: preserve the operation ID and reconcile status before any new send.
+Use `abx auth operation <operation-id>` for that read-only reconciliation. If Services has confirmed
+an operation but a public RPC cannot return its receipt, the confirmation and transaction hash still
+stand; switch RPCs or inspect the hash, never replay the write.
+
+Sponsorship is optional service policy, not protocol support. `--send`, `--sign`, and `--unsigned`
+remain first-class bring-your-own alternatives. Honor an explicit choice of any of them. If the
+provider does not advertise the chain, the account is ineligible, or the transaction group exceeds
+policy, select one of those lanes rather than refusing the underlying operation. Do not use
+sponsorship on a production network unless the live descriptor, account capabilities, and command
+all explicitly support it. Never infer eligibility merely because the CLI recognizes the lane.
+
+## Feedback targets
+
+`abx feedback` has two deliberately separate targets:
+
+| Intent | Command | Recipient |
+|---|---|---|
+| ABX protocol, contracts, CLI, SDK, skill, or docs | `abx feedback` | core ABX team |
+| A remote provider's resolver, rendering, auth, or operations | `abx feedback --remote <name>` | that provider |
+
+For first-party hosted-service feedback use `--remote abx`. A third-party remote can advertise the
+optional `abx-service-feedback/v1` interface and operate its own feedback store. Never send
+provider-specific incidents through core feedback merely because both first-party targets currently
+share infrastructure.
+
+Discovery and report previews are public. Submission (`--yes`) and `--mine` require the same key
+created by `abx auth login`; login once rather than creating a separate feedback credential. Run the
+command without report flags to inspect its live schema and instructions. To report, provide the
+required structured flags; use `--detail-file` or `--context-file` rather than fragile shell quoting
+for longer content. The CLI shows the exact destination and payload first. Review and redact the
+preview with the human, then repeat with `--yes` only after explicit approval.
+
+```bash
+# Preview core feedback; nothing is sent.
+abx feedback --area cli --kind bug --summary "Concise summary" --detail-file report.md
+
+# After the human approves this exact preview.
+abx feedback --area cli --kind bug --summary "Concise summary" --detail-file report.md --yes
+
+# Provider-specific preview.
+abx feedback --remote abx --component rendering --kind bug --summary "Concise summary"
+
+# Review reports previously submitted with the current key.
+abx feedback --mine
+abx feedback --remote abx --mine
+```
+
+Do not attach `.env`, credentials, wallet/session URLs, full transcripts, or unrelated source files.
+Prefer the smallest reproduction and relevant version/chain/address context. The API key authenticates
+the reporter; hosted-service entitlement is evaluated separately. It never grants transaction-signing
+authority.
+
+Use the CLI instead of hand-written HTTP or retry loops. The device flow already handles pending,
+slow-down, and transient polling responses until its fixed expiry. Treat `401` as missing/invalid credentials,
+`403` as recognized credentials without the required entitlement, and schema/interface errors as a
+request or provider-contract mismatch. Read [diagnose.md](diagnose.md) and make one state transition.

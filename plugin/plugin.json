@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "abx",
+  "version": "0.6.0",
+  "description": "Plan, launch, host, inspect, and operate ABX NFT projects: static 1/1s, image series, editions, JavaScript/code drops, and Solidity-rendered projects. Drives the abx CLI, so it needs Node 22.13+ and @artblocks/abx-cli installed on the machine running the session.",
+  "author": {
+    "name": "Art Blocks",
+    "url": "https://abx.io"
+  },
+  "homepage": "https://docs.abx.io",
+  "repository": "https://github.com/ArtBlocks/abx",
+  "license": "MIT",
+  "keywords": ["nft", "ethereum", "base", "solidity", "generative-art", "erc721", "erc1155"]
+}

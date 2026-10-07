@@ -54,7 +54,8 @@
     "sandbox:clean": "bash scripts/sandbox-clean.sh --void",
     "abx-effects": "tsx packages/effects/src/main.ts",
     "changeset": "changeset",
-    "ci:version": "changeset version && node scripts/stamp-skill-version.mjs",
+    "ci:version": "changeset version && node scripts/stamp-skill-version.mjs && node scripts/build-plugin.mjs",
+    "build:plugin": "node scripts/build-plugin.mjs",
     "ci:publish": "changeset publish"
   },
   "devDependencies": {
