@@ -101,6 +101,7 @@ function managedResolver(): Promise<{server: Server; baseUrl: string}> {
         chains: [11155111],
         render: {
           attached: true,
+          constraints: {hardwareAcceleration: false, maxCaptureDelayMs: 45_000},
           effects: [{
             key: 'render',
             outputs: [
@@ -424,6 +425,9 @@ test('deploy-code treats an attached managed renderer as complete and never pres
     assert.equal(code, 0, out);
     assert.match(out, /managed renderer/i);
     assert.match(out, /render\/storage\s+✓ managed by the resolver/i);
+    assert.match(out, /CPU\/headless/i);
+    assert.match(out, /render\.captureDelay up to 45000ms/i);
+    assert.match(out, /GPU-capable effects worker/i);
     assert.doesNotMatch(out, /stand up the runner|deploy-effects|placeholder forever|needs a backend that can name one/i);
   } finally {
     await new Promise<void>((resolveClose, reject) => server.close((err) => err ? reject(err) : resolveClose()));

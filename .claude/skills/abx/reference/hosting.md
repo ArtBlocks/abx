@@ -70,6 +70,13 @@ Register or operate a project using `--remote <name>` and monitor with `abx stat
 If the provider advertises managed rendering, confirm it for the active chain/project. Otherwise the
 creator still owns the effects and storage path.
 
+Read the descriptor's renderer constraints as capabilities, not as host-name conventions. The
+managed ABX renderer currently advertises no hardware acceleration. For a missing, stale, or failed
+thumbnail, check whether the page calls `abx.done()`, whether a larger supported
+`render.captureDelay` is appropriate, and whether the project requires GPU/WebGL acceleration. A
+GPU requirement needs a tested GPU-capable effects worker; the default self-hosted Playwright/Fly
+scaffold does not guarantee one. An artifact can be current without being visually correct.
+
 Never invent a provider, auth flow, price, quota, or key source. If no configured provider exists,
 offer the fully supported creator-operated route.
 

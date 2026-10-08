@@ -20,6 +20,7 @@ const ADDR = '0xb5D472600107a56c0A36838FFf7030A864439a30';
 function mockResolver(opts: {
   verified: boolean | 'unauthorized' | 'missing' | 'none';
   imageRepresentation?: string;
+  effectStatus?: 'failed' | 'stale';
 }): Promise<{server: Server; port: number; seen: string[]}> {
   const seen: string[] = [];
   const server = createServer((req, res) => {
@@ -28,9 +29,22 @@ function mockResolver(opts: {
       res.writeHead(status, {'content-type': 'application/json'});
       res.end(JSON.stringify(body));
     };
+    if (req.url === '/.well-known/abx-service') {
+      return json(200, {
+        service: {name: 'Managed Test'},
+        interfaces: ['abx-token-api/v1'],
+        chains: [11155111],
+        render: {
+          attached: true,
+          constraints: {hardwareAcceleration: false, maxCaptureDelayMs: 45_000},
+          effects: [{key: 'render', outputs: [{key: 'image', mimeType: 'image/png'}]}],
+        },
+      });
+    }
     if (req.url === `/api/project/${ADDR}`) {
       return json(200, {
         name: 'Amber',
+        ...(opts.effectStatus ? {contractType: 'code'} : {}),
         tokens: [{
           tokenId: '0',
           lifecycle: 'live',
@@ -42,6 +56,12 @@ function mockResolver(opts: {
     }
     if (req.url === '/api/watch') return json(200, {watching: false, intervalMs: 0, pollAt: null, lastDeltaAt: null, chains: {}});
     if (req.url === `/api/project/${ADDR}/effects`) {
+      if (opts.effectStatus) {
+        return json(200, {
+          counts: {upToDate: 0, stale: opts.effectStatus === 'stale' ? 1 : 0, rendering: 0, failed: opts.effectStatus === 'failed' ? 1 : 0},
+          tokens: [{tokenId: '0', effectKey: 'render', status: opts.effectStatus, error: 'render_timeout', attempts: 5}],
+        });
+      }
       // a static-image project: nothing to render, so the render lane has nothing to report
       return json(200, {counts: {upToDate: 0, stale: 0, rendering: 0, failed: 0}, tokens: []});
     }
@@ -56,6 +76,20 @@ function mockResolver(opts: {
   });
   return new Promise((r) => server.listen(0, '127.0.0.1', () => r({server, port: (server.address() as {port: number}).port, seen})));
 }
+
+test('failed hosted renders explain completion, bounded delay, and explicit no-GPU constraints', async () => {
+  const {server, port} = await mockResolver({verified: true, effectStatus: 'failed'});
+  try {
+    const {out} = await runCli(['verify', ADDR, '--remote', `http://127.0.0.1:${port}`, '--remote-token', 'k']);
+    assert.match(out, /did not call abx\.done\(\)/i);
+    assert.match(out, /render\.captureDelay supports up to 45000ms/i);
+    assert.match(out, /explicitly has no GPU\/WebGL hardware acceleration/i);
+    assert.match(out, /GPU-capable effects worker/i);
+    assert.doesNotMatch(out, /blank.*means.*GPU/i);
+  } finally {
+    server.close();
+  }
+});
 
 function runCli(args: string[], extraEnv: NodeJS.ProcessEnv = {}): Promise<{code: number | null; out: string; stdout: string}> {
   // Empty, not deleted: the CLI fills UNSET keys from the repo's own .env, which would hand the

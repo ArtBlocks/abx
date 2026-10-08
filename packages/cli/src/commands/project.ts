@@ -49,6 +49,7 @@ import {
   isCurrentRenderer,
   isCurrentGenerator,
   type MetadataField,
+  type ServiceDescriptor,
 } from '@artblocks/abx-sdk';
 import {resolveBackend} from '@artblocks/abx-storage';
 import {currentRenderArtifact, verifyProject} from '@artblocks/abx-token-api';
@@ -81,6 +82,7 @@ import {
   reportRemoteIndexing,
   requireRemoteToken,
   rollUp,
+  serviceClient,
   controlPlaneClient,
   serviceInterfaceClient,
   statusLabel,
@@ -90,6 +92,7 @@ import {
 } from '../remote.js';
 import {describeSchema} from '../schema.js';
 import {looksPerTokenAttributes, parseSeriesTraitsById} from '../series-traits.js';
+import {renderFailureGuidance} from '../renderer-guidance.js';
 
 // ── predict ──────────────────────────────────────────────────────────────────
 // Pre-compute a deploy address from a salt — so you can stand up the resolver and
@@ -935,7 +938,15 @@ export async function cmdVerifyRemote(
   remote: RemoteTarget,
   emit: (p: Record<string, unknown>) => void,
 ): Promise<void> {
-  const base = (await serviceInterfaceClient(remote, TOKEN_API_INTERFACE)).baseUrl;
+  let descriptor: ServiceDescriptor | undefined;
+  try {
+    descriptor = await serviceClient(remote).descriptor();
+  } catch {
+    // Older self-hosted nodes may predate discovery. The interface resolver below preserves that
+    // compatibility; capability-driven guidance is simply unavailable for those nodes.
+  }
+  const base = (await serviceInterfaceClient(remote, TOKEN_API_INTERFACE, descriptor)).baseUrl;
+  const managedRender = descriptor?.render?.attached ? descriptor.render : undefined;
   const chainId = resolveChain(CHAIN).id;
   // Same shape, same field names as the local lane's `verifyReport` (cmdVerifyBody) wherever the
   // two lanes answer the same question, so a caller doesn't need a second parser for `--remote`.
@@ -1040,7 +1051,7 @@ export async function cmdVerifyRemote(
     const relevant = report.tokens.filter((t) => renderableIds.has(t.tokenId));
     for (const t of relevant) {
       const label = `token #${t.tokenId} ${t.effectKey}`;
-      if (t.status === 'up-to-date') ok(`${label}: up to date (real render at the current state)`);
+      if (t.status === 'up-to-date') ok(`${label}: current artifact present at the current state`);
       else if (t.status === 'rendering') info(`${label}: rendering — the effects runner is on it`);
       else if (t.status === 'failed') console.log(`    ${c.red}✗${c.reset} ${label}: FAILED${t.attempts ? ` after ${t.attempts} attempt(s)` : ''} — ${t.error ?? 'see runner logs'} ${dim(`(fix, then \`abx render ${address} ${t.tokenId} --force --remote ${base}\`)`)}`);
       else console.log(`    ${c.orange}⚠${c.reset} ${label}: stale — no render at the current state yet (the runner's next notify/sweep picks it up, or \`abx render ${address} --remote ${base}\`)`);
@@ -1062,6 +1073,7 @@ export async function cmdVerifyRemote(
       const summary = `${upToDate} of ${renderable.length} token(s) current${rendering ? ` · ${rendering} rendering` : ''}${stale ? ` · ${stale} stale` : ''}${failed ? ` · ${failed} FAILED` : ''}`;
       if (failed || stale) console.log(`  ${c.orange}⚠${c.reset} renders: ${summary} ${dim('— live view animates regardless; only the static thumbnail is affected.')}`);
       else ok(`renders: ${summary}`);
+      if (failed || stale) warn(renderFailureGuidance(managedRender));
     }
     verifyReport.renders = jsonSafe({minted: renderable.length, upToDate, stale, rendering, failed, tokens: relevant});
     verifyReport.availability = jsonSafe(
@@ -1089,8 +1101,8 @@ export async function cmdVerifyRemote(
     const img = await fetch(`${base}/t/${chainId}/${address}/${t.tokenId}/image`, {redirect: 'manual'});
     const loc = img.headers.get('location');
     const ct = img.headers.get('content-type') ?? '';
-    if (img.status >= 300 && img.status < 400 && loc) { present++; ok(`token #${t.tokenId} image: real render — resolver 302s to ${loc}`); }
-    else if (img.status === 200 && !/svg/i.test(ct)) { present++; ok(`token #${t.tokenId} image: real render present (${ct})`); }
+    if (img.status >= 300 && img.status < 400 && loc) { present++; ok(`token #${t.tokenId} image: artifact present — resolver 302s to ${loc}`); }
+    else if (img.status === 200 && !/svg/i.test(ct)) { present++; ok(`token #${t.tokenId} image: artifact present (${ct})`); }
     else {
       gap = true;
       missing.push(t.tokenId);
@@ -1101,8 +1113,9 @@ export async function cmdVerifyRemote(
   else console.log(
     gap
       ? `  ${dim('live view animates regardless; the placeholder only affects the static marketplace thumbnail.')}`
-      : `  ${g('✓ thumbnails are real renders')} ${dim('— served straight from the resolver.')}`,
+      : `  ${g('✓ thumbnail artifacts are present')} ${dim('— this confirms availability, not visual correctness.')}`,
   );
+  if (gap) warn(renderFailureGuidance(managedRender));
   verifyReport.renders = jsonSafe({minted: renderable.length, present, missing, scope: 'the resolver (raw image probe — no /effects route)'});
   verifyReport.availability = jsonSafe(
     computeAvailability({isCode: renderable.length > 0, minted: renderable.length, present, anyCheck: false, unrecomputablePointers: 0, onChainContent: onChainContent.length}),

@@ -38,6 +38,20 @@ optional.
 The reference worker loads the live document in Chromium, waits for `abx.done()` or a configured delay,
 and captures the image and traits. Run it with `abx effects`, `abx render`, or `abx deploy-effects`.
 
+Renderer capabilities are deployment properties, not protocol guarantees. A service may advertise
+`render.constraints.hardwareAcceleration` and `render.constraints.maxCaptureDelayMs` in its service
+descriptor. Inspect them with `abx remote <name|url>` before relying on a managed renderer.
+
+The managed ABX renderer is CPU/headless and does not provide GPU/WebGL hardware acceleration. The
+default `abx deploy-effects` Playwright container also does not guarantee a GPU merely because it is
+self-hosted. Projects that require hardware acceleration need an effects worker deployed on tested,
+GPU-capable infrastructure.
+
+For software-compatible projects, call `abx.done()` only after the intended frame and traits are
+ready. A bounded `render.captureDelay` can cover slow initialization, but cannot make unavailable GPU
+features available. A current artifact confirms that bytes were published for the current state; it
+does not prove the image is visually correct.
+
 ## Checking currency directly
 
 `abx artifacts <address> --token <id>` reads a token's artifact set without fetching and parsing the

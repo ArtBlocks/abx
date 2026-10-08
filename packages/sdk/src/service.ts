@@ -200,6 +200,14 @@ export type ServiceErrorCode =
    *  operator's own credentials); the node logs the cause. Retryable. */
   | 'internal_error';
 
+/** Operational limits a managed renderer can advertise without clients guessing from its host. */
+export interface RenderServiceConstraints {
+  /** Whether browser hardware acceleration is available. Omitted means the service did not say. */
+  hardwareAcceleration?: boolean;
+  /** Largest supported `render.captureDelay` value. Omitted means the service did not declare one. */
+  maxCaptureDelayMs?: number;
+}
+
 /** `GET /.well-known/abx-service` — what a service supports, agent-readably. */
 export interface ServiceDescriptor {
   /** Display name + implementation version, for humans and directories — never dispatch. */
@@ -215,7 +223,12 @@ export interface ServiceDescriptor {
   auth?: {scheme: 'bearer'; signupUrl?: string; docsUrl?: string};
   /** Present when rendering runs behind this service (the resolver fronts its runner).
    *  `effects: null` = attached but unverified (the health probe didn't answer). */
-  render?: {attached: boolean; effects: Array<{key: string; outputs: Array<{key: string; mimeType: string}>}> | null};
+  render?: {
+    attached: boolean;
+    effects: Array<{key: string; outputs: Array<{key: string; mimeType: string}>}> | null;
+    /** Additive operational limits for creator tooling and diagnostics. */
+    constraints?: RenderServiceConstraints;
+  };
   /** The public base this node believes it serves — a sanity echo for misconfig detection. */
   baseUrl?: string;
   /** Optional per-interface origins and policy. When absent, an advertised interface is served at
