@@ -1,5 +1,19 @@
 # @artblocks/abx-cli
 
+## 0.7.0
+
+### Minor Changes
+
+- 4226fe8: Drop-in for existing service integrators: add optional managed-renderer constraints to service descriptors, and surface CPU/headless, capture-delay, and GPU-worker guidance in remote inspection, code deployment, and remote verification.
+
+### Patch Changes
+
+- Updated dependencies [4226fe8]
+  - @artblocks/abx-sdk@0.7.0
+  - @artblocks/abx-indexer@0.1.8
+  - @artblocks/abx-storage@0.1.8
+  - @artblocks/abx-token-api@0.2.7
+
 ## 0.6.0
 
 ### Minor Changes
