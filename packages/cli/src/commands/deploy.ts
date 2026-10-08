@@ -92,6 +92,7 @@ import {
   seriesCodeFactoryAbi,
   tryReadContract,
   AbxServiceClient,
+  type ServiceDescriptor,
 } from '@artblocks/abx-sdk';
 import {
   DIRECT_URL_BACKENDS,
@@ -198,6 +199,7 @@ import {
   storedImageTypeFor,
 } from '../ownerops.js';
 import {canonicalLabel} from '../remote.js';
+import {managedRendererConstraintNote} from '../renderer-guidance.js';
 import {assertLaneCanSign, confirmSend, gatedSend, laneFromFlags} from '../riskgate.js';
 import {describeSchema, editionSchemaAdvisory, parseSchemaSpecs} from '../schema.js';
 import {parseSeriesTraits} from '../series-traits.js';
@@ -4462,6 +4464,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     // Hoisted: the `render/storage` row further down needs the same fact, so that a managed provider
     // (which owns rendering) never trips the fs warning there either.
     let renderAttached = false;
+    let managedRender: ServiceDescriptor['render'];
     if (!imageOrphaned && !hasImageRenderer) {
       if (!hasPublicUrl) info(`  ${dim('render mode (a still is never on-chain):')} ${bold('service')} (auto-render every mint/param change — a live/for-sale drop) · ${bold('once')} (fixed supply) · ${bold('none')} (placeholder). ${dim('freshness: no resolver ⇒ no chain-watcher ⇒ MANUAL/backfill (`abx render` after mints + each param change; the on-chain animation updates live, the bucket still does NOT). Continuous/live stills ⇒ run a resolver.')}`);
       // A managed provider whose descriptor says `render.attached` owns rendering — local
@@ -4473,6 +4476,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         try {
           const d = await new AbxServiceClient({baseUrl, timeoutMs: 2_500}).descriptor();
           renderAttached = !!d.render?.attached;
+          managedRender = d.render?.attached ? d.render : undefined;
         } catch { /* advisory — a down/non-ABX URL must not fail the dry run */ }
       }
       if (renderAttached) {
@@ -4511,6 +4515,8 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         `  ${dim('managed renderer:')} ${bold(baseUrl)} ${dim('owns the still + traits — no local runner, storage backend, or render command.')} ` +
           `verify: ${bold('abx verify ' + (shownAddr ?? '<address>') + ' --remote ' + baseUrl)}`,
       );
+      const constraintNote = managedRendererConstraintNote(managedRender);
+      if (constraintNote) warn(`  ${constraintNote}`);
     } else {
       const remoteRender = !(onChainUri && hasImageBase);
       info(`  ${dim('stand up the runner:')} ${bold('abx deploy-effects --resolver-url ' + baseUrl)} · one-shot: ${bold('abx render ' + (shownAddr ?? '<address>') + (remoteRender ? ' --remote ' + baseUrl : ''))} · verify: ${bold('abx verify ' + (shownAddr ?? '<address>'))}`);

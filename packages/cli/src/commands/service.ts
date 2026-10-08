@@ -76,6 +76,7 @@ import {
   serviceInterfaceClient,
   statusLabel,
 } from '../remote.js';
+import {managedRendererConstraintNote} from '../renderer-guidance.js';
 
 /**
  * Ensure the LOCAL client credential for your own resolver exists, generating + persisting one to
@@ -402,7 +403,10 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
   }
   if (d.render?.attached) {
     const outputs = d.render.effects?.flatMap((e) => e.outputs.map((o) => `${e.key}/${o.key}`)).join(', ');
-    info(`rendering  managed behind this service${outputs ? ` (${outputs})` : d.render.effects === null ? dim(' (attached — runner unverified right now)') : ''} — code drops need no effects runner here`);
+    const compatibility = d.render.constraints?.hardwareAcceleration === false ? 'software-compatible code drops' : 'code drops';
+    info(`rendering  managed behind this service${outputs ? ` (${outputs})` : d.render.effects === null ? dim(' (attached — runner unverified right now)') : ''} — ${compatibility} need no effects runner here`);
+    const constraintNote = managedRendererConstraintNote(d.render);
+    if (constraintNote) warn(`rendering  ${constraintNote}`);
   }
   if (d.interfaces?.includes(SERVICE_FEEDBACK_INTERFACE)) {
     info(`feedback   provider reports supported · preview with abx feedback --remote ${target.name?.toLowerCase() ?? target.url}`);

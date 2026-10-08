@@ -108,6 +108,13 @@ The renderer must store its bytes in a backend the resolver can retrieve. A host
 read a laptop-local `fs` store. Managed providers may advertise managed rendering; confirm with
 `abx remote <name>` rather than assuming it.
 
+Also inspect the renderer constraints printed by `abx remote`. The managed ABX renderer is
+CPU/headless and has no GPU/WebGL hardware acceleration. A larger supported `render.captureDelay`
+and a correctly timed `abx.done()` can help a slow software-compatible project; they cannot replace
+GPU features. If the project requires hardware acceleration, use an effects worker on tested,
+GPU-capable infrastructure. Do not claim that the default `abx deploy-effects` Playwright/Fly
+scaffold provides a GPU, and do not treat artifact presence as proof of visual correctness.
+
 ### On-chain program and on-chain live document
 
 Use `--script --onchain-uri` when the generator can assemble the animation document entirely from

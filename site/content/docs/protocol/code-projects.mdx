@@ -111,6 +111,12 @@ A program produces the live `animation_url`. A still image normally comes from t
 [effect](/docs/protocol/effects). Until that effect lands, the resolver returns a deterministic
 placeholder.
 
+Before using a managed renderer, run `abx remote <name|url>` and check its advertised constraints.
+The managed ABX renderer is CPU/headless and has no GPU/WebGL hardware acceleration. A project that
+requires hardware acceleration needs a GPU-capable effects worker; the default self-hosted
+Playwright/Fly scaffold does not itself guarantee GPU access. For slow software-compatible projects,
+signal readiness with `abx.done()` and use a supported `render.captureDelay` when necessary.
+
 Set the collection parameters `render.imageWidth` and `render.aspectRatio` (width divided by height)
 to frame hosted and self-hosted captures consistently. They are part of token data, so a change
 creates a new render input rather than mutating an existing output.
