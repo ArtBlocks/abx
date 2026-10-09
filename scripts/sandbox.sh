@@ -164,7 +164,7 @@ exec "$DEV_ROOT/node_modules/.bin/tsx" "$DEV_ROOT/packages/cli/src/bin.ts" "\$@"
 EOF
 chmod +x "$BIN_DIR/abx"
 # the shipped skill, copied fresh = always current + fully isolated
-cp -R "$DEV_ROOT/.claude/skills/abx" "$SANDBOX/.claude/skills/abx"
+cp -RL "$DEV_ROOT/.claude/skills/abx" "$SANDBOX/.claude/skills/abx"
 # the creator's source files, under sources/ — a single image (donuts-cake.svg), a multi-image
 # series/ directory, and a p5 code sketch, so the 1/1, Series, and code drop types are testable.
 # CREATIVE mode skips this: the agent invents + authors its OWN art (no pre-made file to shortcut with).

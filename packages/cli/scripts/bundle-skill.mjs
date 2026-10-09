@@ -34,5 +34,5 @@ if (skillVersion !== cliVersion) {
 }
 
 rmSync(dest, {recursive: true, force: true});
-cpSync(src, dest, {recursive: true});
+cpSync(src, dest, {recursive: true, dereference: true});
 console.log(`[bundle-skill] bundled ${src} (v${skillVersion}) -> ${dest}`);

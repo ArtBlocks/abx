@@ -1,5 +1,5 @@
-// Stamp the canonical agent skill's version to match the abx CLI's package version, so the skill
-// stays strictly co-versioned with the CLI it drives. Runs right after `changeset version` (see the
+// Stamp the canonical agent skill's version, and the Claude plugin manifest that serves it, to match
+// the abx CLI's package version, so the skill stays strictly co-versioned with the CLI it drives. Runs right after `changeset version` (see the
 // root `ci:version` script), so the "Version Packages" PR carries the bumped SKILL.md alongside the
 // package bumps. Idempotent. The version lives in SKILL.md frontmatter `metadata.version` — the
 // single source of truth the CLI's drift check reads back (see packages/cli/src/update-check.ts).
@@ -32,3 +32,16 @@ const front = fm[2].replace(/^(\s*version:\s*).*$/m, `$1"${version}"`);
 const updated = raw.slice(0, fm.index) + fm[1] + front + fm[3] + raw.slice(fm.index + fm[0].length);
 if (updated !== raw) writeFileSync(skillPath, updated);
 console.log(`[stamp-skill-version] SKILL.md metadata.version → ${version}`);
+
+// The Claude plugin directory re-reads the manifest per commit and shows its version to installers.
+// Rewritten in place rather than re-serialized so the manifest's hand formatting survives.
+const pluginPath = join(repoRoot, 'plugin', '.claude-plugin', 'plugin.json');
+const pluginRaw = readFileSync(pluginPath, 'utf8');
+const versionLine = /^(  "version":\s*)"[^"]*"/m;
+if (!versionLine.test(pluginRaw)) {
+  console.error(`[stamp-skill-version] no top-level "version" in ${pluginPath}`);
+  process.exit(1);
+}
+const pluginUpdated = pluginRaw.replace(versionLine, `$1"${version}"`);
+if (pluginUpdated !== pluginRaw) writeFileSync(pluginPath, pluginUpdated);
+console.log(`[stamp-skill-version] plugin.json version → ${version}`);
