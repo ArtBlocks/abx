@@ -47,6 +47,8 @@ test('hot lane with no key is refused — and the message says nothing was spent
     // It must name all three lanes plus the preview, or the refusal is a dead end.
     assert.throws(() => assertLaneCanSign({} as Flags), /--sign/);
     assert.throws(() => assertLaneCanSign({} as Flags), /--unsigned/);
+    assert.throws(() => assertLaneCanSign({} as Flags), /--sponsor/);
+    assert.throws(() => assertLaneCanSign({} as Flags), /abx auth login/);
     assert.throws(() => assertLaneCanSign({} as Flags), /ABX_DEPLOYER_PK/);
     assert.throws(() => assertLaneCanSign({} as Flags), /--dry-run/);
   });

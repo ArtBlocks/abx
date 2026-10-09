@@ -46,16 +46,14 @@ import {resolveBackend, validateRenderStorageCombo} from '@artblocks/abx-storage
 import {CHAIN, explorerBase, activeBackendId, backendResolution, collectContentLocators, localIndexer, storageOptions, storageOverrides} from './config.js';
 import {type Flags} from './flags.js';
 import {looksPerTokenAttributes, parseSeriesTraitsById} from './series-traits.js';
+import {ANSI, ansiBold, ansiDim, ansiGreen, ansiPurple} from './ansi.js';
 
 // ── tiny ANSI helpers ───────────────────────────────────────────────────────
-export const c = {
-  reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m',
-  green: '\x1b[38;5;115m', purple: '\x1b[38;5;141m', orange: '\x1b[38;5;215m', red: '\x1b[31m',
-};
-export const g = (s: string) => `${c.green}${s}${c.reset}`;
-export const p = (s: string) => `${c.purple}${s}${c.reset}`;
-export const dim = (s: string) => `${c.dim}${s}${c.reset}`;
-export const bold = (s: string) => `${c.bold}${s}${c.reset}`;
+export const c = ANSI;
+export const g = ansiGreen;
+export const p = ansiPurple;
+export const dim = ansiDim;
+export const bold = ansiBold;
 export let stepN = 0;
 export const step = (s: string) => console.log(`\n${p(`[${++stepN}]`)} ${bold(s)}`);
 export const ok = (s: string) => console.log(`    ${g('✓')} ${s}`);

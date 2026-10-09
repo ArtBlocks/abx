@@ -181,6 +181,7 @@ import {
   ONCHAIN_READ_WARN_BYTES,
   tokenUriGasEstimate,
   authorshipContractFields,
+  collectionIdentityContractFields,
   gatewayContractFields,
   servingGateway,
   computeContentPlan,
@@ -1206,7 +1207,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
       transferValidator,
       tokenFields,
       // authorship + rights (creator / license / …) are collection-scope on-chain fields.
-      contractFields: [...authorshipContractFields(flags), ...gatewayContractFields(flags)],
+      contractFields: [...collectionIdentityContractFields(flags), ...authorshipContractFields(flags), ...gatewayContractFields(flags)],
     };
     return {clone, params, salt, contentNote};
   };
@@ -1826,7 +1827,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
       minter,
       paused,
       tokenFields,
-      contractFields: [...authorshipContractFields(flags), ...gatewayContractFields(flags)],
+      contractFields: [...collectionIdentityContractFields(flags), ...authorshipContractFields(flags), ...gatewayContractFields(flags)],
     };
     return {clone, params, salt, contentNote};
   };
@@ -2437,7 +2438,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
       mintCount,
       tokenFields,
       // image contract fields (the O(1) collection-scope image) + authorship/rights (creator / license / …).
-      contractFields: [...contractFields, ...authorshipContractFields(flags), ...gatewayContractFields(flags)],
+      contractFields: [...contractFields, ...collectionIdentityContractFields(flags), ...authorshipContractFields(flags), ...gatewayContractFields(flags)],
     };
     return {clone, params, salt};
   };
@@ -3088,7 +3089,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
       tokenFields,
       // Concatenate — the image lane's collection-scope url-template rides ALONGSIDE the authorship
       // fields. Assigning either over the other would silently drop the creator's --creator/--license.
-      contractFields: [...authorshipContractFields(flags), ...gatewayContractFields(flags), ...imageContractFields],
+      contractFields: [...collectionIdentityContractFields(flags), ...authorshipContractFields(flags), ...gatewayContractFields(flags), ...imageContractFields],
     };
     return {clone, params, salt};
   };
@@ -4009,14 +4010,9 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   // section. null = not applicable / RPC unknown; true = code present; false = no code (would refuse).
   let imageRendererCodePresent: boolean | null = null;
   let attributesRendererCodePresent: boolean | null = null;
-  if (flags.description) {
-    contractFields.push({field: encodeTag(F.description), representation: encodeTag(R.inline), value: toHex(String(flags.description))});
-    identityFields.push('description');
-  }
-  if (flags['external-url']) {
-    contractFields.push({field: encodeTag(F.externalUrl), representation: encodeTag(R.inline), value: toHex(String(flags['external-url']))});
-    identityFields.push('external_url');
-  }
+  contractFields.push(...collectionIdentityContractFields(flags));
+  if (flags.description) identityFields.push('description');
+  if (flags['external-url']) identityFields.push('external_url', 'external_link');
   // authorship + rights — same on-chain inline collection-field slot (creator / license / …).
   contractFields.push(...authorshipContractFields(flags), ...gatewayContractFields(flags));
   for (const [flag, field] of AUTHORSHIP_DEPLOY_FIELDS) if (flags[flag]) identityFields.push(field);
@@ -5471,8 +5467,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   }
 
   const contractFields: {field: Hex; representation: Hex; value: Hex}[] = [];
-  if (flags.description) contractFields.push({field: encodeTag(F.description), representation: encodeTag(R.inline), value: toHex(String(flags.description))});
-  if (flags['external-url']) contractFields.push({field: encodeTag(F.externalUrl), representation: encodeTag(R.inline), value: toHex(String(flags['external-url']))});
+  contractFields.push(...collectionIdentityContractFields(flags));
   contractFields.push(...authorshipContractFields(flags), ...gatewayContractFields(flags));
 
   // The two `renderer`-representation fields. Same guard as the 721 lane: a real deploy REFUSES a
