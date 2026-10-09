@@ -3,6 +3,9 @@ title: "Quickstart"
 description: "Launch an ABX project with one agent prompt."
 ---
 
+import {PromptCard} from '@/components/prompt-card';
+import {QUICKSTART_PROMPT} from '@/lib/quickstart';
+
 ## Before you start
 
 - Node.js 22.13 or newer
@@ -17,12 +20,8 @@ browser wallet, an environment key, or unsigned transactions.
 
 ## Quickstart
 
-Paste this into your coding agent, replacing the bracketed part with your idea. The prompt is plain
-Markdown so coding agents and text-only documentation readers receive the same instructions as the
-browser page.
+Paste this into your coding agent, replacing the bracketed part with your idea.
 
-```text
-Read https://docs.abx.io/docs/using-abx/quickstart, install the ABX skill, and help me launch ⟨describe your project⟩.
-```
+<PromptCard prompt={QUICKSTART_PROMPT} />
 
 After an ABX upgrade, run `abx skill install` again. `abx doctor` reports an outdated skill.
