@@ -22,7 +22,6 @@ binary inside the repository may be older than the source. Start with:
 abx version
 abx doctor
 abx capabilities --json
-abx skill install
 ```
 
 `abx doctor` reports binary provenance, CLI/skill drift, active chain, RPC health and history reach,
@@ -36,7 +35,9 @@ the rename transition the installer moves a recognized `abx-self-host` folder to
 them. For a custom skills parent, run `abx skill install --target <that-parent>`; do not move or merge
 the old folder manually. Restart the agent after installation. If this is a one-shot session that
 cannot restart, run `abx skill path`, open the printed `SKILL.md` directly, and follow it for the
-current run; the installed copy becomes automatic in the next session.
+current run; the installed copy becomes automatic in the next session. If this skill was loaded from
+an agent plugin, it is already installed; do not also run `abx skill install`, which would add a
+second copy.
 
 ABX requires Node 22.13 or newer. Prefer a project-local npm dependency for reproducible automation;
 use a global install for interactive machine-wide use. Avoid repeated `npx` execution when version
@@ -62,14 +63,9 @@ specific contract generation is explicitly quarantined for a security or correct
 Updating the CLI does not redeploy or mutate a project. New deployments may use newer factories or
 defaults, so rerun help, capabilities, and the JSON dry run after upgrading.
 
-Then refresh the copied skill in the same scope reported by the CLI, restart the agent, and check the
-environment again:
-
-```bash
-abx skill install           # project copy
-abx skill install --global  # global copy, when reported
-abx doctor
-```
+Then run `abx doctor`, refresh the skill with the exact command it reports for the stale copy,
+restart the agent, and run `abx doctor` again. A plugin-installed skill updates through the agent's
+plugin manager, not `abx skill install`.
 
 If the creator defers the upgrade, say so once and continue only with the installed release's live
 help and capability output. Never assume a newer flag or behavior exists in an older binary.
@@ -195,7 +191,8 @@ human confirmation authorizes execution.
 ## New environment checklist
 
 1. Install Node 22.13+ and the desired CLI version.
-2. Install the co-versioned skill with `abx skill install`, then restart the agent.
+2. Install the co-versioned skill with `abx skill install`, then restart the agent. Skip this when
+   the skill came from an agent plugin.
 3. Select the testnet with `ABX_CHAIN` when the default is not appropriate.
 4. Add RPC and storage configuration outside the transcript. If the live first-party remote
    advertises sponsorship for the chosen chain and command, recommend it before asking the creator
