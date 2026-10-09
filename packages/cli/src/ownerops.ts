@@ -153,19 +153,19 @@ import {withJson} from './jsonout.js';
 import {controlPlaneClient, resolveRemote} from './remote.js';
 import {isDryRun, positionalArgs, unknownFlags, warnStrayFlags} from './flags.js';
 import {parseSchemaSpecs, describeParamAuthority, describeSchema, type ParsedSchema} from './schema.js';
+import {
+  ANSI as C,
+  ansiBold as bold,
+  ansiDim as dim,
+  ansiGreen as green,
+  ansiRed as red,
+  ansiYellow as yellow,
+} from './ansi.js';
 
 // Re-exported for main.ts (the on-chain-vs-off-chain cost model + the compression-mode type now
 // live in the SDK's staging.ts, layered on planChunks/planContentTxs — see the comment at their
 // definition below).
 export {ONCHAIN_PROJECT_SOFT_LIMIT, ONCHAIN_READ_WARN_BYTES, ETH_CALL_GAS_FLOOR, tokenUriGasEstimate, readableBytesAtGas, type Compress};
-
-// ── ANSI (local) ─────────────────────────────────────────────────────────────
-const C = {reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[38;5;115m', yellow: '\x1b[38;5;221m', red: '\x1b[31m'};
-const dim = (s: string) => `${C.dim}${s}${C.reset}`;
-const green = (s: string) => `${C.green}${s}${C.reset}`;
-const yellow = (s: string) => `${C.yellow}${s}${C.reset}`;
-const bold = (s: string) => `${C.bold}${s}${C.reset}`;
-const red = (s: string) => `${C.red}${s}${C.reset}`;
 
 type Flags = Record<string, string | undefined>;
 
@@ -1249,6 +1249,25 @@ export function authorshipContractFields(flags: Flags): OnChainFieldInput[] {
   );
 }
 
+/** Collection identity supplied by deploy flags. `external_url` is the token-metadata key while
+ * ERC-7572 names the same value `external_link` on contractURI, so deploy writes both reserved
+ * fields. Keeping this in one helper prevents an on-chain URI lane from silently serving a richer
+ * token document than collection document. */
+export function collectionIdentityContractFields(flags: Flags): OnChainFieldInput[] {
+  const fields: OnChainFieldInput[] = [];
+  if (flags.description) {
+    fields.push({field: encodeTag(F.description), representation: encodeTag(R.inline), value: toHex(String(flags.description))});
+  }
+  if (flags['external-url']) {
+    const value = toHex(String(flags['external-url']));
+    fields.push(
+      {field: encodeTag(F.externalUrl), representation: encodeTag(R.inline), value},
+      {field: encodeTag(F.externalLink), representation: encodeTag(R.inline), value},
+    );
+  }
+  return fields;
+}
+
 // ── preferred gateways ───────────────────────────────────────────────────────
 // The two reserved COLLECTION-scope fields that turn a content-addressed `ipfs`/`arweave` value
 // into the `https://` a marketplace can render. Identity (the CID) stays in the field; the serving
@@ -1410,13 +1429,18 @@ export async function cmdSetPrimaryPayee(address: string | undefined, flags: Fla
 const OPENSEA_CHAIN: Record<string, string> = {
   'base-sepolia': 'base_sepolia',
   sepolia: 'sepolia',
+  ethereum: 'ethereum',
+  base: 'base',
   arbitrum: 'arbitrum',
 };
+export function openSeaChainSlug(chain: string): string | undefined {
+  return OPENSEA_CHAIN[chain];
+}
 export async function cmdRefresh(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(address, 'abx refresh <address> [--token 0]');
   const tokenId = flags.token ?? '0';
   const chain = resolveChain(CHAIN);
-  const osChain: string | undefined = OPENSEA_CHAIN[CHAIN];
+  const osChain = openSeaChainSlug(CHAIN);
   const explorer = chain.blockExplorers?.default?.url ?? '';
   const apiKey = process.env.OPENSEA_API_KEY;
 
@@ -3472,10 +3496,11 @@ export async function cmdMinterShow(address: string | undefined, flags: Flags): 
     }
     console.log(`    assigned on token: ${assigned ? green('yes') : yellow(`no — abx set-minter ${token} --minter ${minter}`)}`);
     console.log(`    primary payee:     ${payee === zeroAddress ? yellow('none — abx set-primary-payee …') : payee}`);
-    console.log(`    paused:            ${paused ? yellow(`yes — abx unpause ${token}`) : green('no (open)')}`);
     console.log(`    copies:            ${supply}${maxSupply > 0n ? `/${maxSupply}` : dim(' (open — no cap)')}`);
     const remaining = maxSupply > 0n ? (maxSupply > supply ? maxSupply - supply : 0n) : null;
-    if (sale.configured && remaining !== null && sale.allocation > remaining) {
+    const soldOut = (remaining !== null && remaining === 0n) || (sale.configured && sale.sold >= sale.allocation);
+    console.log(`    paused:            ${paused ? yellow(`yes${soldOut ? ' — sold out; pause is moot' : ` — abx unpause ${token}`}`) : soldOut ? dim('no — sold out') : green('no (open)')}`);
+    if (sale.configured && remaining !== null && remaining > 0n && sale.allocation > remaining) {
       console.log(yellow(`    ⚠ allocation ${sale.allocation} exceeds the ${remaining} still mintable for #${tokenId} (cap ${maxSupply} − ${supply} minted) — only ${remaining} can actually sell.`));
     }
     console.log('');
@@ -3511,12 +3536,13 @@ export async function cmdMinterShow(address: string | undefined, flags: Flags): 
   }
   console.log(`    assigned on token: ${assigned ? green('yes') : yellow(`no — abx set-minter ${token} --minter ${minter}`)}`);
   console.log(`    primary payee:     ${payee === zeroAddress ? yellow('none — abx set-primary-payee …') : payee}`);
-  console.log(`    paused:            ${paused ? yellow(`yes — abx unpause ${token}`) : green('no (open)')}`);
   console.log(`    supply:            ${supply}/${max}`);
   // Readiness must also flag an allocation that overshoots what the contract can still mint — the
   // same check `minter configure` does, surfaced here (this is the command billed as "check state").
   const remaining = max > supply ? max - supply : 0n;
-  if (sale.configured && max > 0n && sale.allocation > remaining) {
+  const soldOut = (max > 0n && remaining === 0n) || (sale.configured && sale.sold >= sale.allocation);
+  console.log(`    paused:            ${paused ? yellow(`yes${soldOut ? ' — sold out; pause is moot' : ` — abx unpause ${token}`}`) : soldOut ? dim('no — sold out') : green('no (open)')}`);
+  if (sale.configured && max > 0n && remaining > 0n && sale.allocation > remaining) {
     console.log(yellow(`    ⚠ allocation ${sale.allocation} exceeds the ${remaining} still mintable (cap ${max} − ${supply} minted) — only ${remaining} can actually sell.`));
   }
   console.log('');

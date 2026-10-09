@@ -1766,7 +1766,7 @@ export async function cmdStateBody(
         paramHooksLock === true
           ? `${c.green}frozen${c.reset} ${dim('— no hook address can ever change again')}`
           : paramHooksLock === false
-            ? `${c.orange}not frozen${c.reset} ${dim('— the owner can re-point these (`abx lock-param-hooks` freezes them forever)')}`
+            ? `${c.orange}not frozen${c.reset} ${dim('— the token contract still permits its owner address to re-point these; a contract owner may not expose that action')}`
             : dim('freeze state unknown (the node refused the check)');
       info(`param hooks    ${shown.length ? shown.join(' · ') : dim('none set')}   ${lockNote}`);
       if (hooks.transferHook !== zeroAddress) {
@@ -1859,13 +1859,14 @@ async function cmdStateEditionBody(
   if (isCanonical === false) warnNotCanonical(address);
   info(`owner          ${owner ?? dim('?')}`);
   const capNote = (cap?: bigint) => (cap !== undefined && cap > 0n ? `${cap} cap` : 'open — no cap');
+  const soldOut = kind.kind === '1of1-edition' && maxSupply0 !== undefined && maxSupply0 > 0n && supply0 !== undefined && supply0 >= maxSupply0;
   if (kind.kind === '1of1-edition') {
     info(`supply         ${supply0 ?? 0n} cop${(supply0 ?? 0n) === 1n ? 'y' : 'ies'} of #0   ${dim(`(${capNote(maxSupply0)})`)}`);
   } else {
     info(`id space       up to ${maxInvocations ?? '?'} distinct id(s)`);
     info(`#0 copies      ${supply0 ?? 0n}   ${dim(`(${capNote(maxSupply0)} — per-id breakdown: \`abx tokens ${address}\`)`)}`);
   }
-  info(`paused         ${paused ? `${c.orange}true${c.reset}  ${dim('— owner-only minting until `abx unpause`')}` : `false ${dim('— open to minter/public')}`}`);
+  info(`paused         ${paused ? `${c.orange}true${c.reset}  ${dim(soldOut ? '— moot: all copies minted, nothing left to mint' : '— owner-only minting until `abx unpause`')}` : `false ${dim(soldOut ? '— sold out' : '— open to minter/public')}`}`);
   info(`minter         ${addrOrNone(minter)}${minter && minter !== zeroAddress ? '' : dim('  (owner-only)')}`);
   info(`primary payee  ${addrOrNone(primaryPayee)}`);
   if (royalty) info(`royalty        ${Number(royalty[1]) / 100}% → ${royalty[0]}`);
@@ -1944,7 +1945,7 @@ async function cmdStateEditionBody(
       paramHooksLock === true
         ? `${c.green}frozen${c.reset} ${dim('— no hook address can ever change again')}`
         : paramHooksLock === false
-          ? `${c.orange}not frozen${c.reset} ${dim('— the owner can re-point these (`abx lock-param-hooks` freezes them forever)')}`
+          ? `${c.orange}not frozen${c.reset} ${dim('— the token contract still permits its owner address to re-point these; a contract owner may not expose that action')}`
           : dim('freeze state unknown (the node refused the check)');
     info(`param hooks    ${shown.length ? shown.join(' · ') : dim('none set')}   ${lockNote}`);
     if (hooks.transferHook !== zeroAddress) {

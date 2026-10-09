@@ -19,6 +19,7 @@ import {
 import type {TransactionReceipt} from 'viem';
 import {faucetHint} from './config.js';
 import {openSponsoredSession} from './creator-signer.js';
+import {ANSI as C, ansiBold as bold, ansiDim as dim, ansiGreen as green, ansiPurple as purple} from './ansi.js';
 
 /**
  * The signing harness — the one place a write transaction turns into a signature.
@@ -99,13 +100,6 @@ export function walletFundingGuidance(chainKey: string): string[] {
     'Review the transaction group and estimated cost in your terminal before approving.',
   ];
 }
-
-// ── tiny ANSI (kept local so this module stands alone) ───────────────────────
-const C = {reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[38;5;115m', purple: '\x1b[38;5;141m', orange: '\x1b[38;5;215m'};
-const dim = (s: string) => `${C.dim}${s}${C.reset}`;
-const bold = (s: string) => `${C.bold}${s}${C.reset}`;
-const purple = (s: string) => `${C.purple}${s}${C.reset}`;
-const green = (s: string) => `${C.green}${s}${C.reset}`;
 
 function explorerFor(chainKey: string): string {
   const chain = resolveChain(chainKey);

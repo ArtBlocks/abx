@@ -34,7 +34,9 @@ The shipped skill is named `abx`. `abx skill install` installs it to `.claude/sk
 the rename transition the installer moves a recognized `abx-self-host` folder to
 `.abx-skill-backups/` before installing the new name. It preserves custom bytes rather than deleting
 them. For a custom skills parent, run `abx skill install --target <that-parent>`; do not move or merge
-the old folder manually. Restart the agent after installation.
+the old folder manually. Restart the agent after installation. If this is a one-shot session that
+cannot restart, run `abx skill path`, open the printed `SKILL.md` directly, and follow it for the
+current run; the installed copy becomes automatic in the next session.
 
 ABX requires Node 22.13 or newer. Prefer a project-local npm dependency for reproducible automation;
 use a global install for interactive machine-wide use. Avoid repeated `npx` execution when version

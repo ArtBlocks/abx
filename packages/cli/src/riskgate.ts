@@ -30,11 +30,7 @@ import {
 } from '@artblocks/abx-sdk';
 import {signTx, type Lane, type SignResult, type TxProvider} from './signer.js';
 import {isDryRun, type Flags} from './flags.js';
-
-// ── tiny ANSI (kept local — every module here stands alone; see signer.ts/ownerops.ts) ───────
-const C = {reset: '\x1b[0m', dim: '\x1b[2m', bold: '\x1b[1m', green: '\x1b[38;5;115m', orange: '\x1b[38;5;215m'};
-const dim = (s: string) => `${C.dim}${s}${C.reset}`;
-const bold = (s: string) => `${C.bold}${s}${C.reset}`;
+import {ANSI as C, ansiBold as bold, ansiDim as dim} from './ansi.js';
 
 /** Resolve the signing lane from flags: `--unsigned` (cold) · `--sign` (wallet) · `--sponsor`
  *  (ABX creator wallet) · default hot. The one place every write makes this decision. */
@@ -86,7 +82,8 @@ export function assertLaneCanSign(flags: Flags): void {
   throw new Error(
     'no signing key, so this run could not be sent — stopping before it uploads or spends anything. ' +
       'Pick a lane: --sign --for 0x.. (you approve in your own wallet, no key here) · --unsigned (print the tx ' +
-      'for an offline signer) · or set ABX_DEPLOYER_PK in .env for the unattended hot lane. ' +
+      'for an offline signer) · --sponsor (eligible ABX creator wallet; run `abx auth login` first) · ' +
+      'or set ABX_DEPLOYER_PK in .env for the unattended hot lane. ' +
       'To preview without any of them, add --dry-run --for 0x...',
   );
 }

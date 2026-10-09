@@ -3,7 +3,19 @@
 // a cryptic ABI read), and the representation/reserved-key guards for the data plane.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {collectionImageWarning, parseRoyaltyBps} from '../src/ownerops.js';
+import {collectionIdentityContractFields, collectionImageWarning, openSeaChainSlug, parseRoyaltyBps} from '../src/ownerops.js';
+
+test('OpenSea chain slugs include Ethereum and supported production L2s', () => {
+  assert.equal(openSeaChainSlug('ethereum'), 'ethereum');
+  assert.equal(openSeaChainSlug('base'), 'base');
+  assert.equal(openSeaChainSlug('arbitrum'), 'arbitrum');
+  assert.equal(openSeaChainSlug('robinhood'), undefined);
+});
+
+test('deploy collection identity writes both token external_url and ERC-7572 external_link', () => {
+  const fields = collectionIdentityContractFields({description: 'A project', 'external-url': 'https://example.com'});
+  assert.deepEqual(fields.map((field) => field.field), ['description', 'external_url', 'external_link'].map((field) => encodeTag(field)));
+});
 
 test('collection image warning names both the precedence trap and the safe display field', () => {
   const message = collectionImageWarning();

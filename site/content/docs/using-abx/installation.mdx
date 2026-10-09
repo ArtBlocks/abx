@@ -48,7 +48,9 @@ By default, ABX writes the skill to both supported discovery paths:
 | `.agents/skills/abx` | Cursor, Codex CLI, Gemini CLI, GitHub Copilot |
 
 Use `--agent <name>` to target one agent or `--global` to install in your home directory. Restart the
-agent after installation. Run `abx skill install` again after upgrading the CLI.
+agent after installation. For a one-shot agent that cannot restart, run `abx skill path` and ask it
+to read the printed `SKILL.md` directly for the current session. Run `abx skill install` again after
+upgrading the CLI.
 
 ## SDK
 

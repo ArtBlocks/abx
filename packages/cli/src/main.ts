@@ -187,7 +187,7 @@ function assertKnownChainEnv(): void {
   const support = chainSupportByKey(key);
   if (support) {
     process.stderr.write(
-      `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is recognized but ${support.supportLevel} ` +
+      `\n${c.red}\u2717${c.reset} ABX_CHAIN="${key}" is recognized but ${support.supportLevel} ` +
         `(${support.name}, chain ${support.chainId}, ${support.environment}).\n` +
         `  This release will not operate on it. Qualify the paired ${support.pairedChain} network and wait for an enabled release.\n\n`,
     );
@@ -211,7 +211,7 @@ function assertKnownChainEnv(): void {
       .join(', ');
     const disabledNote = disabled ? ` Disabled: ${disabled}.` : '';
     process.stderr.write(
-      `\n\u001b[31m\u2717\u001b[0m ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
+      `\n${c.red}\u2717${c.reset} ABX_CHAIN="${key}" is not a recognized chain. Selectable: ${KNOWN_CHAIN_KEYS.join(', ')}.\n` +
         (mainnetish
           ? `  Selectable production networks: ${production}.${disabledNote}\n` +
             `  Prove the same flow on the paired testnet before using real funds.\n\n`
@@ -231,13 +231,13 @@ function warnActiveChainRisk(cmd: string | undefined): void {
   if (!support || !['experimental', 'beta'].includes(support.supportLevel)) return;
   if (support.supportLevel === 'experimental') {
     process.stderr.write(
-      `\n\u001b[38;5;215m⚠\u001b[0m ${support.name} experimental (chain ${support.chainId}).\n` +
+      `\n${c.orange}⚠${c.reset} ${support.name} experimental (chain ${support.chainId}).\n` +
         `  This testnet integration is under qualification. Verify the network, signer, actions, test ETH value, and irreversible choices before sending.\n\n`,
     );
     return;
   }
   process.stderr.write(
-    `\n\u001b[38;5;215m⚠\u001b[0m ${support.name} production beta (chain ${support.chainId}).\n` +
+    `\n${c.orange}⚠${c.reset} ${support.name} production beta (chain ${support.chainId}).\n` +
       `  Real funds and irreversible state are at risk. ABX has not had an independent third-party audit.\n` +
       `  Prove the flow on ${support.pairedChain}; verify the network, signer, actions, value, and locks before sending. Use at your own risk.\n\n`,
   );

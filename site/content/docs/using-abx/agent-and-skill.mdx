@@ -27,7 +27,9 @@ abx skill install --agent cursor
 abx skill install --global
 ```
 
-Restart the agent after installation.
+Restart the agent after installation. If the current agent is a one-shot session and cannot restart,
+run `abx skill path` and have it read the printed `SKILL.md` directly; the installed copy will be
+discovered automatically by the next session.
 
 ## Choose the signer deliberately
 
