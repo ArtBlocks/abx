@@ -14,9 +14,9 @@
  * {@link prereleaseChannel} for the silent-failure mode that would otherwise arrive the day a
  * stable release ships.
  */
-import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
-import {dirname, isAbsolute, join, relative, resolve} from 'node:path';
+import {dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import {findCliPackageRoot, findRepoRoot} from './output.js';
@@ -379,9 +379,37 @@ export function installedSkillCopies(): InstalledSkillCopy[] {
  */
 export function pluginSkillCopies(): InstalledSkillCopy[] {
   const configDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude');
-  const out = marketplacePluginSkillCopies(configDir);
-  for (const copy of syncedPluginSkillCopies(configDir)) if (!out.some((c) => c.path === copy.path)) out.push(copy);
+  const root = resolvedDir(configDir);
+  if (!root) return [];
+  const out = marketplacePluginSkillCopies(root);
+  for (const copy of syncedPluginSkillCopies(root)) if (!out.some((c) => c.path === copy.path)) out.push(copy);
   return out;
+}
+
+/** `realpath` of a directory, or null when it cannot be resolved. */
+function resolvedDir(path: string): string | null {
+  try {
+    return realpathSync(path);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when `skillPath` resolves to a file strictly inside `root`. Both sides are realpaths, so a
+ * relative `installPath`, a `..` segment, or a symlink that leaves the config directory is rejected.
+ * `CLAUDE_CONFIG_DIR` can be set from a project `.env`, and the registry's `installPath` is then
+ * workspace-controlled; a copy outside that directory is not one Claude Code loaded from it.
+ */
+function skillFileStaysUnder(root: string, skillPath: string): boolean {
+  let file: string;
+  try {
+    file = realpathSync(skillPath);
+  } catch {
+    return false;
+  }
+  const rel = relative(root, file);
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
 /**
@@ -410,7 +438,7 @@ function marketplacePluginSkillCopies(configDir: string): InstalledSkillCopy[] {
       }
       const path = join(install.installPath, 'skills', SKILL_DIR_NAME, 'SKILL.md');
       const version = readSkillVersion(path);
-      if (version && readSkillName(path) === SKILL_DIR_NAME && !out.some((c) => c.path === path)) {
+      if (version && readSkillName(path) === SKILL_DIR_NAME && skillFileStaysUnder(configDir, path) && !out.some((c) => c.path === path)) {
         out.push({version, path, scope: 'plugin', plugin: id});
       }
     }
@@ -455,7 +483,7 @@ function syncedPluginSkillCopies(configDir: string): InstalledSkillCopy[] {
       const generation = Number.isInteger(row.generation) ? (row.generation as number) : 1;
       const path = join(bucketDir, generation > 1 ? `${folder}~g${generation}` : folder, 'skills', SKILL_DIR_NAME, 'SKILL.md');
       const version = readSkillVersion(path);
-      if (version && readSkillName(path) === SKILL_DIR_NAME && !out.some((c) => c.path === path)) {
+      if (version && readSkillName(path) === SKILL_DIR_NAME && skillFileStaysUnder(configDir, path) && !out.some((c) => c.path === path)) {
         out.push({version, path, scope: 'plugin', plugin: `${row.name}@synced`});
       }
     }
@@ -486,8 +514,25 @@ export const UNSAFE_PLUGIN_REFRESH_NOTE =
  * and synced manifest names are copied into `name@synced`. `CLAUDE_CONFIG_DIR` can be set from a
  * project `.env`, so either string is untrusted workspace text until it passes this check.
  */
+/** One shell token {@link shArg} would leave unquoted, and not a leading dash. */
+function shellSafeToken(value: string): boolean {
+  return value === shArg(value) && !value.startsWith('-');
+}
+
 export function shellSafePluginId(id: string): boolean {
-  return id === shArg(id) && !id.startsWith('-');
+  return shellSafeToken(id);
+}
+
+/**
+ * Where a skill copy lives, for a line of its own. Plugin paths are registry `installPath`s (or a
+ * folder under `CLAUDE_CONFIG_DIR`, which a project `.env` can point at a workspace tree), so they
+ * are shown only when the path is one shell token — the same check as a plugin id. Whitespace,
+ * control characters, and shell metacharacters are omitted rather than printed. Callers keep this
+ * off any line that contains `run` or `refresh:`.
+ */
+export function skillCopyLocation(copy: InstalledSkillCopy): string | null {
+  if (copy.scope === 'plugin' && !shellSafeToken(copy.path)) return null;
+  return `${copy.scope}: ${copy.path}`;
 }
 
 function pluginRefreshCommand(id: string): string | null {

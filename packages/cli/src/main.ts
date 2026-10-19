@@ -167,7 +167,7 @@ import {
   cmdUnpause,
 } from './ownerops.js';
 import {DEFAULT_PREVIEW_PORT} from './preview.js';
-import {checkForCliUpdate, compareVersions, installedLegacySkillCopies, installedSkillCopies, readCliVersion, skillRefreshCommands, syncedPluginRefreshNote, UNSAFE_PLUGIN_REFRESH_NOTE} from './update-check.js';
+import {checkForCliUpdate, compareVersions, installedLegacySkillCopies, installedSkillCopies, readCliVersion, skillCopyLocation, skillRefreshCommands, syncedPluginRefreshNote, UNSAFE_PLUGIN_REFRESH_NOTE} from './update-check.js';
 import {ABX_RPC_REMOTE_VAR, configureCreatorRpcFromRemote, creatorRpcRemoteSpec} from './creator-rpc.js';
 import {resolveRemote} from './remote.js';
 
@@ -257,10 +257,14 @@ async function maybeNotifyUpdate(flags: Flags): Promise<void> {
     const current = readCliVersion();
     const legacyCopies = installedLegacySkillCopies();
     if (legacyCopies.length) {
-      const where = legacyCopies.length > 1 ? `${legacyCopies.length} legacy copies are` : `the ${legacyCopies[0].scope} legacy copy (${legacyCopies[0].path}) is`;
+      const where = legacyCopies.length > 1 ? `${legacyCopies.length} legacy copies are` : `the ${legacyCopies[0].scope} legacy copy is`;
       console.error(
         `    ${c.orange}⚠${c.reset}  ${where} still active as ${bold('abx-self-host')} — run ${g('abx doctor')} for paths; migrate to ${bold('abx')}: ${skillRefreshCommands(legacyCopies).map((command) => g(command)).join(' && ')}`,
       );
+      for (const copy of legacyCopies) {
+        const location = skillCopyLocation(copy);
+        if (location) console.error(`       ${location}`);
+      }
     }
     // Skill drift (cheap, offline): the skill and CLI are co-versioned, but a separately-installed
     // skill copy doesn't move when the CLI upgrades. Nudge a reinstall when the CLI is ahead.
@@ -270,13 +274,18 @@ async function maybeNotifyUpdate(flags: Flags): Promise<void> {
     const staleCopies = installedSkillCopies().filter((copy) => compareVersions(current, copy.version) > 0);
     if (staleCopies.length) {
       const worst = staleCopies[0];
-      const where = staleCopies.length > 1 ? `${staleCopies.length} installed copies are` : `the ${worst.scope} skill copy (${worst.path}) is`;
+      const where = staleCopies.length > 1 ? `${staleCopies.length} installed copies are` : `the ${worst.scope} skill copy is`;
       const refresh = skillRefreshCommands(staleCopies);
       const syncedNote = syncedPluginRefreshNote(staleCopies);
       const refreshText = refresh.length ? `refresh: ${refresh.map((cmd) => g(cmd)).join(' && ')}` : (syncedNote ?? UNSAFE_PLUGIN_REFRESH_NOTE);
       console.error(
         `    ${c.orange}⚠${c.reset}  ${where} v${worst.version} but the CLI is v${current} — ${refreshText}`,
       );
+      // The path is a following line, never part of `refresh:`. An unsafe registry path is omitted.
+      for (const copy of staleCopies) {
+        const location = skillCopyLocation(copy);
+        if (location) console.error(`       ${location}`);
+      }
       if (refresh.length && syncedNote) console.error(`       ${syncedNote}`);
     }
     const latest = await checkForCliUpdate(current);

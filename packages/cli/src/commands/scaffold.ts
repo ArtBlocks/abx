@@ -52,6 +52,7 @@ import {
   binaryProvenance,
   checkForCliUpdate,
   compareVersions,
+  type InstalledSkillCopy,
   installedSkillCopies,
   installedLegacySkillCopies,
   pluginSkillCopies,
@@ -59,6 +60,7 @@ import {
   readSkillName,
   readSkillVersion,
   shellSafePluginId,
+  skillCopyLocation,
   skillRefreshCommands,
   syncedPluginRefreshNote,
   UNSAFE_PLUGIN_REFRESH_NOTE,
@@ -135,6 +137,14 @@ export function describeMissingRemoteToken(name: string): string {
 /** Continuation indent: aligns under a check/opt detail column. */
 const CONT = ' '.repeat(17);
 
+/** Skill locations on their own lines. Plugin paths that are not one shell token are omitted. */
+function printSkillLocations(copies: InstalledSkillCopy[]): void {
+  for (const copy of copies) {
+    const location = skillCopyLocation(copy);
+    if (location) console.log(`${CONT}${dim(location)}`);
+  }
+}
+
 /**
  * Does every configured endpoint agree with itself about this wallet's nonce?
  *
@@ -210,17 +220,19 @@ export async function cmdDoctor(flags: Flags) {
   const skillFix = refreshCommands.join(' && ');
   const syncedNote = syncedPluginRefreshNote(refreshCopies);
   const skillRemedy = skillFix ? `run ${g(skillFix)}` : (syncedNote ?? UNSAFE_PLUGIN_REFRESH_NOTE);
-  const staleWhere = staleCopies.length === 1 ? ` (${staleCopies[0].scope}: ${staleCopies[0].path})` : '';
+  // Locations stay off this line. The skill tells the agent to run the command after `—`, and a
+  // registry installPath is untrusted text that must not be able to open an earlier `— run` clause.
   if (skillNeedsMigration) {
-    const where = legacyCopies.length === 1 ? ` (${legacyCopies[0].scope}: ${legacyCopies[0].path})` : ` (${legacyCopies.length} copies)`;
+    const where = legacyCopies.length === 1 ? '' : ` (${legacyCopies.length} copies)`;
     check('agent skill', false, `legacy abx-self-host skill still active${where} — migrate: ${skillFix ? g(skillFix) : UNSAFE_PLUGIN_REFRESH_NOTE}`);
-    for (const copy of legacyCopies) console.log(`${CONT}${dim(`${copy.scope}: ${copy.path}`)}`);
+    printSkillLocations(legacyCopies);
     console.log(`${CONT}${dim('the installer archives the old folder outside the discovery tree; it does not delete customizations')}`);
   } else if (skillMissing) {
     check('agent skill', false, `not installed — run ${g('abx skill install')}`);
     console.log(`${CONT}${dim('(recommended: let a coding agent drive abx)')}`);
   } else if (skillStale) {
-    check('agent skill', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion}${staleWhere} — ${skillRemedy}`);
+    check('agent skill', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion} — ${skillRemedy}`);
+    printSkillLocations(staleCopies);
   } else {
     check('agent skill', true, `in sync (v${cliVersion})`);
   }
@@ -397,7 +409,7 @@ export async function cmdDoctor(flags: Flags) {
   } else check('npm', true, `v${cliVersion} (or offline — checked at most every 6h)`);
   if (skillNeedsMigration) check('skill ver', false, `legacy skill name remains active — ${skillFix || syncedNote || UNSAFE_PLUGIN_REFRESH_NOTE}`);
   else if (skillMissing) check('skill ver', false, 'no installed skill to compare — abx skill install');
-  else if (skillStale) check('skill ver', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion}${staleWhere} — ${skillFix || syncedNote || UNSAFE_PLUGIN_REFRESH_NOTE}`);
+  else if (skillStale) check('skill ver', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion} — ${skillFix || syncedNote || UNSAFE_PLUGIN_REFRESH_NOTE}`);
   else check('skill ver', true, `v${cliVersion} matches the CLI`);
 
   // 3. Optional — path-dependent setup. Unset is fine; these say WHEN you'll need each, so an unset
