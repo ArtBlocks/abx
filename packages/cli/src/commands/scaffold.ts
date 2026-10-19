@@ -4,7 +4,7 @@
  * `scaffold-renderer` (copy the Solidity on-chain-renderer starting point), and `skill` (install
  * the version-locked abx agent skill into a coding agent).
  */
-import {cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename, join as joinPath, resolve as resolvePath, sep} from 'node:path';
 import {createInterface} from 'node:readline';
@@ -54,6 +54,7 @@ import {
   compareVersions,
   installedSkillCopies,
   installedLegacySkillCopies,
+  pluginSkillCopies,
   readCliVersion,
   readSkillName,
   readSkillVersion,
@@ -216,6 +217,13 @@ export async function cmdDoctor(flags: Flags) {
   } else {
     check('agent skill', true, `in sync (v${cliVersion})`);
   }
+  const pluginCopy = skillCopies.find((copy) => copy.scope === 'plugin');
+  // Only `.claude/skills` competes with the plugin; Claude Code doesn't read the other agents' dirs.
+  const standaloneCopies = skillCopies.filter((copy) => copy.scope !== 'plugin' && copy.path.includes(joinPath('.claude', 'skills', SKILL_DIR_NAME)));
+  if (pluginCopy && standaloneCopies.length) {
+    console.log(`${CONT}${c.orange}⚠${c.reset}${dim(` Claude Code also loads plugin ${pluginCopy.plugin} — remove the standalone copy so it loads only one:`)}`);
+    for (const copy of standaloneCopies) console.log(`${CONT}${dim(`${copy.scope}: ${copy.path}`)}`);
+  }
   // Offer to fix it here rather than only naming the command. `npm i -g` + `abx skill install` was a
   // two-step install flow where the second step is easy to skip and invisible when skipped (an agent
   // that never learned abx just... doesn't use it). Doctor is already the documented first run, so
@@ -223,7 +231,8 @@ export async function cmdDoctor(flags: Flags) {
   // lifecycle scripts with cwd set to the installed package dir (so the skill would land inside
   // node_modules), pnpm gates install scripts by default, and writing to a user's ~/.claude on
   // install is the kind of side effect that belongs to the user, not to us.
-  if ((skillMissing || skillStale) && !skillNeedsMigration) {
+  // A stale plugin copy is refreshed by the plugin manager; installing here would add a second copy.
+  if ((skillMissing || staleCopies.some((copy) => copy.scope !== 'plugin')) && !skillNeedsMigration) {
     await offerSkillInstall(flags, skillStale, CONT);
   }
   console.log('');
@@ -368,7 +377,7 @@ export async function cmdDoctor(flags: Flags) {
   const latest = await checkForCliUpdate(cliVersion);
   if (latest) {
     check('npm', false, `v${cliVersion} → v${latest} available — upgrade recommended before planning or sending`);
-    console.log(`${CONT}${dim('npm i -g @artblocks/abx-cli@latest · then abx skill install and restart the agent')}`);
+    console.log(`${CONT}${dim(`npm i -g @artblocks/abx-cli@latest · then ${skillRefreshCommands(skillCopies).join(' && ')} and restart the agent`)}`);
     console.log(`${CONT}${dim('updating local tooling does not change deployed projects; earlier canonical generations remain supported')}`);
   } else check('npm', true, `v${cliVersion} (or offline — checked at most every 6h)`);
   if (skillNeedsMigration) check('skill ver', false, `legacy skill name remains active — ${skillFix}`);
@@ -684,10 +693,13 @@ export function resolveInstallParents(agentFlag: string | undefined): string[] {
  *  so the `rmSync` below would delete the canonical skill, and the copy would then have no source.
  *  A self-destructing install is a bad way to learn that. */
 export function installSkillTo(src: string, dest: string): 'installed' | 'already-canonical' {
-  if (resolvePath(src) === resolvePath(dest)) return 'already-canonical';
+  const real = (p: string) => (existsSync(p) ? realpathSync(p) : resolvePath(p));
+  if (real(src) === real(dest)) return 'already-canonical';
   mkdirSync(joinPath(dest, '..'), {recursive: true});
   rmSync(dest, {recursive: true, force: true});
-  cpSync(src, dest, {recursive: true});
+  // The repo's canonical skill dir is a symlink; without `dereference` the install would be a link
+  // back into the checkout rather than a standalone copy.
+  cpSync(src, dest, {recursive: true, dereference: true});
   return 'installed';
 }
 
@@ -739,6 +751,11 @@ export function installSkillToDefaults(src: string, opts: {global?: boolean; age
     const label = SKILL_PARENT_LABELS[parent];
     const note = outcome === 'already-canonical' ? dim('  (already the canonical copy — left as is)') : label ? dim('  → ' + label) : '';
     console.log(`    ${g(joinPath(parent, SKILL_DIR_NAME))}${note}`);
+  }
+  const plugin = pluginSkillCopies()[0];
+  if (plugin && parents.includes('.claude/skills')) {
+    const copy = `${opts.global ? '~/' : ''}.claude/skills/${SKILL_DIR_NAME}`;
+    warn(`Claude Code already loads the abx skill from plugin ${plugin.plugin} — remove ${g(copy)} so it doesn't load two; keep the plugin current with ${g(`claude plugin update ${plugin.plugin}`)}.`);
   }
   info('restart your agent so it loads the skill, then ask it to launch an NFT with abx.');
   info(`the skill is version-locked to this CLI (v${version}); re-run ${g('abx skill install')} after upgrading so the two stay in sync.`);

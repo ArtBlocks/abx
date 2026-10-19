@@ -136,7 +136,8 @@ groups they contain. Large code deployments may split setup across transactions.
 ## Agent skill and updates
 
 `abx skill install` installs the version-matched agent skill. `abx doctor` reports drift between the
-skill and CLI.
+skill and CLI, including a copy served by the Claude Code plugin, and names the command that refreshes
+each stale copy.
 
 The CLI may print a notice when a newer npm release exists. It never upgrades itself. Set
 `ABX_NO_UPDATE_CHECK=1` to disable the check.

@@ -16,7 +16,7 @@
  */
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
-import {dirname, join, resolve} from 'node:path';
+import {dirname, isAbsolute, join, relative, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import {findCliPackageRoot, findRepoRoot} from './output.js';
@@ -324,12 +324,15 @@ export function installedSkillVersions(): string[] {
   return [...new Set(installedSkillCopies().map((c) => c.version))];
 }
 
-/** One installed skill copy: its version, where it lives, and whether it's project-local or global. */
+/** One installed skill copy: its version, where it lives, and how it was installed. */
 export interface InstalledSkillCopy {
   version: string;
   path: string;
-  /** `project` = under the CWD (fixed by `abx skill install`); `global` = under HOME (needs `--global`). */
-  scope: 'project' | 'global';
+  /** `project` = under the CWD (fixed by `abx skill install`); `global` = under HOME (needs `--global`);
+   *  `plugin` = served by Claude Code's plugin manager, which alone can refresh it. */
+  scope: 'project' | 'global' | 'plugin';
+  /** The plugin manager's id (`name@marketplace`) for a `plugin` copy. */
+  plugin?: string;
 }
 
 function installedSkillCopiesNamed(names: readonly string[]): InstalledSkillCopy[] {
@@ -361,7 +364,45 @@ function installedSkillCopiesNamed(names: readonly string[]): InstalledSkillCopy
  * came back forever. The reported path and scope make the remedy actionable.
  */
 export function installedSkillCopies(): InstalledSkillCopy[] {
-  return installedSkillCopiesNamed([SKILL_DIR_NAME]);
+  const out = installedSkillCopiesNamed([SKILL_DIR_NAME]);
+  for (const copy of pluginSkillCopies()) if (!out.some((c) => c.path === copy.path)) out.push(copy);
+  return out;
+}
+
+/**
+ * Copies served by Claude Code plugins, read from the plugin manager's own registry rather than by
+ * walking `plugins/cache`: the cache keeps superseded version directories after an update, so a scan
+ * would report a stale copy the agent no longer loads. Without this, a plugin user looked uninstalled
+ * and doctor recommended `abx skill install`, which adds the competing second copy.
+ */
+export function pluginSkillCopies(): InstalledSkillCopy[] {
+  const configDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude');
+  let plugins: unknown;
+  try {
+    plugins = (JSON.parse(readFileSync(join(configDir, 'plugins', 'installed_plugins.json'), 'utf8')) as {plugins?: unknown}).plugins;
+  } catch {
+    return [];
+  }
+  if (!plugins || typeof plugins !== 'object') return [];
+  const cwd = process.cwd();
+  const out: InstalledSkillCopy[] = [];
+  for (const [id, entry] of Object.entries(plugins as Record<string, unknown>)) {
+    // Registry v1 stored one install object per plugin; v2 stores an array of per-scope installs.
+    for (const install of (Array.isArray(entry) ? entry : [entry]) as Array<{installPath?: unknown; projectPath?: unknown}>) {
+      if (!install || typeof install.installPath !== 'string') continue;
+      // A project-scoped install only loads inside that project.
+      if (typeof install.projectPath === 'string') {
+        const rel = relative(install.projectPath, cwd);
+        if (rel.startsWith('..') || isAbsolute(rel)) continue;
+      }
+      const path = join(install.installPath, 'skills', SKILL_DIR_NAME, 'SKILL.md');
+      const version = readSkillVersion(path);
+      if (version && readSkillName(path) === SKILL_DIR_NAME && !out.some((c) => c.path === path)) {
+        out.push({version, path, scope: 'plugin', plugin: id});
+      }
+    }
+  }
+  return out;
 }
 
 /** Legacy copies still trigger independently and can compete with the renamed `abx` skill. */
@@ -370,13 +411,17 @@ export function installedLegacySkillCopies(): InstalledSkillCopy[] {
 }
 
 /**
- * The exact `abx skill install` invocation that would refresh the given stale copies — `--global`
- * when a stale copy lives under HOME, plain when it's project-local, both when both are stale.
+ * The exact command that would refresh the given stale copies — `--global` when a stale copy lives
+ * under HOME, plain when it's project-local, `claude plugin update` for a plugin copy (an
+ * `abx skill install` there would add a second, competing copy instead).
  * Returned as the literal command string so a readout can print something that actually works.
  */
 export function skillRefreshCommands(stale: InstalledSkillCopy[]): string[] {
   const cmds: string[] = [];
   if (stale.some((c) => c.scope === 'project')) cmds.push('abx skill install');
   if (stale.some((c) => c.scope === 'global')) cmds.push('abx skill install --global');
+  for (const id of new Set(stale.flatMap((c) => (c.scope === 'plugin' && c.plugin ? [c.plugin] : [])))) {
+    cmds.push(`claude plugin update ${id}`);
+  }
   return cmds.length ? cmds : ['abx skill install'];
 }

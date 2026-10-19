@@ -190,6 +190,52 @@ test('installedLegacySkillCopies reports abx-self-host separately from the canon
   }
 });
 
+test('skillRefreshCommands: a stale PLUGIN copy → the plugin manager, never a second abx skill install', () => {
+  const cmds = skillRefreshCommands([{version: '0.1.0', path: '/c/plugins/cache/m/abx/0.1.0/skills/abx/SKILL.md', scope: 'plugin', plugin: 'abx@m'}]);
+  assert.deepEqual(cmds, ['claude plugin update abx@m']);
+});
+
+// Regression: doctor scanned only skills dirs, so a Claude Code plugin user read as "not installed"
+// and was told to run `abx skill install` — creating the duplicate copy the plugin exists to avoid.
+test('installedSkillCopies: finds a Claude Code plugin copy through the plugin registry', () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'abx-plugin-skill-')));
+  const config = join(dir, 'claude');
+  const writeSkill = (installPath: string, version: string) => {
+    mkdirSync(join(installPath, 'skills', 'abx'), {recursive: true});
+    writeFileSync(join(installPath, 'skills', 'abx', 'SKILL.md'), `---\nname: abx\nmetadata:\n  version: "${version}"\n---\nbody\n`);
+  };
+  const current = join(config, 'plugins', 'cache', 'mkt', 'abx', '0.9.9');
+  const superseded = join(config, 'plugins', 'cache', 'mkt', 'abx', '0.1.0');
+  const otherProject = join(config, 'plugins', 'cache', 'mkt', 'abx', '0.2.0');
+  writeSkill(current, '0.9.9');
+  writeSkill(superseded, '0.1.0');
+  writeSkill(otherProject, '0.2.0');
+  writeFileSync(
+    join(config, 'plugins', 'installed_plugins.json'),
+    JSON.stringify({
+      version: 2,
+      plugins: {
+        'abx@mkt': [
+          {scope: 'user', installPath: current, version: '0.9.9'},
+          {scope: 'project', projectPath: join(dir, 'elsewhere'), installPath: otherProject, version: '0.2.0'},
+        ],
+      },
+    }),
+  );
+  const prevConfig = process.env.CLAUDE_CONFIG_DIR;
+  const cwd = process.cwd();
+  try {
+    process.env.CLAUDE_CONFIG_DIR = config;
+    process.chdir(dir);
+    const mine = installedSkillCopies().filter((c) => c.path.startsWith(dir));
+    assert.deepEqual(mine, [{version: '0.9.9', path: join(current, 'skills', 'abx', 'SKILL.md'), scope: 'plugin', plugin: 'abx@mkt'}]);
+  } finally {
+    process.chdir(cwd);
+    if (prevConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = prevConfig;
+  }
+});
+
 test('installedSkillVersions stays the de-duplicated version list it always was', () => {
   const versions = installedSkillVersions();
   assert.deepEqual(versions, [...new Set(versions)]);
