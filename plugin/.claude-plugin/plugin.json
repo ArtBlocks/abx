@@ -10,6 +10,6 @@
   "homepage": "https://docs.abx.io",
   "repository": "https://github.com/ArtBlocks/abx",
   "license": "MIT",
-  "keywords": ["nft", "ethereum", "base", "solidity", "generative-art", "erc721", "erc1155"],
+  "keywords": ["art blocks", "abx", "nft", "mint", "onchain", "generative-art", "ethereum", "base", "arbitrum", "solidity", "erc721", "erc1155"],
   "skills": ["./skills/abx"]
 }
