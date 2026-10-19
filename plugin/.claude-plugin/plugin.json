@@ -2,7 +2,7 @@
   "name": "abx",
   "displayName": "ABX",
   "version": "0.7.1",
-  "description": "Launch and operate factory-deployed ABX NFT projects on EVM networks—from static 1/1s and editions to generative code—with guided CLI workflows for onchain and offchain media, typed PostParams, programmable hooks, custom minters, hosting, sales, verification, and locks. Requires Node 22.13+ and @artblocks/abx-cli",
+  "description": "Use the ABX CLI (abx) to plan, launch, host, inspect, and operate ABX NFT projects on supported networks: static 1/1s, image series, editions, JavaScript/code drops, and Solidity-rendered projects. Covers on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales, PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Requires Node 22.13+ and @artblocks/abx-cli",
   "author": {
     "name": "Art Blocks",
     "url": "https://abx.io"
