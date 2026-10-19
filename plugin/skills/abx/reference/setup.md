@@ -24,6 +24,15 @@ abx doctor
 abx capabilities --json
 ```
 
+If `abx` is not found, the skill was installed without the CLI, as happens when it comes from an
+agent plugin. With the creator's approval, install the CLI, then run the commands above:
+
+```bash
+npm install -g @artblocks/abx-cli
+```
+
+The unscoped `abx` package on npm is unrelated; never install it.
+
 `abx doctor` reports binary provenance, CLI/skill drift, active chain, RPC health and history reach,
 wallet readiness, canonical factories, storage, and configured remotes without exposing credentials.
 Treat a red check as an actionable setup state, not as permission to improvise a workaround.
@@ -65,7 +74,8 @@ defaults, so rerun help, capabilities, and the JSON dry run after upgrading.
 
 Then run `abx doctor`, refresh the skill with the exact command it reports for the stale copy,
 restart the agent, and run `abx doctor` again. A plugin-installed skill updates through the agent's
-plugin manager, not `abx skill install`.
+plugin manager, not `abx skill install`. A plugin added from Anthropic's directory on claude.ai
+updates when Claude Code restarts and syncs the directory's published version.
 
 If the creator defers the upgrade, say so once and continue only with the installed release's live
 help and capability output. Never assume a newer flag or behavior exists in an older binary.
@@ -190,7 +200,7 @@ human confirmation authorizes execution.
 
 ## New environment checklist
 
-1. Install Node 22.13+ and the desired CLI version.
+1. Install Node 22.13+ and the desired version of `@artblocks/abx-cli`.
 2. Install the co-versioned skill with `abx skill install`, then restart the agent. Skip this when
    the skill came from an agent plugin.
 3. Select the testnet with `ABX_CHAIN` when the default is not appropriate.

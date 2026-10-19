@@ -6,7 +6,8 @@ ABX is a polyglot monorepo:
 - `packages/`: pnpm TypeScript workspace containing the SDK, CLI, indexer, token API, storage
   adapters, and effects runner.
 - `site/`: maintained public documentation. Content lives in `site/content/docs/`.
-- `.claude/skills/abx/`: the end-user skill bundled into `@artblocks/abx-cli`.
+- `plugin/`: the Claude plugin listed in Anthropic's directory. Its `skills/abx/` is the end-user
+ skill bundled into `@artblocks/abx-cli`; `.claude/skills/abx` is a symlink to it.
 - `.claude/skills/dev-loop-test/`: contributor-only cold-agent regression workflow.
 - `contributor/agent-eval/`: regression scenarios and rubrics used by the development loop.
 

@@ -26,7 +26,8 @@ typed errors outrank remembered prose.
   endpoint or API key, put either in browser code, or use it for a project website. Public apps need
   their own Alchemy, QuickNode, Infura, or equivalent account; misuse may suspend the API key/account.
 - Use `pnpm abx …` inside the ABX source repository. Use `abx …` in a creator project or installed
-  environment. Run `abx version` if provenance is uncertain.
+  environment. Run `abx version` if provenance is uncertain. If `abx` is not installed, ask before
+  installing `@artblocks/abx-cli` (Node 22.13+); the unscoped `abx` npm package is unrelated.
 - Treat an available CLI update as an action item. Recommend upgrading before further planning or
   preparing a write: current ABX releases retain support for canonical projects created by earlier
   releases, and updating local tooling does not change deployed contracts. Never upgrade silently.

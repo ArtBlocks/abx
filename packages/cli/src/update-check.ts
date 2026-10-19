@@ -14,7 +14,7 @@
  * {@link prereleaseChannel} for the silent-failure mode that would otherwise arrive the day a
  * stable release ships.
  */
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {dirname, isAbsolute, join, relative, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -329,9 +329,10 @@ export interface InstalledSkillCopy {
   version: string;
   path: string;
   /** `project` = under the CWD (fixed by `abx skill install`); `global` = under HOME (needs `--global`);
-   *  `plugin` = served by Claude Code's plugin manager, which alone can refresh it. */
+   *  `plugin` = served by a Claude Code plugin, which only Claude Code can refresh. */
   scope: 'project' | 'global' | 'plugin';
-  /** The plugin manager's id (`name@marketplace`) for a `plugin` copy. */
+  /** The plugin manager's id for a `plugin` copy: `name@marketplace`, or `name@synced` for a plugin
+   *  added from Anthropic's directory on claude.ai. */
   plugin?: string;
 }
 
@@ -370,13 +371,24 @@ export function installedSkillCopies(): InstalledSkillCopy[] {
 }
 
 /**
- * Copies served by Claude Code plugins, read from the plugin manager's own registry rather than by
- * walking `plugins/cache`: the cache keeps superseded version directories after an update, so a scan
- * would report a stale copy the agent no longer loads. Without this, a plugin user looked uninstalled
- * and doctor recommended `abx skill install`, which adds the competing second copy.
+ * Copies served by Claude Code plugins. Without this, a plugin user looked uninstalled and doctor
+ * recommended `abx skill install`, which adds the competing second copy. A plugin approved for
+ * Anthropic's directory reaches Claude Code two ways: synced from a claude.ai account, or installed
+ * from the `claude-community` marketplace that mirrors the directory.
  */
 export function pluginSkillCopies(): InstalledSkillCopy[] {
   const configDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude');
+  const out = marketplacePluginSkillCopies(configDir);
+  for (const copy of syncedPluginSkillCopies(configDir)) if (!out.some((c) => c.path === copy.path)) out.push(copy);
+  return out;
+}
+
+/**
+ * Marketplace installs, read from the plugin manager's own registry rather than by walking
+ * `plugins/cache`: the cache keeps superseded version directories after an update, so a scan would
+ * report a stale copy the agent no longer loads.
+ */
+function marketplacePluginSkillCopies(configDir: string): InstalledSkillCopy[] {
   let plugins: unknown;
   try {
     plugins = (JSON.parse(readFileSync(join(configDir, 'plugins', 'installed_plugins.json'), 'utf8')) as {plugins?: unknown}).plugins;
@@ -405,6 +417,56 @@ export function pluginSkillCopies(): InstalledSkillCopy[] {
   return out;
 }
 
+const UUID = '[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
+const SYNCED_BUCKET = new RegExp(`^${UUID}_(?:unbound|${UUID})$`, 'i');
+
+/**
+ * Plugins added from Anthropic's directory on claude.ai. Claude Code syncs these into
+ * `plugins/synced/<org>_<account>/` and never records them in `installed_plugins.json`. Each account
+ * bucket's `manifest.json` lists the plugins it holds; a bucket without its `.bucket-<name>` marker
+ * is one Claude Code discards rather than loads. Every marked bucket is reported because which
+ * claude.ai account is signed in isn't visible from here.
+ */
+function syncedPluginSkillCopies(configDir: string): InstalledSkillCopy[] {
+  const root = join(configDir, 'plugins', 'synced');
+  let buckets: string[];
+  try {
+    buckets = readdirSync(root).filter((name) => SYNCED_BUCKET.test(name) && existsSync(join(root, `.bucket-${name}`)));
+  } catch {
+    return [];
+  }
+  const out: InstalledSkillCopy[] = [];
+  for (const bucket of buckets) {
+    const bucketDir = join(root, bucket);
+    let rows: unknown;
+    try {
+      rows = (JSON.parse(readFileSync(join(bucketDir, 'manifest.json'), 'utf8')) as {plugins?: unknown}).plugins;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows as Array<{name?: unknown; generation?: unknown}>) {
+      if (!row || typeof row.name !== 'string' || !row.name) continue;
+      // Mirrors Claude Code's folder naming: path-unsafe characters become `_`, trailing dots and
+      // spaces are dropped, and a later generation of the same plugin gets a `~g<N>` suffix.
+      const folder = row.name.replace(/[<>:"|?*\\/]/g, '_').replace(/[. ]+$/, '');
+      if (!folder) continue;
+      const generation = Number.isInteger(row.generation) ? (row.generation as number) : 1;
+      const path = join(bucketDir, generation > 1 ? `${folder}~g${generation}` : folder, 'skills', SKILL_DIR_NAME, 'SKILL.md');
+      const version = readSkillVersion(path);
+      if (version && readSkillName(path) === SKILL_DIR_NAME && !out.some((c) => c.path === path)) {
+        out.push({version, path, scope: 'plugin', plugin: `${row.name}@synced`});
+      }
+    }
+  }
+  return out;
+}
+
+/** Whether a plugin copy comes from claude.ai sync, which only Claude Code's startup sync refreshes. */
+function isSyncedPlugin(id: string): boolean {
+  return id.endsWith('@synced');
+}
+
 /** Legacy copies still trigger independently and can compete with the renamed `abx` skill. */
 export function installedLegacySkillCopies(): InstalledSkillCopy[] {
   return installedSkillCopiesNamed(LEGACY_SKILL_DIR_NAMES);
@@ -412,16 +474,18 @@ export function installedLegacySkillCopies(): InstalledSkillCopy[] {
 
 /**
  * The exact command that would refresh the given stale copies — `--global` when a stale copy lives
- * under HOME, plain when it's project-local, `claude plugin update` for a plugin copy (an
+ * under HOME, plain when it's project-local, `claude plugin update` for a marketplace plugin copy (an
  * `abx skill install` there would add a second, competing copy instead).
  * Returned as the literal command string so a readout can print something that actually works.
+ * A plugin synced from claude.ai has no command: Claude Code fetches the directory's published
+ * version when it starts, so the step returned for it is a restart.
  */
 export function skillRefreshCommands(stale: InstalledSkillCopy[]): string[] {
   const cmds: string[] = [];
   if (stale.some((c) => c.scope === 'project')) cmds.push('abx skill install');
   if (stale.some((c) => c.scope === 'global')) cmds.push('abx skill install --global');
   for (const id of new Set(stale.flatMap((c) => (c.scope === 'plugin' && c.plugin ? [c.plugin] : [])))) {
-    cmds.push(`claude plugin update ${id}`);
+    cmds.push(isSyncedPlugin(id) ? `restart Claude Code (${id} updates from claude.ai)` : `claude plugin update ${id}`);
   }
   return cmds.length ? cmds : ['abx skill install'];
 }

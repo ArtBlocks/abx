@@ -1,7 +1,7 @@
 // Stamp the canonical agent skill's version, and the Claude plugin manifest that serves it, to match
-// the abx CLI's package version, so the skill stays strictly co-versioned with the CLI it drives. Runs right after `changeset version` (see the
-// root `ci:version` script), so the "Version Packages" PR carries the bumped SKILL.md alongside the
-// package bumps. Idempotent. The version lives in SKILL.md frontmatter `metadata.version` — the
+// the abx CLI's package version, so the skill stays strictly co-versioned with the CLI it drives.
+// Runs right after `changeset version` (see the root `ci:version` script), so the "Version Packages"
+// PR carries the bumped SKILL.md alongside the package bumps. Idempotent. The version lives in SKILL.md frontmatter `metadata.version` — the
 // single source of truth the CLI's drift check reads back (see packages/cli/src/update-check.ts).
 import {readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';

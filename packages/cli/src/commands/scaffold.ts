@@ -231,7 +231,7 @@ export async function cmdDoctor(flags: Flags) {
   // lifecycle scripts with cwd set to the installed package dir (so the skill would land inside
   // node_modules), pnpm gates install scripts by default, and writing to a user's ~/.claude on
   // install is the kind of side effect that belongs to the user, not to us.
-  // A stale plugin copy is refreshed by the plugin manager; installing here would add a second copy.
+  // A stale plugin copy is refreshed through Claude Code; installing here would add a second copy.
   if ((skillMissing || staleCopies.some((copy) => copy.scope !== 'plugin')) && !skillNeedsMigration) {
     await offerSkillInstall(flags, skillStale, CONT);
   }
@@ -755,7 +755,7 @@ export function installSkillToDefaults(src: string, opts: {global?: boolean; age
   const plugin = pluginSkillCopies()[0];
   if (plugin && parents.includes('.claude/skills')) {
     const copy = `${opts.global ? '~/' : ''}.claude/skills/${SKILL_DIR_NAME}`;
-    warn(`Claude Code already loads the abx skill from plugin ${plugin.plugin} — remove ${g(copy)} so it doesn't load two; keep the plugin current with ${g(`claude plugin update ${plugin.plugin}`)}.`);
+    warn(`Claude Code already loads the abx skill from plugin ${plugin.plugin} — remove ${g(copy)} so it doesn't load two; keep the plugin current with ${g(skillRefreshCommands([plugin])[0])}.`);
   }
   info('restart your agent so it loads the skill, then ask it to launch an NFT with abx.');
   info(`the skill is version-locked to this CLI (v${version}); re-run ${g('abx skill install')} after upgrading so the two stay in sync.`);

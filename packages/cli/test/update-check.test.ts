@@ -236,6 +236,43 @@ test('installedSkillCopies: finds a Claude Code plugin copy through the plugin r
   }
 });
 
+test('skillRefreshCommands: a stale plugin synced from claude.ai → a restart, not a plugin command', () => {
+  const cmds = skillRefreshCommands([{version: '0.1.0', path: '/c/plugins/synced/b/abx/skills/abx/SKILL.md', scope: 'plugin', plugin: 'abx@synced'}]);
+  assert.deepEqual(cmds, ['restart Claude Code (abx@synced updates from claude.ai)']);
+});
+
+// Regression: a plugin added from Anthropic's directory is synced from claude.ai and never appears
+// in installed_plugins.json, so doctor called it missing and offered the duplicate `abx skill install`.
+test('installedSkillCopies: finds a plugin synced from claude.ai through the sync manifest', () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'abx-synced-skill-')));
+  const config = join(dir, 'claude');
+  const synced = join(config, 'plugins', 'synced');
+  const writeSkill = (pluginDir: string, version: string) => {
+    mkdirSync(join(pluginDir, 'skills', 'abx'), {recursive: true});
+    writeFileSync(join(pluginDir, 'skills', 'abx', 'SKILL.md'), `---\nname: abx\nmetadata:\n  version: "${version}"\n---\nbody\n`);
+  };
+  const bucket = '0b9ac1d2-3e4f-4a5b-8c6d-7e8f9a0b1c2d_unbound';
+  const unmarked = '1c0bd2e3-4f5a-4b6c-9d7e-8f9a0b1c2d3e_unbound';
+  writeSkill(join(synced, bucket, 'abx~g2'), '0.9.9');
+  writeSkill(join(synced, bucket, 'abx'), '0.1.0');
+  writeSkill(join(synced, unmarked, 'abx'), '0.2.0');
+  writeFileSync(join(synced, `.bucket-${bucket}`), '');
+  writeFileSync(join(synced, bucket, 'manifest.json'), JSON.stringify({lastUpdated: 1, plugins: [{pluginId: 'p1', name: 'abx', version: '0.9.9', generation: 2}]}));
+  writeFileSync(join(synced, unmarked, 'manifest.json'), JSON.stringify({lastUpdated: 1, plugins: [{pluginId: 'p1', name: 'abx', version: '0.2.0'}]}));
+  const prevConfig = process.env.CLAUDE_CONFIG_DIR;
+  const cwd = process.cwd();
+  try {
+    process.env.CLAUDE_CONFIG_DIR = config;
+    process.chdir(dir);
+    const mine = installedSkillCopies().filter((c) => c.path.startsWith(dir));
+    assert.deepEqual(mine, [{version: '0.9.9', path: join(synced, bucket, 'abx~g2', 'skills', 'abx', 'SKILL.md'), scope: 'plugin', plugin: 'abx@synced'}]);
+  } finally {
+    process.chdir(cwd);
+    if (prevConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = prevConfig;
+  }
+});
+
 test('installedSkillVersions stays the de-duplicated version list it always was', () => {
   const versions = installedSkillVersions();
   assert.deepEqual(versions, [...new Set(versions)]);

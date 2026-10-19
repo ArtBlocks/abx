@@ -4,10 +4,11 @@ ABX keeps two agent skills in source control:
 
 | Skill | Audience | Published |
 | --- | --- | --- |
-| `abx/` | People using ABX | Bundled with `@artblocks/abx-cli` |
+| `abx/` | People using ABX | Bundled with `@artblocks/abx-cli` and the Claude plugin in Anthropic's directory |
 | `dev-loop-test/` | Contributors testing the CLI and end-user skill | No |
 
-Canonical skill files live under `.claude/skills/`. Matching symlinks under `.agents/skills/`
+The `abx` skill's canonical files live in `plugin/skills/abx/`; `.claude/skills/abx` is a symlink to
+them. Contributor skills live under `.claude/skills/`. Matching symlinks under `.agents/skills/`
 make contributor skills discoverable by agents that use the vendor-neutral directory.
 
 The `abx` skill is a published artifact. Its frontmatter version is stamped from the CLI package
