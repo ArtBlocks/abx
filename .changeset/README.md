@@ -22,6 +22,22 @@ Publishing goes through `pnpm -r publish`, which rewrites `workspace:*` dependen
 concrete published version in each tarball (a plain `npm publish` would ship an uninstallable
 `workspace:*`).
 
+## Choosing a version
+
+ABX follows the same compatibility rules before and after `1.0`. A `0.x` version is not permission
+to hide a breaking change in a minor release.
+
+| Bump | Use it for | Examples |
+| --- | --- | --- |
+| **Patch** | Backward-compatible fixes and maintenance that do not add a public capability | Bug fixes, security or dependency updates, performance fixes |
+| **Minor** | Backward-compatible public capabilities | A supported network, command, option, export, or project mechanic |
+| **Major** | A change that can break a supported consumer or existing workflow | Removing or renaming an API, rejecting previously valid input, or changing established command behavior |
+
+Documentation-only and repository-internal changes do not need a Changeset unless they alter a
+published package. When uncertain, describe the affected consumer and compatibility impact in the
+PR; choose the larger bump rather than understating a break. Review the generated Version Packages
+PR before merging it, then confirm every version it names is available from npm after publication.
+
 ## Release channels
 
 The packages publish stable versions from `main` to npm's `latest` dist-tag. Normal changes should

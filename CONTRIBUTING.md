@@ -39,7 +39,9 @@ forge test
 - Run local CLI code with `pnpm abx …`.
 - Add or update tests for behavior changes.
 - Update `site/content/docs/` with user-visible changes.
-- Add a Changeset with `pnpm changeset` when a published `@artblocks/abx-*` package changes.
+- Add a Changeset with `pnpm changeset` when a published `@artblocks/abx-*` package changes. Follow
+  the [version-selection policy](.changeset/README.md#choosing-a-version): fixes are patches, new
+  compatible capabilities are minors, and breaking changes are majors—even before `1.0`.
 - Preserve package boundaries and do not introduce provider-specific behavior into the SDK.
 - Do not add planning, strategy, research notebooks, review transcripts, or private triage records.
   Use GitHub Issues and pull requests for work tracking and design discussion.
