@@ -43,7 +43,7 @@ without evidence, or wrap the CLI in an unbounded retry loop.
 | placeholder image | image surface not published/wired | choose renderer, public image base, or resolver/effects path |
 | storage accepted but gateway 404 | propagation may be pending | `storage status`; wait if propagating |
 | empty historical reconstruction | pruning/range-capped RPC may have answered `[]` | put a full-history endpoint first, then re-index |
-| skill version/name warning | agent membrane is stale or duplicated | run the exact project/global `abx skill install` commands shown |
+| skill version/name warning | agent membrane is stale or duplicated | run the exact refresh commands Doctor shows |
 
 ## Nonces and serialized writes
 

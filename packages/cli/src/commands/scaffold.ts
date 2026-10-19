@@ -4,7 +4,7 @@
  * `scaffold-renderer` (copy the Solidity on-chain-renderer starting point), and `skill` (install
  * the version-locked abx agent skill into a coding agent).
  */
-import {cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename, join as joinPath, resolve as resolvePath, sep} from 'node:path';
 import {createInterface} from 'node:readline';
@@ -52,12 +52,18 @@ import {
   binaryProvenance,
   checkForCliUpdate,
   compareVersions,
+  type InstalledSkillCopy,
   installedSkillCopies,
   installedLegacySkillCopies,
+  pluginSkillCopies,
   readCliVersion,
   readSkillName,
   readSkillVersion,
+  shellSafePluginId,
+  skillCopyLocation,
   skillRefreshCommands,
+  syncedPluginRefreshNote,
+  UNSAFE_PLUGIN_REFRESH_NOTE,
 } from '../update-check.js';
 
 // ── doctor ────────────────────────────────────────────────────────────────--
@@ -131,6 +137,14 @@ export function describeMissingRemoteToken(name: string): string {
 /** Continuation indent: aligns under a check/opt detail column. */
 const CONT = ' '.repeat(17);
 
+/** Skill locations on their own lines. Plugin paths that are not one shell token are omitted. */
+function printSkillLocations(copies: InstalledSkillCopy[]): void {
+  for (const copy of copies) {
+    const location = skillCopyLocation(copy);
+    if (location) console.log(`${CONT}${dim(location)}`);
+  }
+}
+
 /**
  * Does every configured endpoint agree with itself about this wallet's nonce?
  *
@@ -201,20 +215,36 @@ export async function cmdDoctor(flags: Flags) {
   const skillNeedsMigration = legacyCopies.length > 0;
   // Which copy, and the command that refreshes THAT copy — a bare `abx skill install` never touches
   // the global one, so naming it for a stale global copy printed a fix that could not clear the ✗.
-  const skillFix = skillRefreshCommands([...staleCopies, ...legacyCopies]).join(' && ');
-  const staleWhere = staleCopies.length === 1 ? ` (${staleCopies[0].scope}: ${staleCopies[0].path})` : '';
+  const refreshCopies = [...staleCopies, ...legacyCopies];
+  const refreshCommands = skillRefreshCommands(refreshCopies);
+  const skillFix = refreshCommands.join(' && ');
+  const syncedNote = syncedPluginRefreshNote(refreshCopies);
+  const skillRemedy = skillFix ? `run ${g(skillFix)}` : (syncedNote ?? UNSAFE_PLUGIN_REFRESH_NOTE);
+  // Locations stay off this line. The skill tells the agent to run the command after `—`, and a
+  // registry installPath is untrusted text that must not be able to open an earlier `— run` clause.
   if (skillNeedsMigration) {
-    const where = legacyCopies.length === 1 ? ` (${legacyCopies[0].scope}: ${legacyCopies[0].path})` : ` (${legacyCopies.length} copies)`;
-    check('agent skill', false, `legacy abx-self-host skill still active${where} — migrate: ${g(skillFix)}`);
-    for (const copy of legacyCopies) console.log(`${CONT}${dim(`${copy.scope}: ${copy.path}`)}`);
+    const where = legacyCopies.length === 1 ? '' : ` (${legacyCopies.length} copies)`;
+    check('agent skill', false, `legacy abx-self-host skill still active${where} — migrate: ${skillFix ? g(skillFix) : UNSAFE_PLUGIN_REFRESH_NOTE}`);
+    printSkillLocations(legacyCopies);
     console.log(`${CONT}${dim('the installer archives the old folder outside the discovery tree; it does not delete customizations')}`);
   } else if (skillMissing) {
     check('agent skill', false, `not installed — run ${g('abx skill install')}`);
     console.log(`${CONT}${dim('(recommended: let a coding agent drive abx)')}`);
   } else if (skillStale) {
-    check('agent skill', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion}${staleWhere} — run ${g(skillFix)}`);
+    check('agent skill', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion} — ${skillRemedy}`);
+    printSkillLocations(staleCopies);
   } else {
     check('agent skill', true, `in sync (v${cliVersion})`);
+  }
+  // Restart guidance for a claude.ai-synced plugin is prose. It is not part of the `&&` command.
+  if (skillFix && syncedNote) console.log(`${CONT}${dim(syncedNote)}`);
+  const pluginCopy = skillCopies.find((copy) => copy.scope === 'plugin');
+  const pluginLabel = pluginCopy?.plugin && shellSafePluginId(pluginCopy.plugin) ? `plugin ${pluginCopy.plugin}` : 'a plugin';
+  // Only `.claude/skills` competes with the plugin; Claude Code doesn't read the other agents' dirs.
+  const standaloneCopies = skillCopies.filter((copy) => copy.scope !== 'plugin' && copy.path.includes(joinPath('.claude', 'skills', SKILL_DIR_NAME)));
+  if (pluginCopy && standaloneCopies.length) {
+    console.log(`${CONT}${c.orange}⚠${c.reset}${dim(` Claude Code also loads ${pluginLabel} — remove the standalone copy so it loads only one:`)}`);
+    for (const copy of standaloneCopies) console.log(`${CONT}${dim(`${copy.scope}: ${copy.path}`)}`);
   }
   // Offer to fix it here rather than only naming the command. `npm i -g` + `abx skill install` was a
   // two-step install flow where the second step is easy to skip and invisible when skipped (an agent
@@ -223,7 +253,8 @@ export async function cmdDoctor(flags: Flags) {
   // lifecycle scripts with cwd set to the installed package dir (so the skill would land inside
   // node_modules), pnpm gates install scripts by default, and writing to a user's ~/.claude on
   // install is the kind of side effect that belongs to the user, not to us.
-  if ((skillMissing || skillStale) && !skillNeedsMigration) {
+  // A stale plugin copy is refreshed through Claude Code; installing here would add a second copy.
+  if ((skillMissing || staleCopies.some((copy) => copy.scope !== 'plugin')) && !skillNeedsMigration) {
     await offerSkillInstall(flags, skillStale, CONT);
   }
   console.log('');
@@ -368,12 +399,17 @@ export async function cmdDoctor(flags: Flags) {
   const latest = await checkForCliUpdate(cliVersion);
   if (latest) {
     check('npm', false, `v${cliVersion} → v${latest} available — upgrade recommended before planning or sending`);
-    console.log(`${CONT}${dim('npm i -g @artblocks/abx-cli@latest · then abx skill install and restart the agent')}`);
+    const refresh = skillRefreshCommands(skillCopies);
+    const syncedRefresh = syncedPluginRefreshNote(skillCopies);
+    console.log(`${CONT}${dim(refresh.length ? `npm i -g @artblocks/abx-cli@latest · then ${refresh.join(' && ')}` : 'npm i -g @artblocks/abx-cli@latest')}`);
+    if (!refresh.length && !syncedRefresh) console.log(`${CONT}${dim(UNSAFE_PLUGIN_REFRESH_NOTE)}`);
+    // Restart guidance stays prose. It is not part of the `&&`-joined refresh line the skill runs.
+    console.log(`${CONT}${dim(syncedRefresh ? `${syncedRefresh} Then rerun abx doctor.` : 'Restart the agent after upgrading, then rerun abx doctor.')}`);
     console.log(`${CONT}${dim('updating local tooling does not change deployed projects; earlier canonical generations remain supported')}`);
   } else check('npm', true, `v${cliVersion} (or offline — checked at most every 6h)`);
-  if (skillNeedsMigration) check('skill ver', false, `legacy skill name remains active — ${skillFix}`);
+  if (skillNeedsMigration) check('skill ver', false, `legacy skill name remains active — ${skillFix || syncedNote || UNSAFE_PLUGIN_REFRESH_NOTE}`);
   else if (skillMissing) check('skill ver', false, 'no installed skill to compare — abx skill install');
-  else if (skillStale) check('skill ver', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion}${staleWhere} — ${skillFix}`);
+  else if (skillStale) check('skill ver', false, `v${staleSkills.join(', v')} behind CLI v${cliVersion} — ${skillFix || syncedNote || UNSAFE_PLUGIN_REFRESH_NOTE}`);
   else check('skill ver', true, `v${cliVersion} matches the CLI`);
 
   // 3. Optional — path-dependent setup. Unset is fine; these say WHEN you'll need each, so an unset
@@ -684,10 +720,13 @@ export function resolveInstallParents(agentFlag: string | undefined): string[] {
  *  so the `rmSync` below would delete the canonical skill, and the copy would then have no source.
  *  A self-destructing install is a bad way to learn that. */
 export function installSkillTo(src: string, dest: string): 'installed' | 'already-canonical' {
-  if (resolvePath(src) === resolvePath(dest)) return 'already-canonical';
+  const real = (p: string) => (existsSync(p) ? realpathSync(p) : resolvePath(p));
+  if (real(src) === real(dest)) return 'already-canonical';
   mkdirSync(joinPath(dest, '..'), {recursive: true});
   rmSync(dest, {recursive: true, force: true});
-  cpSync(src, dest, {recursive: true});
+  // The repo's canonical skill dir is a symlink; without `dereference` the install would be a link
+  // back into the checkout rather than a standalone copy.
+  cpSync(src, dest, {recursive: true, dereference: true});
   return 'installed';
 }
 
@@ -739,6 +778,20 @@ export function installSkillToDefaults(src: string, opts: {global?: boolean; age
     const label = SKILL_PARENT_LABELS[parent];
     const note = outcome === 'already-canonical' ? dim('  (already the canonical copy — left as is)') : label ? dim('  → ' + label) : '';
     console.log(`    ${g(joinPath(parent, SKILL_DIR_NAME))}${note}`);
+  }
+  const plugin = pluginSkillCopies()[0];
+  if (plugin && parents.includes('.claude/skills')) {
+    const copy = `${opts.global ? '~/' : ''}.claude/skills/${SKILL_DIR_NAME}`;
+    const named = plugin.plugin && shellSafePluginId(plugin.plugin) ? `plugin ${plugin.plugin}` : 'a plugin';
+    const update = skillRefreshCommands([plugin])[0];
+    const synced = syncedPluginRefreshNote([plugin]);
+    if (update) {
+      warn(`Claude Code already loads the abx skill from ${named} — remove ${g(copy)} so it doesn't load two; keep the plugin current with ${g(update)}.`);
+    } else if (synced) {
+      warn(`Claude Code already loads the abx skill from ${named} — remove ${g(copy)} so it doesn't load two. ${synced}`);
+    } else {
+      warn(`Claude Code already loads the abx skill from a plugin — remove ${g(copy)} so it doesn't load two. ${UNSAFE_PLUGIN_REFRESH_NOTE}.`);
+    }
   }
   info('restart your agent so it loads the skill, then ask it to launch an NFT with abx.');
   info(`the skill is version-locked to this CLI (v${version}); re-run ${g('abx skill install')} after upgrading so the two stay in sync.`);

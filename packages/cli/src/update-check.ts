@@ -14,12 +14,13 @@
  * {@link prereleaseChannel} for the silent-failure mode that would otherwise arrive the day a
  * stable release ships.
  */
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
-import {dirname, join, resolve} from 'node:path';
+import {dirname, isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import {findCliPackageRoot, findRepoRoot} from './output.js';
+import {shArg} from './shell.js';
 
 const REGISTRY = 'https://registry.npmjs.org';
 const PKG = '@artblocks/abx-cli';
@@ -324,12 +325,16 @@ export function installedSkillVersions(): string[] {
   return [...new Set(installedSkillCopies().map((c) => c.version))];
 }
 
-/** One installed skill copy: its version, where it lives, and whether it's project-local or global. */
+/** One installed skill copy: its version, where it lives, and how it was installed. */
 export interface InstalledSkillCopy {
   version: string;
   path: string;
-  /** `project` = under the CWD (fixed by `abx skill install`); `global` = under HOME (needs `--global`). */
-  scope: 'project' | 'global';
+  /** `project` = under the CWD (fixed by `abx skill install`); `global` = under HOME (needs `--global`);
+   *  `plugin` = served by a Claude Code plugin, which only Claude Code can refresh. */
+  scope: 'project' | 'global' | 'plugin';
+  /** The plugin manager's id for a `plugin` copy: `name@marketplace`, or `name@synced` for a plugin
+   *  added from Anthropic's directory on claude.ai. */
+  plugin?: string;
 }
 
 function installedSkillCopiesNamed(names: readonly string[]): InstalledSkillCopy[] {
@@ -361,7 +366,134 @@ function installedSkillCopiesNamed(names: readonly string[]): InstalledSkillCopy
  * came back forever. The reported path and scope make the remedy actionable.
  */
 export function installedSkillCopies(): InstalledSkillCopy[] {
-  return installedSkillCopiesNamed([SKILL_DIR_NAME]);
+  const out = installedSkillCopiesNamed([SKILL_DIR_NAME]);
+  for (const copy of pluginSkillCopies()) if (!out.some((c) => c.path === copy.path)) out.push(copy);
+  return out;
+}
+
+/**
+ * Copies served by Claude Code plugins. Without this, a plugin user looked uninstalled and doctor
+ * recommended `abx skill install`, which adds the competing second copy. A plugin approved for
+ * Anthropic's directory reaches Claude Code two ways: synced from a claude.ai account, or installed
+ * from the `claude-community` marketplace that mirrors the directory.
+ */
+export function pluginSkillCopies(): InstalledSkillCopy[] {
+  const configDir = process.env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude');
+  const root = resolvedDir(configDir);
+  if (!root) return [];
+  const out = marketplacePluginSkillCopies(root);
+  for (const copy of syncedPluginSkillCopies(root)) if (!out.some((c) => c.path === copy.path)) out.push(copy);
+  return out;
+}
+
+/** `realpath` of a directory, or null when it cannot be resolved. */
+function resolvedDir(path: string): string | null {
+  try {
+    return realpathSync(path);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when `skillPath` resolves to a file strictly inside `root`. Both sides are realpaths, so a
+ * relative `installPath`, a `..` segment, or a symlink that leaves the config directory is rejected.
+ * `CLAUDE_CONFIG_DIR` can be set from a project `.env`, and the registry's `installPath` is then
+ * workspace-controlled; a copy outside that directory is not one Claude Code loaded from it.
+ */
+function skillFileStaysUnder(root: string, skillPath: string): boolean {
+  let file: string;
+  try {
+    file = realpathSync(skillPath);
+  } catch {
+    return false;
+  }
+  const rel = relative(root, file);
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+/**
+ * Marketplace installs, read from the plugin manager's own registry rather than by walking
+ * `plugins/cache`: the cache keeps superseded version directories after an update, so a scan would
+ * report a stale copy the agent no longer loads.
+ */
+function marketplacePluginSkillCopies(configDir: string): InstalledSkillCopy[] {
+  let plugins: unknown;
+  try {
+    plugins = (JSON.parse(readFileSync(join(configDir, 'plugins', 'installed_plugins.json'), 'utf8')) as {plugins?: unknown}).plugins;
+  } catch {
+    return [];
+  }
+  if (!plugins || typeof plugins !== 'object') return [];
+  const cwd = process.cwd();
+  const out: InstalledSkillCopy[] = [];
+  for (const [id, entry] of Object.entries(plugins as Record<string, unknown>)) {
+    // Registry v1 stored one install object per plugin; v2 stores an array of per-scope installs.
+    for (const install of (Array.isArray(entry) ? entry : [entry]) as Array<{installPath?: unknown; projectPath?: unknown}>) {
+      if (!install || typeof install.installPath !== 'string') continue;
+      // A project-scoped install only loads inside that project.
+      if (typeof install.projectPath === 'string') {
+        const rel = relative(install.projectPath, cwd);
+        if (rel.startsWith('..') || isAbsolute(rel)) continue;
+      }
+      const path = join(install.installPath, 'skills', SKILL_DIR_NAME, 'SKILL.md');
+      const version = readSkillVersion(path);
+      if (version && readSkillName(path) === SKILL_DIR_NAME && skillFileStaysUnder(configDir, path) && !out.some((c) => c.path === path)) {
+        out.push({version, path, scope: 'plugin', plugin: id});
+      }
+    }
+  }
+  return out;
+}
+
+const UUID = '[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
+const SYNCED_BUCKET = new RegExp(`^${UUID}_(?:unbound|${UUID})$`, 'i');
+
+/**
+ * Plugins added from Anthropic's directory on claude.ai. Claude Code syncs these into
+ * `plugins/synced/<org>_<account>/` and never records them in `installed_plugins.json`. Each account
+ * bucket's `manifest.json` lists the plugins it holds; a bucket without its `.bucket-<name>` marker
+ * is one Claude Code discards rather than loads. Every marked bucket is reported because which
+ * claude.ai account is signed in isn't visible from here.
+ */
+function syncedPluginSkillCopies(configDir: string): InstalledSkillCopy[] {
+  const root = join(configDir, 'plugins', 'synced');
+  let buckets: string[];
+  try {
+    buckets = readdirSync(root).filter((name) => SYNCED_BUCKET.test(name) && existsSync(join(root, `.bucket-${name}`)));
+  } catch {
+    return [];
+  }
+  const out: InstalledSkillCopy[] = [];
+  for (const bucket of buckets) {
+    const bucketDir = join(root, bucket);
+    let rows: unknown;
+    try {
+      rows = (JSON.parse(readFileSync(join(bucketDir, 'manifest.json'), 'utf8')) as {plugins?: unknown}).plugins;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows as Array<{name?: unknown; generation?: unknown}>) {
+      if (!row || typeof row.name !== 'string' || !row.name) continue;
+      // Mirrors Claude Code's folder naming: path-unsafe characters become `_`, trailing dots and
+      // spaces are dropped, and a later generation of the same plugin gets a `~g<N>` suffix.
+      const folder = row.name.replace(/[<>:"|?*\\/]/g, '_').replace(/[. ]+$/, '');
+      if (!folder) continue;
+      const generation = Number.isInteger(row.generation) ? (row.generation as number) : 1;
+      const path = join(bucketDir, generation > 1 ? `${folder}~g${generation}` : folder, 'skills', SKILL_DIR_NAME, 'SKILL.md');
+      const version = readSkillVersion(path);
+      if (version && readSkillName(path) === SKILL_DIR_NAME && skillFileStaysUnder(configDir, path) && !out.some((c) => c.path === path)) {
+        out.push({version, path, scope: 'plugin', plugin: `${row.name}@synced`});
+      }
+    }
+  }
+  return out;
+}
+
+/** Whether a plugin copy comes from claude.ai sync, which only Claude Code's startup sync refreshes. */
+function isSyncedPlugin(id: string): boolean {
+  return id.endsWith('@synced');
 }
 
 /** Legacy copies still trigger independently and can compete with the renamed `abx` skill. */
@@ -370,13 +502,80 @@ export function installedLegacySkillCopies(): InstalledSkillCopy[] {
 }
 
 /**
- * The exact `abx skill install` invocation that would refresh the given stale copies — `--global`
- * when a stale copy lives under HOME, plain when it's project-local, both when both are stale.
+ * Prose for a plugin install whose id must not be pasted into a shell. Not a command: doctor and
+ * the update notice print it in place of a refresh line, and it is never joined with `&&`.
+ */
+export const UNSAFE_PLUGIN_REFRESH_NOTE =
+  'the recorded plugin id is not a shell-safe token, so no refresh command is printed';
+
+/**
+ * True when `id` is one shell token {@link shArg} would leave unquoted, and not a leading dash
+ * (`claude plugin update` must not treat the id as a flag). Registry keys are `name@marketplace`
+ * and synced manifest names are copied into `name@synced`. `CLAUDE_CONFIG_DIR` can be set from a
+ * project `.env`, so either string is untrusted workspace text until it passes this check.
+ */
+/** One shell token {@link shArg} would leave unquoted, and not a leading dash. */
+function shellSafeToken(value: string): boolean {
+  return value === shArg(value) && !value.startsWith('-');
+}
+
+export function shellSafePluginId(id: string): boolean {
+  return shellSafeToken(id);
+}
+
+/**
+ * Where a skill copy lives, for a line of its own. Plugin paths are registry `installPath`s (or a
+ * folder under `CLAUDE_CONFIG_DIR`, which a project `.env` can point at a workspace tree), so they
+ * are shown only when the path is one shell token — the same check as a plugin id. Whitespace,
+ * control characters, and shell metacharacters are omitted rather than printed. Callers keep this
+ * off any line that contains `run` or `refresh:`.
+ */
+export function skillCopyLocation(copy: InstalledSkillCopy): string | null {
+  if (copy.scope === 'plugin' && !shellSafeToken(copy.path)) return null;
+  return `${copy.scope}: ${copy.path}`;
+}
+
+function pluginRefreshCommand(id: string): string | null {
+  if (isSyncedPlugin(id) || !shellSafePluginId(id)) return null;
+  return `claude plugin update ${shArg(id)}`;
+}
+
+/**
+ * Restart guidance for a plugin synced from claude.ai. Prose only: it is not a shell command and
+ * must not be joined into a refresh line with `&&`. A manifest name that is not a shell-safe token
+ * is left out of the sentence.
+ */
+export function syncedPluginRefreshNote(stale: InstalledSkillCopy[]): string | null {
+  const ids = [...new Set(stale.flatMap((c) => (c.scope === 'plugin' && c.plugin && isSyncedPlugin(c.plugin) ? [c.plugin] : [])))];
+  if (!ids.length) return null;
+  const safe = ids.filter(shellSafePluginId);
+  if (safe.length !== ids.length) return 'Restart Claude Code. A plugin synced from claude.ai updates when Claude Code starts.';
+  const which = safe.length === 1 ? safe[0] : safe.join(', ');
+  return `Restart Claude Code. ${which} updates from claude.ai.`;
+}
+
+/**
+ * The exact command that would refresh the given stale copies — `--global` when a stale copy lives
+ * under HOME, plain when it's project-local, `claude plugin update` for a marketplace plugin copy (an
+ * `abx skill install` there would add a second, competing copy instead).
  * Returned as the literal command string so a readout can print something that actually works.
+ * A plugin id that is not a shell-safe token is omitted. A plugin synced from claude.ai has no
+ * command; callers print {@link syncedPluginRefreshNote} beside the command list, never inside it.
+ * When every copy is a plugin and none yields a command, the result is empty — callers print the
+ * synced note or {@link UNSAFE_PLUGIN_REFRESH_NOTE} instead of inventing `abx skill install`.
  */
 export function skillRefreshCommands(stale: InstalledSkillCopy[]): string[] {
   const cmds: string[] = [];
   if (stale.some((c) => c.scope === 'project')) cmds.push('abx skill install');
   if (stale.some((c) => c.scope === 'global')) cmds.push('abx skill install --global');
-  return cmds.length ? cmds : ['abx skill install'];
+  const pluginIds = new Set(stale.flatMap((c) => (c.scope === 'plugin' ? [c.plugin ?? ''] : [])));
+  for (const id of pluginIds) {
+    const command = pluginRefreshCommand(id);
+    if (command) cmds.push(command);
+  }
+  if (cmds.length) return cmds;
+  // A plugin copy is not refreshed by `abx skill install`. Falling back would add a second copy
+  // and, for a rejected id, would still be answering an untrusted registry.
+  if (pluginIds.size) return [];
+  return ['abx skill install'];
 }

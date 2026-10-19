@@ -7,7 +7,7 @@ description: >-
   PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
   requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
   change an ABX collection, or to determine whether ABX supports a mechanic.
-compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
+compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; installed by an agent plugin or `abx skill install`, refreshed with the command `abx doctor` reports.
 metadata:
   version: "0.7.1"
 ---
@@ -26,11 +26,12 @@ typed errors outrank remembered prose.
   endpoint or API key, put either in browser code, or use it for a project website. Public apps need
   their own Alchemy, QuickNode, Infura, or equivalent account; misuse may suspend the API key/account.
 - Use `pnpm abx …` inside the ABX source repository. Use `abx …` in a creator project or installed
-  environment. Run `abx version` if provenance is uncertain.
+  environment. Run `abx version` if provenance is uncertain. If `abx` is not installed, ask before
+  installing `@artblocks/abx-cli` (Node 22.13+); the unscoped `abx` npm package is unrelated.
 - Treat an available CLI update as an action item. Recommend upgrading before further planning or
   preparing a write: current ABX releases retain support for canonical projects created by earlier
   releases, and updating local tooling does not change deployed contracts. Never upgrade silently.
-  After an upgrade, run the scope-appropriate `abx skill install`, restart the agent, and rerun
+  After an upgrade, run the skill refresh command `abx doctor` reports, restart the agent, and rerun
   `abx doctor` plus any help or dry run used for the plan. If the creator defers, state that the
   installed version remains behind and use only that version's live help and capabilities.
 - Read the full `chains` array from `abx capabilities --json` before choosing a network. Never

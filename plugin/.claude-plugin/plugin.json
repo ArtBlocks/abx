@@ -1,0 +1,15 @@
+{
+  "name": "abx",
+  "displayName": "ABX by Art Blocks",
+  "version": "0.7.1",
+  "description": "Put art, images and code on chain as NFTs. Deploy, mint, sell and host collections with ABX by Art Blocks on Ethereum, Base and Arbitrum: 1/1s, image series, editions, JavaScript drops and Solidity-rendered work. Store content on chain or off, hosted by ABX or self-hosted. Requires Node 22.13+ and @artblocks/abx-cli.",
+  "author": {
+    "name": "Art Blocks",
+    "url": "https://abx.io"
+  },
+  "homepage": "https://docs.abx.io",
+  "repository": "https://github.com/ArtBlocks/abx",
+  "license": "MIT",
+  "keywords": ["art blocks", "abx", "nft", "mint", "onchain", "generative-art", "ethereum", "base", "arbitrum", "solidity", "erc721", "erc1155"],
+  "skills": ["./skills/abx"]
+}

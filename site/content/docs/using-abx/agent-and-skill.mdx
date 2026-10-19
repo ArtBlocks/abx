@@ -12,7 +12,12 @@ abx skill install
 ```
 
 The skill version is stamped when the CLI ships. `abx doctor` warns when the installed copy no longer
-matches. Run the install command again after each CLI upgrade.
+matches and prints the command that refreshes it. Run that command after each CLI upgrade.
+
+If Claude Code loads the skill from the ABX plugin, `abx doctor` detects it and reports how that
+copy updates instead. A plugin added from Anthropic's directory on claude.ai updates when you restart
+Claude Code, which syncs the directory's published version. Do not also run `abx skill install` for
+Claude Code: a second copy under `.claude/skills` means Claude Code loads the skill twice.
 
 When ABX reports a newer CLI, the agent recommends upgrading before planning a deployment or write.
 Updating local tooling does not change deployed projects, and the current release continues to
