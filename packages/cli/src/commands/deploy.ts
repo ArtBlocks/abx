@@ -200,6 +200,7 @@ import {
   storedImageTypeFor,
 } from '../ownerops.js';
 import {canonicalLabel} from '../remote.js';
+import {shArg} from '../shell.js';
 import {managedRendererConstraintNote} from '../renderer-guidance.js';
 import {assertLaneCanSign, confirmSend, gatedSend, laneFromFlags} from '../riskgate.js';
 import {describeSchema, editionSchemaAdvisory, parseSchemaSpecs} from '../schema.js';
@@ -207,6 +208,8 @@ import {parseSeriesTraits} from '../series-traits.js';
 import {decodeOnChainJson} from '../served.js';
 import {openWalletSession, signHotSequence, signTx, type Lane, type SignResult} from '../signer.js';
 import {assertSponsorConfigured, openSponsoredSession, sponsoredPreviewAddress} from '../creator-signer.js';
+
+export {shArg};
 
 // ── plan-object warning capture ──────────────────────────────────────────────────────────────────
 // The structured `--json` plan object (deploy-plan.ts) reports "the warnings the lane raised"
@@ -402,11 +405,7 @@ export async function warnUnfunded(publicClient: PublicClient, address: Address,
 // old rule (wrap only whitespace values in DOUBLE quotes) corrupted any name/description containing
 // a quote, `&`, `<`, `$`, etc. — the shell reparsed it and silently truncated/mangled the text
 // (round-3 finding: `Bob's "Café" & Friends` came back broken). POSIX single-quote escaping is the
-// robust fix: it makes ANY string a single safe token (embedded `'` → `'\''`).
-export function shArg(v: string): string {
-  return /^[A-Za-z0-9,._+:@%/=-]+$/.test(v) ? v : `'${v.replace(/'/g, "'\\''")}'`;
-}
-
+// robust fix: it makes ANY string a single safe token (embedded `'` → `'\''`). See {@link shArg}.
 export function deployCommandLine(flags: Flags, salt: string): string {
   const parts = ['abx deploy'];
   const str = (k: string, v?: string) => { if (v) parts.push(`--${k} ${shArg(v)}`); };

@@ -167,7 +167,7 @@ import {
   cmdUnpause,
 } from './ownerops.js';
 import {DEFAULT_PREVIEW_PORT} from './preview.js';
-import {checkForCliUpdate, compareVersions, installedLegacySkillCopies, installedSkillCopies, readCliVersion, skillRefreshCommands} from './update-check.js';
+import {checkForCliUpdate, compareVersions, installedLegacySkillCopies, installedSkillCopies, readCliVersion, skillRefreshCommands, syncedPluginRefreshNote, UNSAFE_PLUGIN_REFRESH_NOTE} from './update-check.js';
 import {ABX_RPC_REMOTE_VAR, configureCreatorRpcFromRemote, creatorRpcRemoteSpec} from './creator-rpc.js';
 import {resolveRemote} from './remote.js';
 
@@ -271,9 +271,13 @@ async function maybeNotifyUpdate(flags: Flags): Promise<void> {
     if (staleCopies.length) {
       const worst = staleCopies[0];
       const where = staleCopies.length > 1 ? `${staleCopies.length} installed copies are` : `the ${worst.scope} skill copy (${worst.path}) is`;
+      const refresh = skillRefreshCommands(staleCopies);
+      const syncedNote = syncedPluginRefreshNote(staleCopies);
+      const refreshText = refresh.length ? `refresh: ${refresh.map((cmd) => g(cmd)).join(' && ')}` : (syncedNote ?? UNSAFE_PLUGIN_REFRESH_NOTE);
       console.error(
-        `    ${c.orange}⚠${c.reset}  ${where} v${worst.version} but the CLI is v${current} — refresh: ${skillRefreshCommands(staleCopies).map((cmd) => g(cmd)).join(' && ')}`,
+        `    ${c.orange}⚠${c.reset}  ${where} v${worst.version} but the CLI is v${current} — ${refreshText}`,
       );
+      if (refresh.length && syncedNote) console.error(`       ${syncedNote}`);
     }
     const latest = await checkForCliUpdate(current);
     if (latest) {
@@ -283,11 +287,20 @@ async function maybeNotifyUpdate(flags: Flags): Promise<void> {
       // singletons had moved and then had no way to tell whether that needed them to act. The
       // packaged CHANGELOG.md ships with every install (see package.json `files`) and carries the
       // real per-release notes, so it's readable offline and always matches the version you have.
+      const installed = installedSkillCopies();
+      const afterUpgrade = skillRefreshCommands(installed);
+      const syncedNote = syncedPluginRefreshNote(installed);
+      const afterUpgradeLine = afterUpgrade.length
+        ? `       after upgrading: ${g(afterUpgrade.join(' && '))}\n`
+        : syncedNote
+          ? ''
+          : `       after upgrading: ${UNSAFE_PLUGIN_REFRESH_NOTE}\n`;
       console.error(
         `\n    ${c.orange}⚠${c.reset}  update available: ${bold('abx')} ${dim(current)} → ${g(latest)}\n` +
           `       ${bold('recommended: upgrade before planning or sending')} ${dim('· earlier canonical ABX projects remain supported')}\n` +
           `       upgrade: ${g('npm i -g @artblocks/abx-cli@latest')} ${dim('· or invoke:')} ${g('npx @artblocks/abx-cli@latest <command>')}\n` +
-          `       after upgrading: ${g(skillRefreshCommands(installedSkillCopies()).join(' && '))} ${dim('then restart the agent and rerun abx doctor')}\n` +
+          afterUpgradeLine +
+          `       ${dim(syncedNote ? `${syncedNote} Then rerun abx doctor.` : 'Restart the agent, then rerun abx doctor.')}\n` +
           `       release notes: ${g('CHANGELOG.md')} ${dim('(ships with the CLI) · all versions: https://www.npmjs.com/package/@artblocks/abx-cli?activeTab=versions')}\n` +
           `       ${dim('silence: ABX_NO_UPDATE_CHECK=1')}\n`,
       );

@@ -20,6 +20,7 @@ import {dirname, isAbsolute, join, relative, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import {findCliPackageRoot, findRepoRoot} from './output.js';
+import {shArg} from './shell.js';
 
 const REGISTRY = 'https://registry.npmjs.org';
 const PKG = '@artblocks/abx-cli';
@@ -473,19 +474,63 @@ export function installedLegacySkillCopies(): InstalledSkillCopy[] {
 }
 
 /**
+ * Prose for a plugin install whose id must not be pasted into a shell. Not a command: doctor and
+ * the update notice print it in place of a refresh line, and it is never joined with `&&`.
+ */
+export const UNSAFE_PLUGIN_REFRESH_NOTE =
+  'the recorded plugin id is not a shell-safe token, so no refresh command is printed';
+
+/**
+ * True when `id` is one shell token {@link shArg} would leave unquoted, and not a leading dash
+ * (`claude plugin update` must not treat the id as a flag). Registry keys are `name@marketplace`
+ * and synced manifest names are copied into `name@synced`. `CLAUDE_CONFIG_DIR` can be set from a
+ * project `.env`, so either string is untrusted workspace text until it passes this check.
+ */
+export function shellSafePluginId(id: string): boolean {
+  return id === shArg(id) && !id.startsWith('-');
+}
+
+function pluginRefreshCommand(id: string): string | null {
+  if (isSyncedPlugin(id) || !shellSafePluginId(id)) return null;
+  return `claude plugin update ${shArg(id)}`;
+}
+
+/**
+ * Restart guidance for a plugin synced from claude.ai. Prose only: it is not a shell command and
+ * must not be joined into a refresh line with `&&`. A manifest name that is not a shell-safe token
+ * is left out of the sentence.
+ */
+export function syncedPluginRefreshNote(stale: InstalledSkillCopy[]): string | null {
+  const ids = [...new Set(stale.flatMap((c) => (c.scope === 'plugin' && c.plugin && isSyncedPlugin(c.plugin) ? [c.plugin] : [])))];
+  if (!ids.length) return null;
+  const safe = ids.filter(shellSafePluginId);
+  if (safe.length !== ids.length) return 'Restart Claude Code. A plugin synced from claude.ai updates when Claude Code starts.';
+  const which = safe.length === 1 ? safe[0] : safe.join(', ');
+  return `Restart Claude Code. ${which} updates from claude.ai.`;
+}
+
+/**
  * The exact command that would refresh the given stale copies — `--global` when a stale copy lives
  * under HOME, plain when it's project-local, `claude plugin update` for a marketplace plugin copy (an
  * `abx skill install` there would add a second, competing copy instead).
  * Returned as the literal command string so a readout can print something that actually works.
- * A plugin synced from claude.ai has no command: Claude Code fetches the directory's published
- * version when it starts, so the step returned for it is a restart.
+ * A plugin id that is not a shell-safe token is omitted. A plugin synced from claude.ai has no
+ * command; callers print {@link syncedPluginRefreshNote} beside the command list, never inside it.
+ * When every copy is a plugin and none yields a command, the result is empty — callers print the
+ * synced note or {@link UNSAFE_PLUGIN_REFRESH_NOTE} instead of inventing `abx skill install`.
  */
 export function skillRefreshCommands(stale: InstalledSkillCopy[]): string[] {
   const cmds: string[] = [];
   if (stale.some((c) => c.scope === 'project')) cmds.push('abx skill install');
   if (stale.some((c) => c.scope === 'global')) cmds.push('abx skill install --global');
-  for (const id of new Set(stale.flatMap((c) => (c.scope === 'plugin' && c.plugin ? [c.plugin] : [])))) {
-    cmds.push(isSyncedPlugin(id) ? `restart Claude Code (${id} updates from claude.ai)` : `claude plugin update ${id}`);
+  const pluginIds = new Set(stale.flatMap((c) => (c.scope === 'plugin' ? [c.plugin ?? ''] : [])));
+  for (const id of pluginIds) {
+    const command = pluginRefreshCommand(id);
+    if (command) cmds.push(command);
   }
-  return cmds.length ? cmds : ['abx skill install'];
+  if (cmds.length) return cmds;
+  // A plugin copy is not refreshed by `abx skill install`. Falling back would add a second copy
+  // and, for a rejected id, would still be answering an untrusted registry.
+  if (pluginIds.size) return [];
+  return ['abx skill install'];
 }
