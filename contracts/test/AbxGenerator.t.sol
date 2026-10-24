@@ -1325,6 +1325,103 @@ contract AbxGeneratorTest is Test {
         assertTrue(chainComplete);
     }
 
+    // ── fuzz: author-controlled bytes cannot close the inline script early ───--
+
+    /// @dev Case-insensitive count of `</script` in the assembled document. The shell itself
+    ///      contributes a fixed number; anything an author or hook supplies must contribute zero.
+    function _closeTags(string memory doc) internal pure returns (uint256) {
+        return _countOccurrences(LibString.lower(doc), "</script");
+    }
+
+    /// @dev The shell's own `</script` count, measured on a script with nothing to escape.
+    function _shellCloseTags() internal returns (uint256) {
+        SeriesCode nft = _deploy(new IAbxOnChainMetadata.FieldInput[](0));
+        vm.prank(owner);
+        nft.setScriptChunk(0, bytes("x"));
+        return _closeTags(gen.document(address(nft), 0));
+    }
+
+    /// @dev Place a close tag (case chosen by `mask`) at `at` within `body`.
+    function _withCloseTag(bytes memory body, uint256 at, uint8 mask)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        bytes memory tag = bytes("</script>");
+        for (uint256 i = 2; i < 8; ++i) {
+            if ((mask >> (i - 2)) & 1 == 1) tag[i] = bytes1(uint8(tag[i]) - 32);
+        }
+        at = bound(at, 0, body.length);
+        return bytes.concat(_slice(body, 0, at), tag, _slice(body, at, body.length));
+    }
+
+    function _slice(bytes memory b, uint256 from, uint256 to)
+        internal
+        pure
+        returns (bytes memory out)
+    {
+        out = new bytes(to - from);
+        for (uint256 i; i < out.length; ++i) {
+            out[i] = b[from + i];
+        }
+    }
+
+    /// Arbitrary bytes in two script chunks, each carrying a `</script>` in a fuzzed case at a
+    /// fuzzed offset: document() does not revert and the document has no `</script` beyond the
+    /// shell's own.
+    function testFuzz_ScriptChunksCannotCloseInlineScript(
+        bytes memory a,
+        bytes memory b,
+        uint256 atA,
+        uint256 atB,
+        uint8 maskA,
+        uint8 maskB
+    ) public {
+        uint256 shell = _shellCloseTags();
+        SeriesCode nft = _deploy(new IAbxOnChainMetadata.FieldInput[](0));
+        vm.startPrank(owner);
+        nft.setScriptChunk(0, _withCloseTag(a, atA, maskA));
+        nft.setScriptChunk(1, _withCloseTag(b, atB, maskB));
+        vm.stopPrank();
+
+        string memory doc = gen.document(address(nft), 0);
+        assertEq(_closeTags(doc), shell, "author bytes closed the script");
+    }
+
+    /// A tag split across the chunk boundary (`</scr` | `ipt>`) cannot re-form after the join.
+    function testFuzz_CloseTagSplitAcrossChunksStaysInert(uint8 cut, uint8 mask) public {
+        uint256 shell = _shellCloseTags();
+        bytes memory tag = _withCloseTag("", 0, mask);
+        uint256 at = bound(cut, 1, tag.length - 1);
+        SeriesCode nft = _deploy(new IAbxOnChainMetadata.FieldInput[](0));
+        vm.startPrank(owner);
+        nft.setScriptChunk(0, _slice(tag, 0, at));
+        nft.setScriptChunk(1, _slice(tag, at, tag.length));
+        vm.stopPrank();
+
+        assertEq(_closeTags(gen.document(address(nft), 0)), shell, "split tag closed the script");
+    }
+
+    /// An augment hook value is author-controlled text that lands inside the inline
+    /// `window.abxTokenData=` script; arbitrary bytes plus a `</script>` must not close it.
+    function testFuzz_AugmentValueCannotCloseInlineScript(
+        string memory value,
+        uint256 at,
+        uint8 mask
+    ) public {
+        uint256 shell = _shellCloseTags();
+        SeriesCode nft = _deploy(new IAbxOnChainMetadata.FieldInput[](0));
+        OneEntryAugmentHook hook =
+            new OneEntryAugmentHook("mood", string(_withCloseTag(bytes(value), at, mask)));
+        vm.startPrank(owner);
+        nft.setScriptChunk(0, bytes("x"));
+        nft.setParamHooks(address(0), address(hook), address(0));
+        vm.stopPrank();
+
+        string memory doc = gen.document(address(nft), 0);
+        assertEq(_closeTags(doc), shell, "augment value closed the script");
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────--
 
     function _repeat(bytes1 ch, uint256 n) internal pure returns (string memory) {
