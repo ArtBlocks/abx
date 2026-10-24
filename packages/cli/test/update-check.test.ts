@@ -121,6 +121,14 @@ test('binaryProvenance: npm_command=exec (what `npx` sets today) is detected eve
   assert.equal(binaryProvenance({isSourceCheckout: false, here: '/tmp/whatever/main.js', env: {npm_command: 'exec'}}), 'npx');
 });
 
+test('binaryProvenance: `npx abx` resolving the project-local install is npm, not npx', () => {
+  const env = {npm_command: 'exec', npm_config_local_prefix: '/work/art'};
+  assert.equal(binaryProvenance({isSourceCheckout: false, here: '/work/art/node_modules/@artblocks/abx-cli/dist/main.js', env}), 'npm');
+  // a different project's node_modules, or a prefix that only shares a string prefix, still counts as npx
+  assert.equal(binaryProvenance({isSourceCheckout: false, here: '/work/artwork/node_modules/@artblocks/abx-cli/dist/main.js', env}), 'npx');
+  assert.equal(binaryProvenance({isSourceCheckout: false, here: 'C:\\work\\art\\node_modules\\@artblocks\\abx-cli\\dist\\main.js', env: {npm_command: 'exec', npm_config_local_prefix: 'C:\\work\\art'}}), 'npm');
+});
+
 test('binaryProvenance: neither signal present, not a source checkout ⇒ a plain npm install (global or local)', () => {
   assert.equal(
     binaryProvenance({isSourceCheckout: false, here: '/usr/local/lib/node_modules/@artblocks/abx-cli/dist/main.js', env: {}}),
