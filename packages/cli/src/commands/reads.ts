@@ -199,6 +199,12 @@ export async function cmdInspect(path: string | undefined, flags: Flags) {
     info(`the mint ${bold('seed')} and collector ${bold('params')} will NOT reach it → every token renders IDENTICALLY, and traits stay empty. Read state the one supported way: ${bold('var td = (window.abx && abx.tokenData) || {}')} then ${bold('td.seed')} / ${bold('td.<paramKey>')} (flat), report with ${bold('abx.traits({…})')}. Contract + a worked example: the skill's "Authoring the program" section.`);
   }
 
+  if (a.inlineHtml.unterminated) {
+    step('Inline HTML');
+    warn(`a ${bold('<!--')} followed by ${bold('<script')} (offset ${a.inlineHtml.at}) leaves the inline <script> UNTERMINATED in the generated document: the browser swallows the rest of the page and never runs the program — no console error.`);
+    info(`break either token so the HTML parser can't see it, e.g. ${bold("'<!-' + '-'")} or ${bold("'<scr' + 'ipt'")}, or add a matching ${bold('-->')} after it. (Raw-source check: HTML ignores JS strings and comments.)`);
+  }
+
   step('Traits');
   if (a.traits.present) {
     info(
