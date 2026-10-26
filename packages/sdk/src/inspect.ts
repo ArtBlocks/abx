@@ -47,7 +47,8 @@ export interface ScriptAnalysis {
   // ends the element. The element runs to end-of-file and the browser never executes it — silently, no
   // console error. The `</script` → `<\/script` escape cannot help (it is a different rule). `at` is the
   // offset of the offending `<!--` in the source, or null when the inline script terminates normally.
-  inlineHtml: {unterminated: boolean; at: number | null};
+  // Optional so code that builds its own ScriptAnalysis keeps compiling; analyzeScript always sets it.
+  inlineHtml?: {unterminated: boolean; at: number | null};
 }
 
 /**

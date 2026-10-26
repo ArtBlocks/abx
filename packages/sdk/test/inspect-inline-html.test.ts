@@ -30,3 +30,8 @@ test('analyzeScript surfaces inlineHtml', () => {
   assert.deepEqual(analyzeScript('var s="<!--<script>";').inlineHtml, {unterminated: true, at: 7});
   assert.deepEqual(analyzeScript('var s=1;').inlineHtml, {unterminated: false, at: null});
 });
+
+test('inlineScriptUnterminatedAt is exported from the SDK entry point', async () => {
+  const sdk = await import('../src/index.js');
+  assert.equal(sdk.inlineScriptUnterminatedAt, inlineScriptUnterminatedAt);
+});
