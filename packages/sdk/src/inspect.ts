@@ -42,6 +42,13 @@ export interface ScriptAnalysis {
   // `tokenData`), which deploys + renders without error but is SILENTLY broken: the seed never
   // arrives (every token identical) and traits are empty. `wrongGlobal` names such a near-miss.
   runtime: {readsTokenData: boolean; reportsTraits: boolean; wrongGlobal: string | null};
+  // HTML, not JS: a `<!--` followed by `<script` (any case) inside an inline script flips the HTML
+  // tokenizer into its "double-escaped" state, where the generator's own closing `</script>` no longer
+  // ends the element. The element runs to end-of-file and the browser never executes it — silently, no
+  // console error. The `</script` → `<\/script` escape cannot help (it is a different rule). `at` is the
+  // offset of the offending `<!--` in the source, or null when the inline script terminates normally.
+  // Optional so code that builds its own ScriptAnalysis keeps compiling; analyzeScript always sets it.
+  inlineHtml?: {unterminated: boolean; at: number | null};
 }
 
 /**
@@ -222,6 +229,57 @@ function traitKeys(source: string): string[] {
   return [...new Set(keys)];
 }
 
+/** A tag-name boundary per the HTML tokenizer: whitespace, `/`, or `>` must follow `script`. */
+function scriptTagAt(s: string, i: number, prefix: '<' | '</'): boolean {
+  const end = i + prefix.length + 6;
+  if (s.slice(i, i + prefix.length) !== prefix || s.slice(i + prefix.length, end).toLowerCase() !== 'script') return false;
+  return /^[\t\n\f\r />]$/.test(s[end] ?? '');
+}
+
+/**
+ * Does `src`, inlined as the generator inlines it (`</script` escaped, then the shell's own
+ * `\n</script>` appended), end at the shell's close tag? A small model of the HTML tokenizer's
+ * script-data states (data → escaped on `<!--`, → double-escaped on `<script`, `-->` back to data,
+ * `</script` leaves double-escaped / closes from data or escaped). Returns the offset of the `<!--`
+ * that leaves the element unterminated, or null. Raw source on purpose: the HTML parser does not
+ * know JS strings or comments, so neither may this.
+ */
+export function inlineScriptUnterminatedAt(src: string): number | null {
+  const escaped = src.replace(/<\/(script)/gi, '<\\/$1'); // the generator's escape (escapeInlineScript)
+  const doc = escaped + '\n</script>';
+  const shellClose = escaped.length + 1;
+  type State = 'data' | 'escaped' | 'double';
+  let state: State = 'data';
+  let openedAt = -1; // offset (in `escaped`) of the `<!--` that entered escaped state
+  for (let i = 0; i < doc.length; i++) {
+    if (state === 'data') {
+      if (doc.startsWith('<!--', i)) {
+        state = 'escaped';
+        openedAt = i;
+        i += 3;
+      } else if (scriptTagAt(doc, i, '</')) {
+        return i === shellClose ? null : i; // unreachable before the shell after escaping; defensive
+      }
+    } else if (doc[i] === '>' && doc[i - 1] === '-' && doc[i - 2] === '-') {
+      state = 'data'; // `-->` (including the `<!-->` / `<!--->` short forms)
+    } else if (state === 'escaped') {
+      if (scriptTagAt(doc, i, '</')) return i === shellClose ? null : i;
+      if (scriptTagAt(doc, i, '<')) state = 'double';
+    } else if (scriptTagAt(doc, i, '</')) {
+      state = 'escaped';
+    }
+  }
+  // Map the offset in the escaped text back to the source. Only escapes the generator inserted
+  // shift it: one `\` per `</script` in `src` before the `<!--`. A `<\/script` the author already
+  // wrote is not an inserted escape and must not be counted.
+  let inserted = 0;
+  for (const m of src.matchAll(/<\/script/gi)) {
+    if (m.index + inserted >= openedAt) break;
+    inserted++;
+  }
+  return openedAt - inserted;
+}
+
 export function analyzeScript(source: string, declaredDeps: string[] = []): ScriptAnalysis {
   const bytes = new TextEncoder().encode(source).length;
   // `code` for flags that must reflect real code, `noComments` for literal-content extraction.
@@ -307,6 +365,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
     else unknownDepSizes = true;
   }
   const estBytes = bytes + RUNTIME_DOC_BYTES + depDocBytes;
+  const unterminatedAt = inlineScriptUnterminatedAt(source);
   return {
     bytes,
     estChunks: Math.max(1, Math.ceil(bytes / 22_000)),
@@ -318,6 +377,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
     feasibility: {verdict, reason},
     doc: {estBytes, deps, fitsSingleCall: estBytes <= SINGLE_CALL_DOC_CEILING && !unknownDepSizes, unknownDepSizes},
     runtime: {readsTokenData, reportsTraits, wrongGlobal},
+    inlineHtml: {unterminated: unterminatedAt !== null, at: unterminatedAt},
   };
 }
 

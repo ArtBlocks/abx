@@ -70,6 +70,10 @@ Inspect the program before choosing custody:
 abx inspect ./sketch.js
 ```
 
+`inspect` also warns when a `<!--` followed by `<script` anywhere in the source, including inside a
+JS string or comment, would stop the browser from closing the inline `<script>` element. Split
+either token (for example `'<!-' + '-'`) before deploying.
+
 Then deploy an onchain script with a hosted resolver:
 
 ```bash
