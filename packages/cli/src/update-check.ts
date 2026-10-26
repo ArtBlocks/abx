@@ -138,7 +138,13 @@ export function binaryProvenance(opts: {isSourceCheckout?: boolean; here?: strin
 
 function isUnderLocalNodeModules(here: string, localPrefix: string | undefined): boolean {
   if (!localPrefix) return false;
-  const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '');
+  // Windows paths compare case-insensitively (`C:\Work` and `c:\work` are the same directory);
+  // POSIX paths stay case-sensitive.
+  const windows = /^[A-Za-z]:[\\/]/.test(localPrefix);
+  const norm = (p: string) => {
+    const slashed = p.replace(/\\/g, '/').replace(/\/+$/, '');
+    return windows ? slashed.toLowerCase() : slashed;
+  };
   return norm(here).startsWith(`${norm(localPrefix)}/node_modules/`);
 }
 

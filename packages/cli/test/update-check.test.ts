@@ -127,6 +127,12 @@ test('binaryProvenance: `npx abx` resolving the project-local install is npm, no
   // a different project's node_modules, or a prefix that only shares a string prefix, still counts as npx
   assert.equal(binaryProvenance({isSourceCheckout: false, here: '/work/artwork/node_modules/@artblocks/abx-cli/dist/main.js', env}), 'npx');
   assert.equal(binaryProvenance({isSourceCheckout: false, here: 'C:\\work\\art\\node_modules\\@artblocks\\abx-cli\\dist\\main.js', env: {npm_command: 'exec', npm_config_local_prefix: 'C:\\work\\art'}}), 'npm');
+  // Windows drive/directory casing can differ between npm's prefix and the module path.
+  assert.equal(binaryProvenance({isSourceCheckout: false, here: 'C:\\Work\\Art\\node_modules\\@artblocks\\abx-cli\\dist\\main.js', env: {npm_command: 'exec', npm_config_local_prefix: 'c:\\work\\art'}}), 'npm');
+  // POSIX paths stay case-sensitive.
+  assert.equal(binaryProvenance({isSourceCheckout: false, here: '/work/Art/node_modules/@artblocks/abx-cli/dist/main.js', env: {npm_command: 'exec', npm_config_local_prefix: '/work/art'}}), 'npx');
+  // An `_npx` cache copy is npx even when it sits under the local prefix.
+  assert.equal(binaryProvenance({isSourceCheckout: false, here: '/work/art/node_modules/.cache/_npx/1a2b/node_modules/@artblocks/abx-cli/dist/main.js', env: {npm_command: 'exec', npm_config_local_prefix: '/work/art'}}), 'npx');
 });
 
 test('binaryProvenance: neither signal present, not a source checkout ⇒ a plain npm install (global or local)', () => {
