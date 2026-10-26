@@ -71,8 +71,9 @@ process.emitWarning = function (this: unknown, warning: string | Error, ...rest:
   const opt = rest[0];
   const type =
     warning instanceof Error ? warning.name : typeof opt === 'string' ? opt : (opt as {type?: string} | undefined)?.type;
-  const message = typeof warning === 'string' ? warning : warning.message;
-  if (type === 'ExperimentalWarning' && message.startsWith('SQLite is an experimental feature')) return;
+  const message = typeof warning === 'string' ? warning : (warning as Error | undefined)?.message;
+  // Anything else (a bad argument) goes straight to Node, which validates and throws as before.
+  if (type === 'ExperimentalWarning' && typeof message === 'string' && message.startsWith('SQLite is an experimental feature')) return;
   return (emitWarning as (...args: unknown[]) => void).call(process, warning, ...rest);
 } as typeof process.emitWarning;
 
