@@ -57,6 +57,26 @@ function nodeSqliteMessage(version: string): string {
   );
 }
 
+/**
+ * Node 22 prints `ExperimentalWarning: SQLite is an experimental feature…` the first time
+ * `node:sqlite` loads, on every command, to stderr (#135). It says nothing actionable to an abx user
+ * and pollutes output that scripts and agents read. Drop exactly that warning; every other warning,
+ * experimental or not, still goes through Node's normal path. This has to be installed here, before
+ * the import below, because that import is what triggers it.
+ */
+const emitWarning = process.emitWarning;
+process.emitWarning = function (this: unknown, warning: string | Error, ...rest: unknown[]) {
+  // Same precedence as Node: an Error's own name is its type (Node ignores the type argument then);
+  // otherwise the type is the second argument or the options object's `type`.
+  const opt = rest[0];
+  const type =
+    warning instanceof Error ? warning.name : typeof opt === 'string' ? opt : (opt as {type?: string} | undefined)?.type;
+  const message = typeof warning === 'string' ? warning : (warning as Error | undefined)?.message;
+  // Anything else (a bad argument) goes straight to Node, which validates and throws as before.
+  if (type === 'ExperimentalWarning' && typeof message === 'string' && message.startsWith('SQLite is an experimental feature')) return;
+  return (emitWarning as (...args: unknown[]) => void).call(process, warning, ...rest);
+} as typeof process.emitWarning;
+
 try {
   await import('node:sqlite');
 } catch {
