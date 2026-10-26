@@ -66,9 +66,11 @@ function nodeSqliteMessage(version: string): string {
  */
 const emitWarning = process.emitWarning;
 process.emitWarning = function (this: unknown, warning: string | Error, ...rest: unknown[]) {
+  // Same precedence as Node: an Error's own name is its type (Node ignores the type argument then);
+  // otherwise the type is the second argument or the options object's `type`.
   const opt = rest[0];
   const type =
-    typeof opt === 'string' ? opt : (opt as {type?: string} | undefined)?.type ?? (warning instanceof Error ? warning.name : undefined);
+    warning instanceof Error ? warning.name : typeof opt === 'string' ? opt : (opt as {type?: string} | undefined)?.type;
   const message = typeof warning === 'string' ? warning : warning.message;
   if (type === 'ExperimentalWarning' && message.startsWith('SQLite is an experimental feature')) return;
   return (emitWarning as (...args: unknown[]) => void).call(process, warning, ...rest);
