@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import {readFileSync} from 'node:fs';
 import {loadDotEnv} from '@artblocks/abx-sdk/node';
 import {makePublicClient, readEnv} from '@artblocks/abx-sdk';
 import {resolveBackend} from '@artblocks/abx-storage';
@@ -33,7 +32,6 @@ import {renderEffect} from './render.js';
 const USAGE = `usage: abx-effects                              start the runner (HTTP on ABX_EFFECTS_PORT, default 8788, plus the sweep loop)
        abx-effects --once <address> [tokenId…]  render one project's missing work once and exit
        abx-effects --help | -h                  print this help
-       abx-effects --version | -v               print the package version
 
 Configuration is read from the environment (and .env): ABX_RESOLVER_URL, ABX_RPC_URL, ABX_EFFECTS_PORT,
 ABX_EFFECTS_INTERVAL_MS, ABX_EFFECTS_CONCURRENCY, ABX_EFFECTS_TOKEN, ABX_ENVIRONMENT_ID,
@@ -45,12 +43,6 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] === '--help' || args[0] === '-h') {
     console.log(USAGE);
-    return;
-  }
-  if (args[0] === '--version' || args[0] === '-v') {
-    // package.json sits one level above both src/ and dist/, and npm always ships it.
-    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {version: string};
-    console.log(pkg.version);
     return;
   }
   if (args.length && args[0] !== '--once') {

@@ -4,7 +4,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn, spawnSync} from 'node:child_process';
-import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {mkdtempSync, rmSync} from 'node:fs';
 import {createServer, connect} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -31,8 +31,11 @@ function listening(port: number): Promise<boolean> {
 
 function sandbox(port: number) {
   const dir = mkdtempSync(join(tmpdir(), 'abx-effects-args-'));
+  // Drop inherited ABX_* settings (RPC, storage, tokens) so the developer's own config can't change
+  // what the child does; keep the rest of the environment so Node itself still launches.
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('ABX_')));
   const env = {
-    ...process.env,
+    ...inherited,
     ABX_DATA_DIR: dir,
     ABX_EFFECTS_PORT: String(port),
     ABX_RESOLVER_URL: 'http://127.0.0.1:9',
@@ -63,18 +66,6 @@ for (const flag of ['--help', '-h']) {
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /usage: abx-effects/);
     assert.doesNotMatch(r.stdout + r.stderr, /runner up/);
-    assert.equal(await listening(port), false);
-  });
-}
-
-for (const flag of ['--version', '-v']) {
-  test(`abx-effects ${flag} prints the package version and exits 0 without starting the runner`, async () => {
-    const port = await freePort();
-    const {version} = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8')) as {version: string};
-    const r = runOnce([flag], port);
-    assert.equal(r.signal, null, `${flag} did not exit on its own (runner started?)`);
-    assert.equal(r.status, 0, r.stderr);
-    assert.equal(r.stdout.trim(), version);
     assert.equal(await listening(port), false);
   });
 }
