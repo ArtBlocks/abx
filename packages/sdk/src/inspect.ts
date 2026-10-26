@@ -268,9 +268,15 @@ export function inlineScriptUnterminatedAt(src: string): number | null {
       state = 'escaped';
     }
   }
-  // map the offset in the escaped text back to the source (one inserted `\` per earlier escape)
-  const before = escaped.slice(0, openedAt).match(/<\\\/script/gi)?.length ?? 0;
-  return openedAt - before;
+  // Map the offset in the escaped text back to the source. Only escapes the generator inserted
+  // shift it: one `\` per `</script` in `src` before the `<!--`. A `<\/script` the author already
+  // wrote is not an inserted escape and must not be counted.
+  let inserted = 0;
+  for (const m of src.matchAll(/<\/script/gi)) {
+    if (m.index + inserted >= openedAt) break;
+    inserted++;
+  }
+  return openedAt - inserted;
 }
 
 export function analyzeScript(source: string, declaredDeps: string[] = []): ScriptAnalysis {

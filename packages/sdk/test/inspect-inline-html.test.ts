@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import {analyzeScript, inlineScriptUnterminatedAt} from '../src/inspect.js';
 
 // Each case: script body → expected offset of the offending `<!--` (null = the inline script ends at
-// the shell's own `</script>`). Expectations cross-checked against headless Chromium on real
-// generator-shaped documents (the browser either runs the script or never does).
+// the shell's own `</script>`).
 const CASES: Array<[string, string, number | null]> = [
   ['plain', 'var s="no comment";', null],
   ['comment-open only', 'var s="<!--";', null],
@@ -17,6 +16,8 @@ const CASES: Array<[string, string, number | null]> = [
   ['short form <!--> resets', 'var s="<!--><script>";', null],
   ['inside a JS comment still counts', '// <!-- <script>\nvar x=1;', 3],
   ['offset maps through an earlier escape', 'var a="</script>";var s="<!--<script>";', 25],
+  ['author-written <\\/script is not a generator escape', 'var a="<\\/script>"; <!-- <script> x', 20],
+  ['author-written and generator escapes mixed', 'var a="<\\/script>";var b="</script>";<!--<script>', 37],
 ];
 
 for (const [name, src, want] of CASES) {
