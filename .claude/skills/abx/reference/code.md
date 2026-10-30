@@ -88,7 +88,10 @@ document size, and lane fit. Treat findings as evidence and the deploy dry run/t
 the final proof.
 
 Avoid unseeded randomness, wall-clock dependence, environment-only assets, and network fetches when
-claiming reproducibility. A live-data design is valid; label it live rather than deterministic.
+claiming reproducibility. For ecosystem-driven art, prefer same-chain EVM reads through a renderer
+or augment hook, with resilient fallback output. Do not recommend HTTP-dependent NFT live views by
+default; even an on-chain script can depend on a service forever. Apply the
+[durability guidance](ecosystem/durability.md) before proposing an essential external service.
 
 ## Plan JavaScript projects
 

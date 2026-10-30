@@ -2,21 +2,37 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, readdirSync, existsSync} from 'node:fs';
 import {resolve, join, dirname} from 'node:path';
+import {CHAIN_SUPPORT, isChainSelectable} from '../../sdk/src/chain-support.js';
 
 // The shipped agent skill is prose, so nothing type-checks it — but it is the product membrane, and
 // its dispatch metadata, progressive-disclosure budget, routing, and known drift phrases are
 // mechanical enough to pin here.
 //
-// (1) An orphaned reference file. `reference/*.md` is only reachable via the routing table in
-//     SKILL.md; a file nobody links to is a file no agent ever reads. capabilities.md — added after
-//     three sessions in one week where an agent told a creator ABX could not do something it does —
-//     is the one that matters most, because it is only consulted when an agent is about to say no.
+// (1) An orphaned reference file. References must be reachable from SKILL.md, directly or through
+//     a task-specific router; a file nobody links to is a file no agent ever reads. capabilities.md —
+//     added after three sessions in one week where an agent told a creator ABX could not do something
+//     it does — matters most, because it is consulted when an agent is about to say no.
 // (2) A dead relative link. Renaming a reference file silently breaks every pointer into it, and the
 //     agent's fallback when a link fails is to answer from its own priors. That is the exact failure
 //     this skill exists to prevent.
 
 const SKILL = resolve(import.meta.dirname, '../../../.claude/skills/abx');
 const skillMd = readFileSync(join(SKILL, 'SKILL.md'), 'utf8');
+
+function referenceFiles(directory = 'reference'): string[] {
+  return readdirSync(join(SKILL, directory), {withFileTypes: true}).flatMap((entry) => {
+    const name = `${directory}/${entry.name}`;
+    return entry.isDirectory() ? referenceFiles(name) : entry.name.endsWith('.md') ? [name] : [];
+  });
+}
+
+const referenceDocs = referenceFiles().map((name) => [name, readFileSync(join(SKILL, name), 'utf8')] as const);
+const skillDocs = [['SKILL.md', skillMd], ...referenceDocs] as const;
+
+function markdownTargets(name: string, body: string): string[] {
+  return [...body.matchAll(/\]\((?!https?:)([^)#\s]+\.md)(?:#[^)\s]*)?\)/g)]
+    .map(([, target]) => resolve(dirname(join(SKILL, name)), target));
+}
 
 test('skill metadata satisfies the Agent Skills dispatch contract', () => {
   const front = /^---\r?\n([\s\S]*?)\r?\n---/.exec(skillMd)?.[1] ?? '';
@@ -34,35 +50,45 @@ test('the always-loaded router stays lean', () => {
   assert.ok(words <= 4000, `SKILL.md grew to ${words} words; keep the router under the progressive-disclosure budget`);
 });
 
-test('every reference file is registered in SKILL.md — an unlinked one is never read', () => {
-  const files = readdirSync(join(SKILL, 'reference')).filter((f) => f.endsWith('.md'));
-  assert.ok(files.length > 0, 'reference/ should not be empty');
-  for (const f of files) {
-    assert.ok(skillMd.includes(`reference/${f}`), `reference/${f} is not linked from SKILL.md — no agent will ever open it`);
+test('every reference is reachable from SKILL.md through the reference graph', () => {
+  assert.ok(referenceDocs.length > 0, 'reference/ should not be empty');
+  const docsByPath = new Map(skillDocs.map(([name, body]) => [resolve(SKILL, name), {name, body}]));
+  const pending = [resolve(SKILL, 'SKILL.md')];
+  const reachable = new Set<string>();
+  while (pending.length > 0) {
+    const path = pending.pop()!;
+    if (reachable.has(path)) continue;
+    reachable.add(path);
+    const doc = docsByPath.get(path);
+    if (doc) pending.push(...markdownTargets(doc.name, doc.body));
+  }
+  for (const [name] of referenceDocs) {
+    assert.ok(reachable.has(resolve(SKILL, name)), `${name} has no route from SKILL.md`);
   }
 });
 
 test('every relative .md link in the skill resolves to a real file', () => {
-  const docs = [
-    ['SKILL.md', skillMd],
-    ...readdirSync(join(SKILL, 'reference'))
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => [`reference/${f}`, readFileSync(join(SKILL, 'reference', f), 'utf8')] as const),
-  ] as const;
-
   const broken: string[] = [];
-  for (const [name, body] of docs) {
-    for (const [, target] of body.matchAll(/\]\((?!https?:)([^)#\s]+\.md)(?:#[^)\s]*)?\)/g)) {
-      const from = dirname(join(SKILL, name));
-      if (!existsSync(resolve(from, target))) broken.push(`${name} -> ${target}`);
+  for (const [name, body] of skillDocs) {
+    for (const target of markdownTargets(name, body)) {
+      if (!existsSync(target)) broken.push(`${name} -> ${target}`);
     }
   }
   assert.deepEqual(broken, [], `dead links in the skill: ${broken.join(' | ')}`);
 });
 
+test('every selectable network has ecosystem context linked from the topic router', () => {
+  const router = 'reference/ecosystem.md';
+  const routes = markdownTargets(router, readFileSync(join(SKILL, router), 'utf8'));
+  for (const chain of CHAIN_SUPPORT.filter(isChainSelectable)) {
+    const path = resolve(SKILL, 'reference/ecosystem/chains', `${chain.key}.md`);
+    assert.ok(routes.includes(path), `${chain.name} needs its own routed ecosystem context`);
+    assert.ok(existsSync(path), `${chain.name} ecosystem context is missing`);
+  }
+});
+
 test('long references expose a table of contents', () => {
-  for (const file of readdirSync(join(SKILL, 'reference')).filter((f) => f.endsWith('.md'))) {
-    const body = readFileSync(join(SKILL, 'reference', file), 'utf8');
+  for (const [file, body] of referenceDocs) {
     if (body.split('\n').length > 100) {
       assert.match(body, /^## Contents$/m, `${file} is over 100 lines and needs a Contents map`);
     }
@@ -87,12 +113,7 @@ test('the capability gate is wired: SKILL.md routes to capabilities.md, which na
 });
 
 test('known stale contradictions cannot re-enter the router or references', () => {
-  const corpus = [
-    skillMd,
-    ...readdirSync(join(SKILL, 'reference'))
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => readFileSync(join(SKILL, 'reference', f), 'utf8')),
-  ].join('\n');
+  const corpus = skillDocs.map(([, body]) => body).join('\n');
   for (const stale of [
     /Node\s*(?:≥|>=)\s*22\.5/i,
     /deploy-code --copies[^\n]*script-only/i,

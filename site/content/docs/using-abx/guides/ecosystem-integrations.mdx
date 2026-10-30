@@ -1,0 +1,159 @@
+---
+title: "Ecosystem integrations"
+description: "Choose durable on-chain ecosystem integrations and understand lifetime dependencies."
+---
+
+An ABX project can relate to an existing community or respond to a pool's state. Prefer same-chain
+contract reads executed inside the EVM, with self-contained artwork and a usable fallback if a read
+fails. The core NFT should remain usable when a creator's website or a third-party API disappears.
+
+ABX handles its collection and parameters. Use each provider's official skills, MCP servers, CLIs,
+SDKs, APIs, or contract interfaces for that provider's workflow. Separate tools used to research or
+create a project from services the finished NFT would need forever. Official tooling can simplify
+creation without becoming a runtime dependency. Low setup cost does not establish permanence.
+
+## Discover by network and purpose
+
+The agent skill has a context entry for every selectable ABX network: Ethereum, Base, Arbitrum,
+Robinhood Chain, and each separate testnet. Entries without additional chain-specific research say
+so and point to shared references. It loads the selected chain and relevant topics, keeping shared
+providers in one place rather than copying their instructions into each network file.
+
+The examples below are a **non-exhaustive starting point**, not an approved-provider list or ranking.
+Countless other protocols and communities may suit your project. Agents should explore beyond these
+references using official sources, starting from your theme, audience, and distinctive mechanics.
+Evaluate what the actual on-chain data means, how reliably it can be read, and why it strengthens
+this particular artwork. A familiar token or protocol should not dictate the project's concept.
+Apply the same provenance, reliability, tooling, and dependency checks to every new candidate.
+
+| Intent | Official starting point | Data route |
+| --- | --- | --- |
+| Marketplace discovery and collection context | [OpenSea agent tools](https://docs.opensea.io/docs/build-with-ai-agents) | Off-chain discovery/indexing for authoring or a companion app. Use verified NFT contract state directly for same-chain ownership mechanics. |
+| Swap access, liquidity, or pool-informed art | [Uniswap skills](https://developers.uniswap.org/docs/uniswap-ai/skills) and [deployments](https://developers.uniswap.org/deployments) | Prefer on-chain pool reads for art. Quotes and indexed analytics suit discovery or an optional companion app. |
+| Existing generative projects and communities | [Art Blocks tools](https://docs.artblocks.io/developer/mcp-server/quick-start/) and [published read APIs](https://docs.artblocks.io/developer/token-and-generator-apis/) | Mixed: ownership/token state can be read on-chain. Hosted media and live views suit research or companion displays; embedding them makes the artwork service-dependent. |
+| Existing token communities | Issuer/protocol contract directories and official ERC-20 interfaces | On-chain balances and supply; hosted token search, portfolio data, and price APIs are off-chain. |
+| Companion fungible token creation | [Clanker SDK](https://github.com/clanker-devco/clanker-sdk) and its [official skill](https://github.com/clanker-devco/clanker-sdk/blob/main/.cursor/skills/use-clanker-sdk/SKILL.md) as one starting option | Created token and pool state are on-chain; hosted discovery and media add off-chain dependencies. |
+
+These are discovery routes, not tested ABX adapters or a promise of support on every network.
+Check each selected tool, protocol version, and exact deployment. Production coverage does not imply
+the same testnet deployments, assets, or liquidity. An unlisted integration needs research; it is
+not automatically unsupported. Consult the [ABX network summary](/docs/reference/deployments)
+independently of third-party coverage.
+
+## Choose inputs that fit the artwork
+
+For an on-chain NFT, an ABX Solidity renderer or augment hook can read same-chain contract state
+live. For example, a community treasury's token balance could change an SVG's density without a
+hosted data API. Specify the exact contract, field, and wallet whose state matters. Prefer visual
+effects over external-state gates unless the creator specifically needs a gate; configure/transfer
+hooks require deliberate failure rules and tests across mint, transfer, burn, and parameter writes.
+
+Label each proposed input **on-chain**, **off-chain**, or **mixed**, and name the access path. An API
+response remains an off-chain input even when it indexes a blockchain. Solidity cannot fetch HTTP.
+Use APIs for discovery and creation without making the NFT call them every time it is viewed.
+For durable output, prefer these options in order:
+
+1. Read the required same-chain state inside the EVM and render self-contained output.
+2. Capture the actual bounded input on-chain and render from it, disclosing its source and capture
+   time/block. It is a snapshot, not a live feed. A URL or hash alone does not preserve the input.
+3. Keep hosted analytics, trading interfaces, and artwork embeds in an optional companion app whose
+   disappearance leaves the NFT usable.
+
+On-chain reads still need careful design. Check upgrade/admin/pause powers; a fixed address can
+change behavior. Bound calls, gas, returndata, and output, and return meaningful fallback art on
+failure. A read-only renderer cannot save a last-good value without a separate state-writing flow.
+For eligibility gates, define failures without silently bypassing the intended rule.
+
+An on-chain script or on-chain URI does not preserve the network services its JavaScript fetches.
+A hardcoded RPC URL inside the live view is also a service dependency; prefer state computed inside
+the EVM. Oracles and cross-chain attestations require their own publisher, update, funding, and
+staleness assumptions even when the resulting value is stored on-chain.
+
+The initial token references include [USDC's official deployments](https://developers.circle.com/stablecoins/usdc-contract-addresses),
+[ARB's official deployment directory](https://docs.arbitrum.foundation/deployment-addresses), and
+[Aerodrome's AERO contracts](https://github.com/aerodrome-finance/contracts). A balance can select
+a palette or inform eligibility, but token identity, units, chain, and the intended wallet must be
+verified. Native and bridged assets differ; liquid tokens and locked voting positions differ too.
+Balance alone does not prove sustained ownership or governance participation.
+
+A companion token is optional. ABX creates the NFT collection; an external protocol creates and
+manages the ERC-20. Clanker is a general starting reference with official launch and management
+tools, not a required provider. Agents can use another protocol's official tooling where it fits.
+Keep token launch, liquidity configuration, and ABX deployment as separate reviewed operations.
+
+## Keep track of setup
+
+Compare accounts, credentials, and runtime services separately. A tool can avoid a new account yet
+still require an expiring API key, RPC access, or a hosted data service. Check what you already have
+before adding another connection, and distinguish your setup from what each collector must do.
+
+| Route | Setup to account for |
+| --- | --- |
+| OpenSea MCP or REST data | An API key. [Instant keys](https://docs.opensea.io/reference/api-keys) need no signup but expire; full keys use the developer account flow. [Wallet-scoped MCP tools](https://docs.opensea.io/reference/mcp) add wallet authentication. |
+| Uniswap interface link | No developer API key to provision; the collector uses the official app and their wallet to transact. The [Trading API](https://developers.uniswap.org/docs/get-started/quickstart) needs a key; an [iframe embed](https://developers.uniswap.org/docs/trading/embed-app) needs origin approval. |
+| Art Blocks MCP | OAuth sign-in for discovery tools. Published views can be linked from a companion gallery; avoid making the NFT's own output depend on them. |
+| Direct contract reads | Browser/build tools need RPC access, with provider-specific limits and accounts. EVM-to-EVM reads do not introduce an application API account; users still need ordinary chain access. |
+| Clanker direct SDK flow | RPC and a wallet client, plus funding/gas for transactions. The documented direct flow does not add a separate Clanker account/API key; hosted APIs, social login, media, or distribution services need their own check in the [official docs](https://docs.clanker.world). |
+
+These official access paths were reviewed on October 30, 2026. Recheck their terms, authentication,
+limits, and renewal requirements when choosing a route. Documentation discovery does not require
+creating accounts, minting keys, installing every provider's tool, or granting a wallet permission.
+
+Ask your agent for a small setup summary with each proposal: the selected tool and chain, existing
+connection to reuse, any new account/key/OAuth/RPC requirement, read or signing authority, cost and
+renewal work, and whether the deployed project will depend on the service. Keep secret values out
+of that summary. A simpler setup should also have a clear way to remove or replace the dependency.
+
+## Make the integration boundary explicit
+
+An idea is ready for implementation when you can name the input, its provenance, the ABX behavior it
+controls, and how you will verify both ends.
+
+| Fragile direction to avoid | Preferred integration |
+| --- | --- |
+| Live-view HTTP calls for floor prices, portfolio balances, or indexed volume | Use a suitable same-chain contract field through a renderer/augment hook, or capture the actual input on-chain. If no suitable input exists, change the idea or keep it in a companion app. |
+| Hosted generator/media iframe as essential NFT artwork | Use self-contained output driven by verified contract data. Link to the other work in a companion gallery and check reuse permissions. |
+| An external data service decides whether an NFT can transfer | Keep display inputs separate from lifecycle rules. An intentional ownership gate should use verified same-chain state and tested failure semantics. |
+| A token-launch website or hosted token logo is required to render the NFT | Use official launch tools during creation, then read the resulting token's verified on-chain fields with fallback art. |
+| Marketplace indexing becomes the NFT's canonical state | Preserve canonical ABX metadata and use marketplace tools for discovery, projection, and orders separately. |
+
+A live view and its marketplace still can differ until the still is refreshed. Being an NFT does
+not establish lending eligibility or available offers. Pool spot values and temporary balances
+need a separate manipulation assessment before they control financial rules.
+Changing the input can also change the idea: a pool's spot price is not an NFT floor price, and a
+current contract field does not necessarily reproduce indexed historical volume.
+
+A multichain data API does not let a contract directly read another chain's ownership. A cross-chain
+holder gate needs a separate snapshot or proof design with explicit freshness and trust assumptions.
+If a proof is needed, preserving its root alone does not preserve the proof data collectors need.
+
+## When a live external service is essential
+
+HTTP-dependent NFT live views are an exception requiring an explicit creator decision. Explain
+plainly: **the service must remain available for as long as the NFT promises this live behavior**.
+Show an EVM or on-chain snapshot alternative before choosing the service-dependent design.
+
+At minimum, establish and verify:
+
+- **Lifetime operation:** who hosts and pays for the API, media, proxy, credentials, renewals, and
+  updates; what disappears if they stop. A free or signup-free service still needs an operator.
+- **Owner-controlled replacement:** which owner/admin can replace the endpoint/provider and adapt
+  response handling. Distinguish the collection owner from an individual NFT owner, and verify the
+  actual configuration or custom extension rather than assuming ABX provides an endpoint setter.
+- **Usable fallback:** bound requests and timeouts; preserve meaningful, self-contained output if
+  the service, credentials, or media vanish. An art-data API failure must not block minting or transfers.
+- **Integrity and recovery:** handle stale or incompatible data explicitly, keep credentials out of
+  public NFT code, and test replacement after ownership handover and planned locks. A server-side
+  proxy adds another lifetime service; it does not remove the dependency.
+
+Disable the service and exercise the fallback before launch. Owner configurability helps recovery,
+but cannot guarantee a replacement service or equivalent data will exist forever. If the design
+cannot meet these requirements, choose the EVM/snapshot alternative or an optional companion app.
+Externally stored, content-addressed media also needs an availability plan; a CID alone is not a
+guarantee that the bytes will remain available. Disclose the permanence and control of each surface
+separately, including any hosted live view, resolver, and marketplace still.
+
+Keep ABX operations in its CLI. A third party's token deployment flow does not create an ABX
+collection, and a connected tool or unsigned transaction does not authorize a trade or approval.
+See [custom mechanics](/docs/using-abx/guides/custom-mechanics) for ABX extension points and
+[royalty enforcement](/docs/using-abx/guides/royalty-enforcement) for transfer-validator choices.

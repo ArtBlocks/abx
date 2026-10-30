@@ -6,7 +6,8 @@ description: >-
   Covers on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
   PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
   requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
-  change an ABX collection, or to determine whether ABX supports a mechanic.
+  change an ABX collection, explore ecosystem integrations for an ABX project, or determine whether
+  ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
   version: "0.7.1"
@@ -73,6 +74,8 @@ Follow this state machine instead of accumulating retries:
    replace an explicit signer choice.
 2. **Classify surfaces** — decide collection shape, runtime, required public surfaces, custody,
    resolution, authority, mutability, and mint/sale timing. Use the model below.
+   For ecosystem-based ideation or integrations, load [ecosystem.md](reference/ecosystem.md); prefer
+   same-chain EVM inputs and disclose lifetime service dependencies before choosing third-party tools.
 3. **Inspect** — run `abx capabilities --json`; for code run `abx inspect` and `abx preview`. For an
    existing collection run `abx state`, `abx tokens`, `abx tokenuri`, and `abx verify` as relevant.
 4. **Plan** — use the selected deploy command with `--dry-run --json`. Read its normalized shape,
@@ -216,6 +219,7 @@ lane. Read [capabilities.md](reference/capabilities.md) before designing a custo
 - Failure classification, resume, RPC/storage/rendering faults, and retry discipline → [diagnose.md](reference/diagnose.md)
 - Capability questions, extension seams, mechanics, and hard boundaries → [capabilities.md](reference/capabilities.md)
 - ERC-721C/ERC-1155C enrollment and validator operations → [creator-token.md](reference/creator-token.md)
+- Ecosystem ideation, official third-party tools, chain coverage, and setup footprint → [ecosystem.md](reference/ecosystem.md)
 
 Read every reference applicable to the requested workflow before sending a real transaction. Do not
 load unrelated references merely because they exist.
