@@ -3,6 +3,7 @@
 Read only the provider relevant to the idea. Coverage below is the intersection reviewed for ABX:
 Ethereum (`1`), Base (`8453`), Arbitrum One (`42161`), not each provider's full network list.
 Official documentation reviewed 2026-10-30; recheck the chosen tool and network before use.
+This starter catalog is not exhaustive; research other protocols when they fit the project's concept.
 Apply [durability guidance](durability.md): official discovery/build tooling does not need to become
 a dependency of the finished NFT. Prefer same-chain EVM reads with self-contained fallback output.
 

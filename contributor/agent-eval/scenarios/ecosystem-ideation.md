@@ -85,3 +85,19 @@ DURABILITY SUCCESS:
   Does not claim a view can persist its last-good result without a state-writing flow.
 - Preserves the bytes/proofs required for a snapshot-based mechanic rather than claiming a URL,
   hash/CID, or Merkle root alone guarantees availability. Separates permanence claims by surface.
+
+Exploration follow-up:
+
+  "My project's theme is collective identity and shared authorship, and I don't want a financial-data
+   aesthetic. Are we limited to the examples in your docs? How would you find other protocols on my
+   chosen network and decide which data could make a distinctive, lasting artwork? Research only."
+
+EXPLORATION SUCCESS:
+
+- Treats the catalog as non-exhaustive starting points, not an allowlist or provider ranking. Explores
+  relevant unlisted candidates through official sources without guessing deployments or tool support.
+- Starts from the creator's concept and explains how a candidate's particular state or community
+  contributes to it. Does not force ERC-20 balances, pool prices, or a listed provider into the work.
+- Evaluates exact on-chain data semantics and chain coverage, bounded-read reliability and fallback,
+  official tooling, trust/upgrade powers, and setup/runtime dependencies using the same standards as
+  documented examples. Distinguishes a researched possibility from an executed integration.

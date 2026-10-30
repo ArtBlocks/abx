@@ -22,17 +22,21 @@ providers are described once; chain notes add local context rather than copying 
 
 Topic routes: [multichain integrations](ecosystem/multichain.md) cover marketplaces, liquidity, and
 existing generative art; [ERC-20s and token creation](ecosystem/tokens.md) cover specific tokens and
-an external launch protocol. This is a small starting set: an unlisted provider is unknown here,
-not unsupported. Read `abx capabilities --json` for current ABX network eligibility; third-party
-coverage does not enable an ABX network or sponsorship lane.
+an external launch protocol. These examples are non-exhaustive starting points, not an allowlist or
+provider ranking. Explore protocols beyond this catalog that fit the creator's theme, community, or
+distinctive mechanics. Evaluate their actual on-chain data, semantics, reliability, official tools,
+and setup/runtime costs; explain why each input belongs in this particular project. An unlisted
+provider is unresearched here, not unsupported. Verify new candidates against official sources and
+the same durability criteria. Read `abx capabilities --json` for current ABX network eligibility;
+third-party coverage does not enable an ABX network or sponsorship lane.
 
 ## Turn an idea into a bounded plan
 
 1. Apply the [durability guidance](ecosystem/durability.md): prefer same-chain EVM reads and
    self-contained output. Keep discovery/build tools separate from the finished NFT's dependencies.
-   Identify the creative relationship: relate to existing art, discover a community, react to public
-   state, check eligibility, or move assets. Offer a few relevant concepts with their setup tradeoffs;
-   do not turn an ideation request into account creation or a transaction workflow.
+   Start from the project's theme, audience, and distinctive mechanic. Explain how each proposed
+   input supports that concept; do not force a familiar token, provider, or financial theme into an
+   unrelated work. Keep ideation separate from account creation or transaction execution.
 2. Check available connections and project dependencies through their supported discovery/status
    surfaces. Reuse suitable existing tooling and accounts. Do not inspect credential files to make
    this inventory.
