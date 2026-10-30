@@ -73,6 +73,9 @@ Package changelogs begin with the public source release.
 
 ## Security
 
+See [Third-party audits](site/content/docs/reference/audits/index.mdx) for a summary of reports,
+their scope and quality, and the maintainer response.
+
 Do not report vulnerabilities or credentials in a public issue. See [SECURITY.md](SECURITY.md) for the
 private reporting path and supported-version policy.
 

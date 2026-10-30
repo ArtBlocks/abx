@@ -8,9 +8,10 @@ shared renderer, reader, minter, and seed-source singletons. See the maintained
 [event-spine reference](../site/content/docs/protocol/event-spine.mdx).
 
 > **Security status:** Production-network support is beta. The canonical contracts are deployed and
-> verified, but the repository does not publish a completed independent third-party audit. Review
-> the source, tests, deployed bytecode, owner powers, and [security policy](../SECURITY.md) before
-> relying on it.
+> verified, but ABX has not had a comprehensive independent security audit. See
+> [Third-party audits](../site/content/docs/reference/audits/index.mdx) for limited-scope reports and
+> the maintainer response. Review the source, tests, deployed bytecode, owner powers, and
+> [security policy](../SECURITY.md) before relying on it.
 
 ## Install as a Solidity dependency
 
