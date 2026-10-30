@@ -66,6 +66,10 @@ straight to the current primary payee. Funds do not remain in the shared minter.
 The token contract enforces its own supply cap on every mint path. The minter's allocation is a separate
 limit on what that sale may issue.
 
+The authorized minter can issue any supply the token's caps permit while unpaused. Sale pricing and
+allocation checks live in the minter contract; the token does not independently enforce them. Review
+those controls and any upgrade authority before authorizing a custom minter.
+
 Pausing blocks minter and delegate mints. The project owner may still mint while paused.
 
 For an edition, the project has both an ID-space cap and a per-ID copy cap. Neither can increase after it
