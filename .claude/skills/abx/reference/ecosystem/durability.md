@@ -1,11 +1,12 @@
 # Durable ecosystem integrations
 
-Use when selecting an ecosystem input for an NFT's art, metadata, or hooks. Prefer designs whose
-essential output remains usable when the creator, website, SDK, and hosted API are gone. Official
-tooling is valuable for authoring; being official, free, or account-free does not make a runtime
-service permanent. See the public [ecosystem guide](https://docs.abx.io/docs/using-abx/guides/ecosystem-integrations).
+Use when selecting dependencies for an object's behavior or output. On-chain, off-chain, and hybrid
+designs are valid; match their guarantees to the intended lifespan and trust model. For long-lived,
+self-contained output, prefer designs that survive loss of the creator, website, SDK, or hosted API.
+Official tooling is valuable for authoring; being official, free, or account-free does not make a
+runtime service permanent. See the public [ecosystem guide](https://docs.abx.io/docs/using-abx/guides/ecosystem-integrations).
 
-## Rank the implementation choices
+## Prefer durable paths for long-lived output
 
 1. **Same-chain EVM reads and self-contained output.** Compute state through the appropriate
    Solidity renderer or augment hook using official contract interfaces. Keep required program,
@@ -32,12 +33,12 @@ identify its publishers, update funding, stale-data policy, and trust model befo
 - Verify chain, contract/version, official interface, and the selected field's semantics. Inspect
   upgrade/admin/pause powers and replaceability; a fixed address does not imply immutable behavior.
   Do not substitute a pool spot price for an NFT floor or current state for indexed historical volume.
-- Bound external calls, gas, returndata, loops, and output. Catch expected read failures and return
-  a useful, self-contained default; do not let a disappearing/reverting dependency blank the NFT.
+- Bound external calls, gas, returndata, loops, and output. For display reads, catch expected failures
+  and return useful, self-contained output; do not let a reverting dependency blank the NFT.
   A view cannot persist a new last-good value: that requires a separately authorized state update.
-- Prefer read-only visual effects over external-state gates unless the creator needs a gate.
-  Configure/transfer hooks need deliberate failure semantics that preserve the intended rule;
-  silently failing open can defeat eligibility. Test mint, transfer, burn, and parameter writes.
+- Choose reads or state-changing interactions to serve the object's purpose. Configure/transfer
+  hooks need deliberate failure semantics that preserve the intended rule; silently failing open
+  can defeat eligibility. Test mint, transfer, burn, and parameter writes.
 - Exercise absent code, reverts, malformed/large responses, zero balances/liquidity, and changed
   dependencies. Test stale oracle data if applicable. Never assume ABX catches a custom hook's revert.
 - Distinguish permanence from frozen output: a robust live on-chain read can still change as the

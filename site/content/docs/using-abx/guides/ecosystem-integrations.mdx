@@ -1,11 +1,12 @@
 ---
 title: "Ecosystem integrations"
-description: "Choose durable on-chain ecosystem integrations and understand lifetime dependencies."
+description: "Choose ecosystem integrations that fit an object's purpose, lifespan, and dependencies."
 ---
 
-An ABX project can relate to an existing community or respond to a pool's state. Prefer same-chain
-contract reads executed inside the EVM, with self-contained artwork and a usable fallback if a read
-fails. The core NFT should remain usable when a creator's website or a third-party API disappears.
+An ABX object can hold data, govern interactions, relate to a community, or respond to a pool's
+state. Start with its purpose and behavior; its appearance is one part of the design. On-chain,
+off-chain, and hybrid approaches are possible. For long-lived, self-contained output, prefer
+same-chain EVM reads and usable fallbacks that survive loss of a website or third-party API.
 
 ABX handles its collection and parameters. Use each provider's official skills, MCP servers, CLIs,
 SDKs, APIs, or contract interfaces for that provider's workflow. Separate tools used to research or
@@ -23,7 +24,7 @@ The examples below are a **non-exhaustive starting point**, not an approved-prov
 Countless other protocols and communities may suit your project. Agents should explore beyond these
 references using official sources, starting from your theme, audience, and distinctive mechanics.
 Evaluate what the actual on-chain data means, how reliably it can be read, and why it strengthens
-this particular artwork. A familiar token or protocol should not dictate the project's concept.
+this particular project. A familiar token or protocol should not dictate the project's concept.
 Apply the same provenance, reliability, tooling, and dependency checks to every new candidate.
 
 | Intent | Official starting point | Data route |
@@ -40,13 +41,13 @@ the same testnet deployments, assets, or liquidity. An unlisted integration need
 not automatically unsupported. Consult the [ABX network summary](/docs/reference/deployments)
 independently of third-party coverage.
 
-## Choose inputs that fit the artwork
+## Choose inputs that fit the object
 
 For an on-chain NFT, an ABX Solidity renderer or augment hook can read same-chain contract state
 live. For example, a community treasury's token balance could change an SVG's density without a
-hosted data API. Specify the exact contract, field, and wallet whose state matters. Prefer visual
-effects over external-state gates unless the creator specifically needs a gate; configure/transfer
-hooks require deliberate failure rules and tests across mint, transfer, burn, and parameter writes.
+hosted data API. State-based rules or eligibility may instead be central to the object. Specify the
+exact contract, field, and wallet whose state matters; configure/transfer hooks require deliberate
+failure rules and tests across mint, transfer, burn, and parameter writes.
 
 Label each proposed input **on-chain**, **off-chain**, or **mixed**, and name the access path. An API
 response remains an off-chain input even when it indexes a blockchain. Solidity cannot fetch HTTP.
