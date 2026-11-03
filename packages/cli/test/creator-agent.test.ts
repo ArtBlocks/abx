@@ -223,16 +223,21 @@ test('native credential records round-trip without exposing a plaintext fallback
   assert.equal(await store.load(), null);
 });
 
-test('sponsor preflight permits Base networks behind the live account gate and requires the API key', () => {
+test('sponsor preflight permits Base and Arbitrum networks behind the live account gate and requires the API key', () => {
   const before = process.env.ABX_SERVICES_API_KEY;
+  const eligible = ['base', 'base-sepolia', 'arbitrum', 'arbitrum-sepolia'];
   try {
     delete process.env.ABX_SERVICES_API_KEY;
-    assert.throws(() => assertSponsorConfigured('sepolia'), /Base and Base Sepolia only/);
-    assert.throws(() => assertSponsorConfigured('base'), /ABX_SERVICES_API_KEY/);
-    assert.throws(() => assertSponsorConfigured('base-sepolia'), /ABX_SERVICES_API_KEY/);
+    for (const chain of ['sepolia', 'ethereum', 'robinhood', 'robinhood-testnet']) {
+      assert.throws(() => assertSponsorConfigured(chain), /eligible Base and Arbitrum networks/);
+    }
+    for (const chain of eligible) {
+      assert.throws(() => assertSponsorConfigured(chain), /ABX_SERVICES_API_KEY/);
+    }
     process.env.ABX_SERVICES_API_KEY = 'abx_test_key';
-    assert.doesNotThrow(() => assertSponsorConfigured('base'));
-    assert.doesNotThrow(() => assertSponsorConfigured('base-sepolia'));
+    for (const chain of eligible) {
+      assert.doesNotThrow(() => assertSponsorConfigured(chain));
+    }
   } finally {
     if (before === undefined) delete process.env.ABX_SERVICES_API_KEY;
     else process.env.ABX_SERVICES_API_KEY = before;
@@ -344,7 +349,7 @@ test('the explicit creator API override is a bounded development escape hatch', 
   );
 });
 
-test('sponsored preview resolves the existing account wallet with a read-only request', async () => {
+test('sponsored preview resolves the same account wallet on Base and Arbitrum with read-only requests', async () => {
   const address = '0xadCaecC6539F91646293ea058A9f398dCC2271A6' as Address;
   const requests: Array<{url: string; method: string}> = [];
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -353,18 +358,20 @@ test('sponsored preview resolves the existing account wallet with a read-only re
       accountId: 'acct_test',
       emailVerified: true,
       wallet: {address, provider: 'privy', providerAppId: 'app_test'},
-      capabilities: {wallet: true, sponsorship: true, sponsoredChains: [8453, 84532]},
+      capabilities: {wallet: true, sponsorship: true, sponsoredChains: [8453, 84532, 42161, 421614]},
     });
   };
 
-  assert.equal(
-    await sponsoredPreviewAddress('base', {
-      env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
-      fetchImpl,
-    }),
-    address,
-  );
-  assert.deepEqual(requests, [{url: 'https://api.example/v1/account', method: 'GET'}]);
+  for (const chain of ['base', 'base-sepolia', 'arbitrum', 'arbitrum-sepolia']) {
+    assert.equal(
+      await sponsoredPreviewAddress(chain, {
+        env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+        fetchImpl,
+      }),
+      address,
+    );
+  }
+  assert.deepEqual(requests, Array.from({length: 4}, () => ({url: 'https://api.example/v1/account', method: 'GET'})));
 });
 
 test('sponsored preview refuses to provision missing account state', async () => {
@@ -460,12 +467,14 @@ test('sponsored preview enforces live per-chain entitlement', async () => {
       capabilities: {wallet: true, sponsorship: true, sponsoredChains: [84532]},
     });
 
-  await assert.rejects(
-    () =>
-      sponsoredPreviewAddress('base', {
-        env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
-        fetchImpl,
-      }),
-    /not enabled for Base/,
-  );
+  for (const chain of ['base', 'arbitrum', 'arbitrum-sepolia']) {
+    await assert.rejects(
+      () =>
+        sponsoredPreviewAddress(chain, {
+          env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+          fetchImpl,
+        }),
+      /not enabled for/,
+    );
+  }
 });

@@ -156,6 +156,8 @@ provider does not advertise the chain, the account is ineligible, or the transac
 policy, select one of those lanes rather than refusing the underlying operation. Do not use
 sponsorship on a production network unless the live descriptor, account capabilities, and command
 all explicitly support it. Never infer eligibility merely because the CLI recognizes the lane.
+During a network rollout, the descriptor may advertise a chain before every account is entitled.
+Check account capabilities too; a test-account grant does not establish general availability.
 
 ## Feedback targets
 

@@ -1,6 +1,6 @@
 ---
 title: "Creator wallet"
-description: "Deploy on eligible Base networks without bringing a funded wallet."
+description: "Deploy on eligible networks without bringing a funded wallet."
 ---
 
 ABX Services gives each verified account one creator wallet. The API key identifies the account but
@@ -9,10 +9,14 @@ cannot sign transactions.
 The [network table](/docs/reference/deployments) shows where sponsorship is available. Sponsorship may
 be limited or paused. Start on a testnet.
 
+The CLI recognizes the sponsored lane on Base, Base Sepolia, Arbitrum, and Arbitrum Sepolia.
+Arbitrum sponsorship is in controlled qualification; recognizing a chain does not enable it for
+your account. Both the live service descriptor and your account capabilities must allow the chain.
+
 ```bash
 abx auth login
 abx remote abx
-abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --dry-run --json
+abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor --dry-run --json
 abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor
 ```
 
