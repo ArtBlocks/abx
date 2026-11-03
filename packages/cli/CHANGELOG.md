@@ -1,5 +1,15 @@
 # @artblocks/abx-cli
 
+## 0.7.2
+
+### Patch Changes
+
+- d86143f: Add selectively loaded ecosystem discovery references for every selectable ABX network, with shared
+  official tooling, ERC-20 and external token-launch ideas, and input provenance. Favor resilient
+  same-chain EVM reads and self-contained output; disclose lifetime service dependencies, owner-controlled
+  replacement, fallback behavior, and account/credential requirements for service-dependent designs.
+- 6fe1f7c: Broaden skill ideation to programmable digital objects, clarify state-changing hook capabilities, and keep concept exploration separate from implementation.
+
 ## 0.7.1
 
 ### Patch Changes
