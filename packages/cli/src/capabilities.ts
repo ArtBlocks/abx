@@ -23,7 +23,7 @@ export const ABX_CAPABILITIES = {
       flag: '--sponsor',
       summary: 'account-bound ABX creator wallet; ABX Services pays eligible gas',
       supportLevel: 'supported',
-      chainIds: [8_453, 84_532],
+      chainIds: [8_453, 84_532, 42_161, 421_614],
       limits: ['zero value', 'network and provider gas policy'],
     },
     unsigned: {flag: '--unsigned', summary: 'print for an external signer', supportLevel: 'supported'},

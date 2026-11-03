@@ -21,10 +21,11 @@ import {
 import type {TransactionReceipt} from 'viem';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from './creator-agent.js';
 import {CreatorKeyringStore} from './creator-keyring.js';
+import {ABX_CAPABILITIES} from './capabilities.js';
 import {warn} from './output.js';
 import {ABX_SERVICES_URL} from './remote.js';
 
-const SPONSORABLE_BASE_CHAINS = new Set([8_453, 84_532]);
+const SPONSORABLE_CHAINS = new Set<number>(ABX_CAPABILITIES.signingLanes.sponsor.chainIds);
 const CREATOR_GRANTS_URL = 'https://services.abx.io/authorize';
 
 /** Preserve the exact RPC estimate across the JSON service boundary. This is a serialization
@@ -44,9 +45,9 @@ export function assertSponsorConfigured(chainKey: string): void {
 }
 
 function assertSponsorConfiguredWithEnv(chainKey: string, env: NodeJS.ProcessEnv): void {
-  if (!SPONSORABLE_BASE_CHAINS.has(resolveChain(chainKey).id)) {
+  if (!SPONSORABLE_CHAINS.has(resolveChain(chainKey).id)) {
     throw new Error(
-      '--sponsor is supported on eligible Base networks (Base and Base Sepolia only) and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
+      '--sponsor is supported on eligible Base and Arbitrum networks (including their Sepolia testnets) and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
     );
   }
   if (!env.ABX_SERVICES_API_KEY) {
