@@ -32,8 +32,8 @@ third-party coverage does not enable an ABX network or sponsorship lane.
 
 ## Turn an idea into a bounded plan
 
-1. Apply the [durability guidance](ecosystem/durability.md): prefer same-chain EVM reads and
-   self-contained output. Keep discovery/build tools separate from the finished NFT's dependencies.
+1. Apply the [durability guidance](ecosystem/durability.md) to the object's intended behavior and
+   lifespan. Keep discovery/build tools separate from the finished NFT's dependencies.
    Start from the project's theme, audience, and distinctive mechanic. Explain how each proposed
    input supports that concept; do not force a familiar token, provider, or financial theme into an
    unrelated work. Keep ideation separate from account creation or transaction execution.
@@ -43,9 +43,9 @@ third-party coverage does not enable an ABX network or sponsorship lane.
 3. Prefer the provider's official skill, MCP, CLI, SDK, API, or contract interfaces for its part of the
    workflow. Link to current installation/authentication instructions instead of copying them here.
    Add only the project-specific glue; do not rebuild an existing client, router, indexer, or signer.
-4. Classify the ABX part using [capabilities.md](capabilities.md). An external API read or marketplace
-   order is not an ABX command. Keep ABX operations in its CLI and the provider's operations in its
-   official tools; do not let a third-party deploy flow silently replace the chosen ABX collection.
+4. Before implementation, check the ABX part using [capabilities.md](capabilities.md). An external
+   API read or marketplace order is not an ABX command. Keep ABX operations in its CLI and provider
+   operations in official tools; do not let a third-party deploy flow replace the chosen ABX collection.
 5. Before implementation, verify the specific chain, contract/version, token or project identity,
    current tool support, and the read/write authority. Testnet availability, liquidity, and datasets
    need separate evidence. A documentation review is not an executed integration test.
@@ -56,14 +56,14 @@ Label each proposed input **on-chain**, **off-chain**, or **mixed**, including t
 
 | Input route | Where it can drive ABX behavior |
 |---|---|
-| On-chain, same-chain contract read | Preferred for live renderer/augment output. Configure or transfer validation requires an intentional gate and lifecycle tests; a display input should not block transfers |
+| On-chain, same-chain contract read | Can inform contract actions, state rules, eligibility, or renderer/augment output. Configure/transfer hooks need deliberate failure semantics and lifecycle tests; a display input should not block transfers |
 | Off-chain API/indexer, even if sourced from contracts | Discovery/build tooling or an optional companion app. Prefer capturing the actual bounded input on-chain over putting HTTP calls in the NFT's live view |
 | Mixed: on-chain state plus hosted metadata/media | Separate the durable NFT output from hosted enrichment. Any essential service is a lifetime dependency requiring explicit creator choice and the recovery design below |
 
 Specify the contract and field, or API and timestamp, plus whether the input is live or captured.
-For contract integrations use official interfaces, bounded reads, and usable fallback output.
+For contract integrations use official interfaces, bounded reads, and purpose-appropriate failure handling.
 Do not assume a renderer's `msg.sender` is the NFT owner. A mutable external read can affect hook
-liveness as well as art; inspect upgrade/pause powers. A browser's hardcoded RPC fetch is still a
+liveness as well as output; inspect upgrade/pause powers. A browser's hardcoded RPC fetch is still a
 network dependency; prefer computing the input in the EVM. A pool spot value alone is not a
 manipulation-resistant price oracle.
 

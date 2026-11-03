@@ -80,7 +80,7 @@ DURABILITY SUCCESS:
   actual replacement/configuration mechanism, post-lock and ownership-handover behavior, credential
   renewal/operator costs, bounded requests, and usable service-independent fallback output. Does
   not claim ABX has a universal endpoint setter or that configurability guarantees a future provider.
-- Defines contract-read failures and upgrade/pause risks. Prefers read-only art over needless gates;
+- Defines contract-read failures and upgrade/pause risks. Separates display reads from lifecycle rules;
   does not blindly fail open on an eligibility rule or let an unavailable service block transfers.
   Does not claim a view can persist its last-good result without a state-writing flow.
 - Preserves the bytes/proofs required for a snapshot-based mechanic rather than claiming a URL,
