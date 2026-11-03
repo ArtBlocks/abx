@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.7.3
+
+### Patch Changes
+
+- c77b9d9: Allow the sponsored signing lane on Arbitrum and Arbitrum Sepolia when the live provider and account advertise eligibility. Update command help and bundled agent guidance for controlled network rollouts; recognizing these chains does not grant sponsorship.
+
 ## 0.7.2
 
 ### Patch Changes
