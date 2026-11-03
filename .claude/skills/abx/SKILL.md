@@ -1,22 +1,27 @@
 ---
 name: abx
 description: >-
-  Use the ABX CLI (`abx`) to plan, launch, host, inspect, and operate ABX NFT projects on supported
-  networks: static 1/1s, image series, editions, JavaScript/code drops, and Solidity-rendered projects.
+  Use the ABX CLI (`abx`) to explore, plan, launch, host, inspect, and operate programmable NFT
+  projects on supported networks, from artwork to shared resources and stateful digital objects.
   Covers on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
   PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
   requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
-  change an ABX collection, explore ecosystem integrations for an ABX project, or determine whether
+  change an ABX collection, develop project ideas or ecosystem integrations, or determine whether
   ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
-  version: "0.7.1"
+  version: "0.7.2"
 ---
 
 # ABX
 
 Use `abx` as the execution and truth surface. Help, capability output, dry runs, on-chain reads, and
 typed errors outrank remembered prose.
+
+Think of ABX NFTs as programmable, durable digital objects that use blockchain technology. Their
+data, state, permissions, and behavior can matter as much as their appearance. Configure and transfer
+hooks can execute contract actions, including creating assets or interacting with financial protocols.
+For project ideation, read [ideation.md](reference/ideation.md) before choosing an implementation path.
 
 ## Non-negotiable rules
 
@@ -63,7 +68,7 @@ typed errors outrank remembered prose.
 
 ## Use the lifecycle
 
-Follow this state machine instead of accumulating retries:
+For implementation and operations, follow this state machine instead of accumulating retries:
 
 1. **Discover** — identify the working directory, CLI provenance/version, active chain, artifacts,
    existing contract addresses, configured remote, and signer preference. Run `abx doctor` for a
@@ -74,8 +79,8 @@ Follow this state machine instead of accumulating retries:
    replace an explicit signer choice.
 2. **Classify surfaces** — decide collection shape, runtime, required public surfaces, custody,
    resolution, authority, mutability, and mint/sale timing. Use the model below.
-   For ecosystem-based ideation or integrations, load [ecosystem.md](reference/ecosystem.md); prefer
-   same-chain EVM inputs and disclose lifetime service dependencies before choosing third-party tools.
+   For ecosystem integrations, load [ecosystem.md](reference/ecosystem.md); choose inputs that fit
+   the object's behavior and explain ongoing dependencies before choosing third-party tools.
 3. **Inspect** — run `abx capabilities --json`; for code run `abx inspect` and `abx preview`. For an
    existing collection run `abx state`, `abx tokens`, `abx tokenuri`, and `abx verify` as relevant.
 4. **Plan** — use the selected deploy command with `--dry-run --json`. Read its normalized shape,
@@ -194,7 +199,7 @@ Before any real deploy, say these choices explicitly when relevant:
 
 ## Use capability classification, not optimism or refusal
 
-Classify an unusual request as exactly one of:
+When assessing implementation feasibility, classify an unusual request as exactly one of:
 
 1. **Native** — a documented CLI lane performs it.
 2. **Extension** — a custom minter, configure/transfer/augment hook, field renderer, or seed source
