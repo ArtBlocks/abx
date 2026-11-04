@@ -1,5 +1,17 @@
 # @artblocks/abx-cli
 
+## 0.7.4
+
+### Patch Changes
+
+- e497ffe: Mark Arbitrum Sepolia, Arbitrum, Base, and Ethereum mainnet as supported. Align the network registry,
+  CLI capabilities, qualification notices, and public network table with their supported status.
+- Updated dependencies [e497ffe]
+  - @artblocks/abx-sdk@0.7.1
+  - @artblocks/abx-indexer@0.1.9
+  - @artblocks/abx-storage@0.1.9
+  - @artblocks/abx-token-api@0.2.8
+
 ## 0.7.3
 
 ### Patch Changes
