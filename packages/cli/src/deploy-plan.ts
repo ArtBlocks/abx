@@ -207,7 +207,7 @@ export interface DeployPlan {
   schemaVersion: typeof DEPLOY_PLAN_SCHEMA_VERSION;
   family: DeployPlanFamily;
   lane: DeployPlanLane;
-  paymentPolicy?: 'prefer-self-payment' | null;
+  paymentPolicy: 'prefer-self-payment' | null;
   transactions: DeployPlanTransactions;
   roles: DeployPlanRoles;
   /** `null` on a `--resume` emit: royalty is an InitParams field fixed at the ORIGINAL deploy, and a

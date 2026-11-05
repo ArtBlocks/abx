@@ -2511,6 +2511,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'series' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         // A staged on-chain collection is many chunk-write txs, one per file — that per-token detail
         // is printed above (`previewImageStaging`), not re-derived here; `legs` just names the shape.
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per token)', 'deploy'] : null},
@@ -4594,6 +4595,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         // here would hit its temporal dead zone. `laneFromFlags` is pure (flags only), so call it
         // directly; the sent-side emit, below `const lane = …`, uses the hoisted binding instead.
         lane: laneFromFlags(flags),
+        paymentPolicy: laneFromFlags(flags) === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -4822,6 +4824,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: isEdition ? 'code-edition' : 'code',
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       roles: {signer: owner, owner, royaltyReceiver: null, primaryPayee: null, minter: null},
       royalty: null,
       // renderer/image: null — both are InitParams facts fixed at the ORIGINAL deploy (like
