@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import type {CreatorAccount, CreatorPreparedOperation, PreparedTx, PublicClient} from '@artblocks/abx-sdk';
-import {assertCreatorSigningRequest, quoteCreatorPayment} from '../src/creator-payment.js';
+import {assertCreatorSigningRequest, preflightCreatorPayment, quoteCreatorPayment} from '../src/creator-payment.js';
 
 const wallet = '0x1111111111111111111111111111111111111111' as const;
 const target = '0x2222222222222222222222222222222222222222' as const;
@@ -27,6 +27,31 @@ const client = (balance: bigint, chainId = 1) =>
     getBalance: async () => balance,
     estimateFeesPerGas: async () => ({maxFeePerGas: 10n, maxPriorityFeePerGas: 2n}),
   }) as unknown as PublicClient;
+
+test('native-value preflight rejects disabled self-payment before reading funds or suggesting funding', async () => {
+  const disabled = {...account, capabilities: {...account.capabilities, selfPayment: false}};
+  for (const balance of [0n, 2000n]) {
+    let reads = 0;
+    const rpc = {
+      ...client(balance, 8453),
+      getBalance: async () => {
+        reads++;
+        return balance;
+      },
+    } as unknown as PublicClient;
+    const call = {...tx, chainId: 8453, value: '0x64'} as const;
+    await assert.rejects(preflightCreatorPayment(rpc, disabled, call), /does not enable creator-wallet self-payment/);
+    await assert.rejects(quoteCreatorPayment(rpc, disabled, call, 100n), /does not enable creator-wallet self-payment/);
+    assert.equal(reads, 0);
+  }
+});
+
+test('native-value preflight checks funding only after self-payment is available', async () => {
+  await assert.rejects(preflightCreatorPayment(client(100n), account, {...tx, value: '0x64'}), /Fund the creator wallet/);
+  await assert.doesNotReject(preflightCreatorPayment(client(1100n), account, {...tx, value: '0x64'}));
+  const disabled = {...account, capabilities: {...account.capabilities, selfPayment: false}};
+  await assert.doesNotReject(preflightCreatorPayment(client(0n, 8453), disabled, {...tx, chainId: 8453}));
+});
 
 test('funded creator wallets self-pay on a non-sponsored network, including native value', async () => {
   const result = await quoteCreatorPayment(client(1100n), account, {...tx, value: '0x64'}, 100n);

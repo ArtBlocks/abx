@@ -24,7 +24,7 @@ import {
 import {formatEther, formatGwei, type TransactionReceipt} from 'viem';
 import {CreatorAgentAuthorization, CreatorAuthorizationError} from './creator-agent.js';
 import {CreatorKeyringStore} from './creator-keyring.js';
-import {quoteCreatorPayment, assertCreatorSigningRequest} from './creator-payment.js';
+import {quoteCreatorPayment, assertCreatorSigningRequest, preflightCreatorPayment} from './creator-payment.js';
 import {warn} from './output.js';
 import {ABX_SERVICES_URL} from './remote.js';
 
@@ -334,10 +334,8 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
       async send(tx: PreparedTx): Promise<SponsoredReceipt> {
         if (closed) throw new Error('The creator authorization session is closed.');
         assertCreatorPreparedTx(tx, chain.id);
+        await preflightCreatorPayment(publicClient, account, tx);
         if (tx.gasFloor && tx.to) await waitForCodeAt(publicClient, tx.to);
-        if (BigInt(tx.value) > 0n && await publicClient.getBalance({address: wallet.address, blockTag: 'pending'}) <= BigInt(tx.value)) {
-          throw new Error('Fund the creator wallet on this network with the transaction value plus network fees. Nothing was signed.');
-        }
         const gas = await pinGas(publicClient, {
           from: wallet.address,
           to: tx.to,

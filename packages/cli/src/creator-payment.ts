@@ -10,6 +10,31 @@ export type CreatorPayment =
 
 const quantity = (value: bigint): Hex => `0x${value.toString(16)}`;
 
+function creatorPaymentOptions(account: CreatorAccount, tx: PreparedTx) {
+  const eligible =
+    BigInt(tx.value) === 0n && account.capabilities.sponsorship && account.capabilities.sponsoredChains.includes(tx.chainId);
+  const canSelfPay = account.capabilities.selfPayment && account.capabilities.walletChains?.includes(tx.chainId);
+  if (!canSelfPay && !eligible) {
+    throw new Error('The provider does not enable creator-wallet self-payment on this network.');
+  }
+  return {eligible, canSelfPay};
+}
+
+/** Check provider eligibility before funding advice or gas estimation that may require native value. */
+export async function preflightCreatorPayment(
+  client: PublicClient,
+  account: CreatorAccount,
+  tx: PreparedTx,
+): Promise<void> {
+  creatorPaymentOptions(account, tx);
+  const value = BigInt(tx.value);
+  if (value > 0n && (await client.getBalance({address: account.wallet!.address, blockTag: 'pending'})) <= value) {
+    throw new Error(
+      'Fund the creator wallet on this network with the transaction value plus network fees. Nothing was signed.',
+    );
+  }
+}
+
 /** Resolve payment once, before preparing/signing an operation. Never switch it after submission. */
 export async function quoteCreatorPayment(
   client: PublicClient,
@@ -19,12 +44,9 @@ export async function quoteCreatorPayment(
   additionalFee?: () => Promise<bigint>,
 ): Promise<CreatorPayment> {
   const value = BigInt(tx.value);
-  const eligible =
-    value === 0n && account.capabilities.sponsorship && account.capabilities.sponsoredChains.includes(tx.chainId);
-  const canSelfPay = account.capabilities.selfPayment && account.capabilities.walletChains?.includes(tx.chainId);
+  const {eligible, canSelfPay} = creatorPaymentOptions(account, tx);
   if (!canSelfPay) {
-    if (eligible) return {mode: 'sponsored', requiredBalance: 0n};
-    throw new Error('The provider does not enable creator-wallet self-payment on this network.');
+    return {mode: 'sponsored', requiredBalance: 0n};
   }
   if (client.chain?.id !== tx.chainId) throw new Error('Creator-wallet fee quote has the wrong chain.');
   const nativeClient = client as PublicClient<Transport, Chain>;

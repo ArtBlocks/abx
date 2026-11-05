@@ -29,6 +29,9 @@ Use the current CLI and refresh its installed skill after upgrading. During a pr
 older providers retain their sponsored-only behavior; recognition by the CLI does not enable a
 network or payment mode for an account.
 
+When self-payment is unavailable, native-value calls report that restriction before checking funds.
+Funding the wallet enables self-payment only after the provider enables it on that network.
+
 Login provisions or reuses the stable creator wallet. `abx auth wallet` shows its address separately.
 Fund that address on the network you intend to use. An ETH balance on Ethereum does not fund Base.
 Native fee quotes include execution fees and, on Base, a reserve for estimated L1/operator fees.
