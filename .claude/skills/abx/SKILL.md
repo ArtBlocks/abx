@@ -74,7 +74,7 @@ For implementation and operations, follow this state machine instead of accumula
    existing contract addresses, configured remote, and signer preference. Run `abx doctor` for a
    deployment or unfamiliar environment. Surface and recommend any available CLI update before
    planning a deployment or write; do not bury the notice in setup output. If the creator has not
-   chosen a signer, inspect the live remote and prefer `--sponsor` when the active chain and command
+   chosen a signer, inspect the live remote and prefer `--embedded` when the active chain and command
    are advertised as eligible; otherwise choose the appropriate bring-your-own lane. Never silently
    replace an explicit signer choice.
 2. **Classify surfaces** — decide collection shape, runtime, required public surfaces, custody,
@@ -151,7 +151,7 @@ Important boundaries:
   `abx_image_type`. See `reference/deploy.md` for repairing a raster that serves as SVG.
 - Deploy tested custom hooks/renderers from exact compiled initcode with `abx deploy-contract`.
   ABX sends the bytes; it does not compile, link, audit, or infer constructor types. Test on the
-  paired testnet and source-verify before wiring a production address. Under `--sponsor`, the
+  paired testnet and source-verify before wiring a production address. Under `--embedded`, the
   keyless CREATE2 proxy is the constructor caller, so pass ownership explicitly instead of relying
   on `msg.sender` in the constructor.
 - A code project may need no public host when its image/traits are computed by Solidity renderers.

@@ -20,11 +20,13 @@ import type {Address} from '@artblocks/abx-sdk';
  *  is read into an un-annotated intermediate object (the resume lane builds one and spreads it into
  *  several emits) the property degrades to `number` and stops satisfying `DeployPlan`. Keep it.
  *
- *  v2 (this change): added `custody.renderer` and `custody.image`; reinterpreted `transactions.legs`
+ *  v2: added `custody.renderer` and `custody.image`; reinterpreted `transactions.legs`
  *  to end with `'deploy'` whenever it is non-null (previously silent about the deploy tx itself —
  *  see each field's own doc comment). A consumer keying behavior off `legs`' shape needs to know
- *  which version it's reading. */
-export const DEPLOY_PLAN_SCHEMA_VERSION = 2 as const;
+ *  which version it's reading.
+ *
+ *  v3: added `paymentPolicy` to describe automatic creator-wallet payment. */
+export const DEPLOY_PLAN_SCHEMA_VERSION = 3 as const;
 
 /** The six product lanes `deploy.ts` implements — a stable discriminator independent of the legacy
  *  `command`/`kind` fields already on the payload (which exist for backward compat and don't fully
@@ -205,6 +207,7 @@ export interface DeployPlan {
   schemaVersion: typeof DEPLOY_PLAN_SCHEMA_VERSION;
   family: DeployPlanFamily;
   lane: DeployPlanLane;
+  paymentPolicy?: 'prefer-self-payment' | null;
   transactions: DeployPlanTransactions;
   roles: DeployPlanRoles;
   /** `null` on a `--resume` emit: royalty is an InitParams field fixed at the ORIGINAL deploy, and a

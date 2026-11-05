@@ -29,7 +29,7 @@ import {ANSI as C, ansiBold as bold, ansiDim as dim, ansiGreen as green, ansiPur
  *   • send (hot)     — sign with the env key and broadcast. Autonomous agents, testnet, low stakes.
  *   • sign (wallet)  — serve a one-shot, operation-aware localhost page; a human approves in their
  *                      own wallet (the key never touches this process). Real value, mainnet.
- *   • sponsor        — a Privy agent grant; ABX Services relays an eligible zero-value transaction.
+ *   • sponsor        — a Privy agent grant; automatic native self-payment or eligible gas sponsorship.
  *   • unsigned (cold)— print the tx data to sign elsewhere (a multisig / offline signer).
  *
  * The agent picks the lane; the CLI owns the mechanics. Signing is the only step
@@ -182,10 +182,10 @@ async function signSponsored(provider: TxProvider, opts: SignOptions): Promise<S
     }
     const prepared = await resolveTx(provider, session.address);
     printIntent(prepared, {...opts, expectedSigner: session.address});
-    console.log(`\n  ${dim(`requesting sponsored send from ${session.address} …`)}`);
-    const {txHash, receipt} = await session.send(prepared);
+    console.log(`\n  ${dim(`requesting creator-wallet send from ${session.address} …`)}`);
+    const {txHash, receipt, paymentMode} = await session.send(prepared);
     console.log(`  ${dim('tx')} ${explorerFor(opts.chainKey)}/tx/${txHash}`);
-    console.log(`  ${green('✓')} sponsored and confirmed`);
+    console.log(`  ${green('✓')} ${paymentMode === 'self-paid' ? 'self-paid' : 'sponsored'} and confirmed`);
     return {txHash, prepared, blockNumber: receipt.blockNumber, contractAddress: receipt.contractAddress ?? null};
   } finally {
     session.close();
