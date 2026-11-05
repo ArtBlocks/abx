@@ -43,8 +43,8 @@ built-in help.
 | `render` / `effects` | Render once or run the effects worker |
 
 Structured deploy output uses `plan.schemaVersion: 3`. Creator-wallet plans include
-`paymentPolicy: "prefer-self-payment"`; consumers should check the schema version before interpreting
-the plan.
+`paymentPolicy: "prefer-self-payment"`; other signing lanes use `paymentPolicy: null`.
+Consumers should check the schema version before interpreting the plan.
 
 ## Sell and operate
 
