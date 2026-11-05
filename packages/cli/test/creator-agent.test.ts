@@ -225,12 +225,9 @@ test('native credential records round-trip without exposing a plaintext fallback
 
 test('sponsor preflight permits Base and Arbitrum networks behind the live account gate and requires the API key', () => {
   const before = process.env.ABX_SERVICES_API_KEY;
-  const eligible = ['base', 'base-sepolia', 'arbitrum', 'arbitrum-sepolia'];
+  const eligible = ['base', 'base-sepolia', 'arbitrum', 'arbitrum-sepolia', 'ethereum', 'sepolia', 'robinhood', 'robinhood-testnet'];
   try {
     delete process.env.ABX_SERVICES_API_KEY;
-    for (const chain of ['sepolia', 'ethereum', 'robinhood', 'robinhood-testnet']) {
-      assert.throws(() => assertSponsorConfigured(chain), /eligible Base and Arbitrum networks/);
-    }
     for (const chain of eligible) {
       assert.throws(() => assertSponsorConfigured(chain), /ABX_SERVICES_API_KEY/);
     }

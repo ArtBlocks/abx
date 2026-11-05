@@ -108,13 +108,13 @@ Every write uses one lane:
 
 | Flag | Behavior |
 | --- | --- |
-| `--sponsor` | Use an eligible account-bound creator wallet and provider-paid gas |
+| `--embedded` (alias `--sponsor`) | Creator wallet; self-pay when sufficiently funded, otherwise eligible gas is sponsored |
 | `--sign` | Open a browser wallet |
 | `--send` | Sign with the configured hot key |
 | `--unsigned` | Print an unsigned transaction |
 | `--dry-run` | Simulate without sending |
 
-If the creator has not chosen a signer, use the live remote descriptor to prefer sponsorship when the
+If the creator has not chosen a signer, use the live remote descriptor to prefer the creator wallet when the
 chain and transaction group are eligible. Otherwise choose the appropriate bring-your-own lane.
 Never paste a private key into a chat or prompt.
 

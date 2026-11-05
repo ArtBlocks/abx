@@ -17,9 +17,10 @@ function run(args: string[]): string {
 
 test('capabilities --json emits the typed capability contract exactly', () => {
   assert.deepEqual(JSON.parse(run(['capabilities', '--json'])), ABX_CAPABILITIES);
-  assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.chainIds, [8_453, 84_532, 42_161, 421_614]);
+  assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.sponsoredChainIds, [8_453, 84_532, 42_161, 421_614]);
+  assert.ok(ABX_CAPABILITIES.signingLanes.sponsor.chainIds.includes(1));
   assert.equal(ABX_CAPABILITIES.signingLanes.sponsor.supportLevel, 'supported');
-  assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.limits, ['zero value', 'network and provider gas policy']);
+  assert.deepEqual(ABX_CAPABILITIES.signingLanes.sponsor.limits, ['wallet covers value plus fees when self-paid', 'zero native value when sponsored', 'network and provider gas policy']);
 });
 
 test('EditionCode supported capability flags reach its exhaustive allowlist', () => {

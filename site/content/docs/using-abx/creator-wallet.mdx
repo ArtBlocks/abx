@@ -1,38 +1,48 @@
 ---
 title: "Creator wallet"
-description: "Deploy on eligible networks without bringing a funded wallet."
+description: "One embedded wallet with automatic gas payment."
 ---
 
 ABX Services gives each verified account one creator wallet. The API key identifies the account but
-cannot sign transactions.
+cannot sign transactions. The same wallet address applies across EVM networks; each network has its
+own balance.
 
-The [network table](/docs/reference/deployments) shows where sponsorship is available. Sponsorship may
-be limited or paused. Start on a testnet.
+Use `--embedded` for this wallet. `--sponsor` remains an alias for the same automatic payment policy.
+When the live provider enables self-payment on a network, ABX uses the wallet's native funds if they
+cover the transaction value plus the quoted fees. Otherwise, an eligible zero-value transaction uses
+ABX gas sponsorship. A non-zero-value transaction always needs enough native funds for value plus fees.
+There is no automatic switch to a different wallet.
 
-Sponsorship is available on Base, Base Sepolia, Arbitrum, and Arbitrum Sepolia for eligible accounts.
-Both the live service descriptor and your account capabilities must allow the chain. Arbitrum
-sponsorship requires CLI 0.7.3 or later; refresh the installed ABX skill after upgrading.
+The [network table](/docs/reference/deployments) lists sponsorship availability. Wallet self-payment
+and sponsorship are separate provider capabilities: check `abx remote abx` and account capabilities.
+Self-payment can cover qualified networks without sponsorship, including Ethereum. Sponsorship is
+currently offered on eligible Base and Arbitrum networks and their Sepolia testnets.
 
 ```bash
 abx auth login
 abx remote abx
-abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor --dry-run --json
-abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --sponsor
+abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --embedded --dry-run --json
+abx deploy --image ./art.png --name "Title" --symbol ART --onchain-uri --embedded
 ```
 
-Login provisions or reuses the account's stable creator wallet. To do that separately, or to show
-the address before a sponsored dry run, run `abx auth wallet`.
+Use the current CLI and refresh its installed skill after upgrading. During a provider rollout,
+older providers retain their sponsored-only behavior; recognition by the CLI does not enable a
+network or payment mode for an account.
 
-The first sponsored command asks you to match a code and approve the agent. ABX stores the grant in
-your operating system's credential store and reuses it for up to 30 days, unless you revoke it first. You
-still review the network and transaction plan in your terminal before each send.
+Login provisions or reuses the stable creator wallet. `abx auth wallet` shows its address separately.
+Fund that address on the network you intend to use. An ETH balance on Ethereum does not fund Base.
+Native fee quotes include execution fees and, on Base, a reserve for estimated L1/operator fees.
+Rollup fees can change; the CLI prints the selected payer and fee bounds before submission.
 
-[Manage agent access](https://services.abx.io/authorize) to review or revoke active grants.
-Sponsored operations cannot send ETH. If the operation is not eligible, use `--send`, `--sign`, or
-`--unsigned`.
+The first creator-wallet operation asks you to approve one agent grant. This single grant permits
+wallet transactions, including transferring funds and paying fees. ABX stores it in the operating
+system credential store and reuses it for up to 30 days unless revoked. There is no separate grant
+for sponsorship or self-payment. Review the network, transaction value, and permanent settings
+before sending. [Manage agent access](https://services.abx.io/authorize) to review or revoke grants.
 
-If a local RPC fails after submission, do not repeat the transaction. The CLI prints the transaction
-hash and operation ID. Check the hash, or run `abx auth operation <operation-id>`.
+Once an operation is prepared, its payment mode and fee ceilings are fixed. An uncertain submission
+is reconciled rather than retried with another payer. Preserve the transaction hash and operation ID;
+use `abx auth operation <operation-id>` for read-only recovery.
 
-Run the same flow on the paired testnet before using a production network. Check the network, value,
-and permanent settings before approval.
+Bring-your-own signing remains available through `--send`, `--sign`, and `--unsigned`. Run the same
+flow on the paired testnet before using a production network.
