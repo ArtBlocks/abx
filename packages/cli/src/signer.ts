@@ -321,7 +321,7 @@ async function signWallet(provider: TxProvider, opts: SignOptions): Promise<Sign
   try {
     const signer = await session.connect();
     const prepared = await resolveTx(provider, signer);
-    const {txHash, receipt, paymentMode} = await session.send(prepared);
+    const {txHash, receipt} = await session.send(prepared);
     return {txHash, prepared, blockNumber: receipt.blockNumber, contractAddress: receipt.contractAddress ?? null};
   } finally {
     session.close();
