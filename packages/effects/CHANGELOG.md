@@ -1,5 +1,13 @@
 # @artblocks/abx-effects
 
+## 0.1.10
+
+### Patch Changes
+
+- Updated dependencies [f1654fd]
+  - @artblocks/abx-sdk@0.8.0
+  - @artblocks/abx-storage@0.1.10
+
 ## 0.1.9
 
 ### Patch Changes
