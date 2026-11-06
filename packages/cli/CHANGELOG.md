@@ -1,5 +1,15 @@
 # @artblocks/abx-cli
 
+## 0.8.1
+
+### Patch Changes
+
+- 80d67eb: Include the automatic creator-wallet payment policy in Series previews, code previews and resume
+  plans. Require the field in every structured deploy plan so future lanes cannot silently omit it.
+- 1154ed1: Explain OS credential-store access before restoring a creator-wallet grant. Stop after denied or
+  failed credential reads instead of automatically starting another browser authorization flow.
+  Keep reusable grants in the OS credential store and document macOS Keychain prompts.
+
 ## 0.8.0
 
 ### Minor Changes
