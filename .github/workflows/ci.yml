@@ -1,16 +1,18 @@
-# Validate every pull request with the same pinned Node, pnpm, and lockfile used for releases.
+# Validate pull requests and merge-queue groups with the pinned release toolchain.
 name: CI
 
 on:
   workflow_dispatch:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
 
-# A new push supersedes an in-flight run on the same ref (but never cancels a `main` run).
+# Supersede obsolete PR/queue runs on the same ref, but never cancel a main-branch push.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 permissions:
   contents: read
