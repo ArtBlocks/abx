@@ -437,6 +437,7 @@ export function deploySeriesCommandLine(flags: Flags, salt: string): string {
   const bool = (k: string) => { if (flags[k] === '' || flags[k] === 'true') parts.push(`--${k}`); };
   str('dir', flags.dir); str('count', flags.count); str('name', flags.name); str('symbol', flags.symbol);
   str('description', flags.description); str('external-url', flags['external-url']); str('attributes', flags.attributes); // were DROPPED → the "redeploy identically" line lost the description
+  for (const [flag] of AUTHORSHIP_DEPLOY_FIELDS) str(flag, flags[flag]);
   bool('onchain-uri'); bool('onchain-image'); str('compress', flags.compress);
   str('backend', flags.backend); str('gateway', flags.gateway); str('bucket', flags.bucket);
   str('ipfs-gateway', flags['ipfs-gateway']); str('arweave-gateway', flags['arweave-gateway']);
@@ -459,6 +460,7 @@ export function deployCodeCommandLine(flags: Flags, salt: string): string {
   const bool = (k: string) => { if (flags[k] === '' || flags[k] === 'true') parts.push(`--${k}`); };
   str('script', flags.script); str('code-dir', flags['code-dir']);
   str('name', flags.name); str('symbol', flags.symbol); str('description', flags.description); str('external-url', flags['external-url']);
+  for (const [flag] of AUTHORSHIP_DEPLOY_FIELDS) str(flag, flags[flag]);
   str('image-renderer', flags['image-renderer']); str('image-base', flags['image-base']); str('attributes-renderer', flags['attributes-renderer']);
   str('max', flags.max); str('schema', flags.schema); bool('no-seed'); str('seed-source', flags['seed-source']);
   bool('onchain-uri'); str('generator', flags.generator); str('renderer', flags.renderer);
