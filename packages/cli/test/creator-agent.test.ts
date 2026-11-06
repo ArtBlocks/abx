@@ -4,8 +4,8 @@ import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {Chacha20Poly1305} from '@hpke/chacha20poly1305';
 import {CipherSuite, DhkemP256HkdfSha256, HkdfSha256} from '@hpke/core';
 import {generateP256KeyPair} from '@privy-io/node';
-import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/creator-keyring.js';
+import {CreatorAgentAuthorization, CreatorAuthorizationError, restoreOrAuthorizeCreatorAgent} from '../src/creator-agent.js';
+import {CreatorCredentialStoreAccessError, CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/creator-keyring.js';
 import {
   assertSponsorConfigured,
   assertSponsoredPreparedTx,
@@ -221,6 +221,66 @@ test('native credential records round-trip without exposing a plaintext fallback
   assert.deepEqual(await store.load(), tokens);
   await store.clear();
   assert.equal(await store.load(), null);
+});
+
+test('denied credential reads stop before another device grant, retry, write, or deletion', async () => {
+  const events: string[] = [];
+  const store = new CreatorKeyringStore('app_test', creatorWallet.address, {
+    async getPassword() {
+      events.push('read');
+      throw new Error('private native error detail');
+    },
+    async setPassword() { events.push('write'); },
+    async deleteCredential() { events.push('delete'); return true; },
+  });
+  const authorization = {
+    async restore() { await store.load(); return []; },
+    async start() { events.push('start'); return {userCode: 'test', verificationUri: 'https://example.test'}; },
+    async wait() { events.push('wait'); return []; },
+  };
+  await assert.rejects(
+    restoreOrAuthorizeCreatorAgent(authorization, {
+      checkingStore: () => events.push('context'),
+      device: () => events.push('show-device'),
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof CreatorCredentialStoreAccessError);
+      assert.match(error.message, /stopped before signing or starting another agent grant/);
+      assert.equal(error.message.includes('private native error detail'), false);
+      return true;
+    },
+  );
+  assert.deepEqual(events, ['context', 'read']);
+});
+
+test('a reusable grant does not start another device authorization', async () => {
+  const wallets = [{id: creatorWallet.id, address: creatorWallet.address, chainType: 'ethereum'}];
+  const events: string[] = [];
+  const result = await restoreOrAuthorizeCreatorAgent({
+    async restore() { events.push('read'); return wallets; },
+    async start() { throw new Error('must not start'); },
+    async wait() { throw new Error('must not wait'); },
+  }, {
+    checkingStore: () => events.push('context'),
+    device: () => { throw new Error('must not show device flow'); },
+  });
+  assert.deepEqual(result, {wallets, newlyApproved: false});
+  assert.deepEqual(events, ['context', 'read']);
+});
+
+test('an absent grant starts exactly one device flow after credential-store context', async () => {
+  const events: string[] = [];
+  const wallets = [{id: creatorWallet.id, address: creatorWallet.address, chainType: 'ethereum'}];
+  const result = await restoreOrAuthorizeCreatorAgent({
+    async restore() { events.push('read'); return null; },
+    async start() { events.push('start'); return {userCode: 'test', verificationUri: 'https://example.test'}; },
+    async wait() { events.push('wait'); return wallets; },
+  }, {
+    checkingStore: () => events.push('context'),
+    device: () => events.push('show-device'),
+  });
+  assert.deepEqual(result, {wallets, newlyApproved: true});
+  assert.deepEqual(events, ['context', 'read', 'start', 'show-device', 'wait']);
 });
 
 test('sponsor preflight permits Base and Arbitrum networks behind the live account gate and requires the API key', () => {

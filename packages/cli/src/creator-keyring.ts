@@ -22,6 +22,17 @@ interface KeyringEntry {
 const SERVICE = 'io.abx.cli.creator-wallet';
 const timeout = () => AbortSignal.timeout(15_000);
 
+export class CreatorCredentialStoreAccessError extends Error {
+  constructor() {
+    super(
+      'Could not read the saved ABX creator-wallet authorization from the OS credential store. ' +
+      'ABX stopped before signing or starting another agent grant. ' +
+      'If you denied the Keychain prompt, retry only when you intend to allow this Node installation access.',
+    );
+    this.name = 'CreatorCredentialStoreAccessError';
+  }
+}
+
 function secret(value: unknown): string {
   if (typeof value !== 'string' || !value || value.length > 16_384) throw new Error('invalid_creator_authorization');
   return value;
@@ -49,29 +60,39 @@ function decode(raw: string): StoredCreatorAuthorization {
 /** Native per-user credential storage: Keychain on macOS, Credential Manager on Windows, and
  * Secret Service/keyutils on Linux. The refresh credential is never written to project files. */
 export class CreatorKeyringStore implements CreatorAuthorizationStore {
-  readonly #entry: KeyringEntry;
+  #entry?: KeyringEntry;
+  readonly #identity: string;
 
   constructor(appId: string, walletAddress: string, entry?: KeyringEntry) {
-    const identity = createHash('sha256').update(`${appId}:${walletAddress.toLowerCase()}`).digest('hex');
-    this.#entry = entry ?? new AsyncEntry(SERVICE, identity);
+    this.#identity = createHash('sha256').update(`${appId}:${walletAddress.toLowerCase()}`).digest('hex');
+    this.#entry = entry;
+  }
+
+  #credential(): KeyringEntry {
+    return this.#entry ??= new AsyncEntry(SERVICE, this.#identity);
   }
 
   async load(): Promise<StoredCreatorAuthorization | null> {
-    const raw = await this.#entry.getPassword(timeout());
+    let raw: string | undefined;
+    try {
+      raw = await this.#credential().getPassword(timeout());
+    } catch {
+      throw new CreatorCredentialStoreAccessError();
+    }
     if (raw === undefined) return null;
     try {
       return decode(raw);
     } catch {
-      await this.#entry.deleteCredential(timeout());
+      await this.#credential().deleteCredential(timeout());
       return null;
     }
   }
 
   async save(tokens: StoredCreatorAuthorization): Promise<void> {
-    await this.#entry.setPassword(JSON.stringify({version: 1, ...tokens}), timeout());
+    await this.#credential().setPassword(JSON.stringify({version: 1, ...tokens}), timeout());
   }
 
   async clear(): Promise<void> {
-    await this.#entry.deleteCredential(timeout());
+    await this.#credential().deleteCredential(timeout());
   }
 }

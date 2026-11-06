@@ -34,6 +34,22 @@ export interface AuthorizedCreatorWallet {
   chainType: string;
 }
 
+/** A failed credential read is not an absent grant. Never replace it with a new device flow. */
+export async function restoreOrAuthorizeCreatorAgent(
+  authorization: Pick<CreatorAgentAuthorization, 'restore' | 'start' | 'wait'>,
+  callbacks: {
+    checkingStore: () => void;
+    device: (device: CreatorDeviceAuthorization) => void;
+  },
+): Promise<{wallets: AuthorizedCreatorWallet[]; newlyApproved: boolean}> {
+  callbacks.checkingStore();
+  const restored = await authorization.restore();
+  if (restored) return {wallets: restored, newlyApproved: false};
+  const device = await authorization.start();
+  callbacks.device(device);
+  return {wallets: await authorization.wait(), newlyApproved: true};
+}
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new CreatorAuthorizationError('invalid_response');
   return value as Record<string, unknown>;

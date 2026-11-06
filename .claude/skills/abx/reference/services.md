@@ -128,6 +128,12 @@ separate grant when payment changes, or another browser approval when a grant is
 or revoke grants at `https://services.abx.io/authorize`. Review exact actions before sending; an agent
 grant is not a per-transaction human approval.
 
+Before the first embedded-wallet write in a session, explain that macOS may ask whether Node can
+access the saved ABX authorization in Keychain. The Mac password stays with macOS; this is distinct
+from the browser wallet grant. If the human denies access or reports unexplained recurring prompts,
+stop wallet operations. Do not repeat credential probes, switch Node installations, or request
+replacement grants to work around that denial. Use one consistent Node runtime for qualification.
+
 Before sending, inspect live descriptor/account capabilities, run command help and a JSON dry run,
 and summarize the active chain, creator-wallet address, native value, transaction group, estimated
 fees and permanent choices. Honor an explicit bring-your-own signer choice. Repeat production risks
