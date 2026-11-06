@@ -6,6 +6,7 @@
     "cli",
     "sdk",
     "contracts",
-    "deployments"
+    "deployments",
+    "audits"
   ]
 }

@@ -13,7 +13,7 @@ export interface CreatorAccount {
   accountId: string;
   emailVerified: boolean;
   wallet: CreatorWallet | null;
-  capabilities: {wallet: boolean; sponsorship: boolean; sponsoredChains: number[]};
+  capabilities: {wallet: boolean; sponsorship: boolean; sponsoredChains: number[]; selfPayment?: boolean; walletChains?: number[]};
 }
 
 export interface CreatorOperation {
@@ -21,6 +21,7 @@ export interface CreatorOperation {
   chainId: number;
   walletId: string;
   state: CreatorOperationState;
+  paymentMode?: 'sponsored' | 'self-paid';
   providerTransactionId: string | null;
   transactionHash: Hex | null;
   userOperationHash: Hex | null;
@@ -94,6 +95,10 @@ function operation(value: unknown): CreatorOperation {
     chainId: Number(row.chainId),
     walletId: string(row.walletId),
     state,
+    paymentMode: row.paymentMode === undefined ? 'sponsored' : (() => {
+      if (row.paymentMode !== 'sponsored' && row.paymentMode !== 'self-paid') throw new Error('ABX Creators returned an invalid payment mode');
+      return row.paymentMode;
+    })(),
     providerTransactionId: nullable(row.providerTransactionId),
     transactionHash: nullable(row.transactionHash) as Hex | null,
     userOperationHash: nullable(row.userOperationHash) as Hex | null,
@@ -142,6 +147,12 @@ export class CreatorApiClient {
         wallet: capabilities.wallet === true,
         sponsorship: capabilities.sponsorship === true,
         sponsoredChains: chains as number[],
+        selfPayment: capabilities.selfPayment === true,
+        walletChains: (() => {
+          if (capabilities.walletChains === undefined) return [];
+          if (!Array.isArray(capabilities.walletChains) || capabilities.walletChains.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw new Error('ABX Creators returned invalid wallet chains');
+          return capabilities.walletChains as number[];
+        })(),
       },
     };
   }
@@ -164,6 +175,9 @@ export class CreatorApiClient {
     value: Hex;
     data: Hex;
     gasLimit: number;
+    paymentMode?: 'sponsored' | 'self-paid';
+    maxFeePerGas?: Hex;
+    maxPriorityFeePerGas?: Hex;
   }): Promise<CreatorPreparedOperation> {
     const result = object(await this.#request('POST', '/v1/operations', input));
     const signing = object(result.signingRequest);
@@ -197,7 +211,7 @@ export class CreatorApiClient {
     } catch (submitError) {
       if (
         submitError instanceof CreatorApiError &&
-        (submitError.status < 500 || submitError.code === 'sponsorship_disabled')
+        (submitError.status < 500 || ['sponsorship_disabled', 'self_payment_disabled'].includes(submitError.code))
       )
         throw submitError;
       // The write may already have reached the provider. Never replay it: reconcile the durable

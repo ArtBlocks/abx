@@ -63,6 +63,12 @@ function tmpSketch(): string {
   return p;
 }
 
+function tmpSeries(): string {
+  const dir = mkdtempSync(resolve(tmpdir(), 'abx-plan-series-'));
+  writeFileSync(resolve(dir, '0.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
+  return dir;
+}
+
 // ── 1/1 lane: royalty bps, burnable, mint plan, approvals count, custody choice, URI base ─────────
 test('deploy --dry-run --json: royalty/burnable/mint/approvals/custody/URI-base all agree between prose and plan', async () => {
   const {code, stdout, stderr} = await runCliSplit(
@@ -73,6 +79,7 @@ test('deploy --dry-run --json: royalty/burnable/mint/approvals/custody/URI-base 
   const payload = JSON.parse(stdout);
   const plan = payload.plan;
   assert.ok(plan, `no plan object in the JSON payload:\n${stdout}`);
+  assert.equal(plan.paymentPolicy, null, 'non-embedded plans explicitly have no creator payment policy');
 
   // royalty bps
   assert.match(stderr, /royalty 7\.5% →/, `fixture drifted — expected a 7.5% royalty line:\n${stderr}`);
@@ -113,6 +120,7 @@ test('deploy-code --dry-run --json: royalty/burnable/mint/approvals/on-chain-cus
   const payload = JSON.parse(stdout);
   const plan = payload.plan;
   assert.ok(plan, `no plan object in the JSON payload:\n${stdout}`);
+  assert.equal(plan.paymentPolicy, null, 'code previews include the required payment-policy field');
 
   assert.match(stderr, /royalty 2\.5%/, `fixture drifted — expected a 2.5% royalty:\n${stderr}`);
   assert.equal(plan.royalty.bps, 250, DRIFT_MSG);
@@ -203,6 +211,8 @@ test('deploy --onchain-image --dry-run --json: renderer address, image file meta
 const FAMILIES: Array<{args: string[]; family: DeployPlanFamily}> = [
   {args: ['deploy', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: '1of1'},
   {args: ['deploy', '--copies', '3', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: '1of1-edition'},
+  {args: ['deploy-series', '--dir', tmpSeries(), '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: 'series'},
+  {args: ['deploy-series', '--dir', tmpSeries(), '--copies', '3', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: 'series-edition'},
 ];
 
 test('every deploy lane emits the same schemaVersion and a closed-union family', async () => {
@@ -211,6 +221,7 @@ test('every deploy lane emits the same schemaVersion and a closed-union family',
     assert.equal(code, 0, `${args.join(' ')}:\n${stderr}`);
     const plan = JSON.parse(stdout).plan;
     assert.equal(plan.schemaVersion, DEPLOY_PLAN_SCHEMA_VERSION, `${family}: schemaVersion drifted`);
+    assert.equal(plan.paymentPolicy, null, `${family}: paymentPolicy must be explicit`);
     assert.equal(plan.family, family, `${family}: family discriminator drifted`);
   }
 });

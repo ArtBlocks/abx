@@ -136,17 +136,16 @@ Every write uses one of four lanes:
 
 | Lane | Select | Use when |
 |---|---|---|
-| Sponsored | `--sponsor` | The live remote advertises sponsorship for this chain and command |
+| Creator wallet | `--embedded` (alias `--sponsor`) | The live provider enables self-payment or sponsorship on this chain |
 | Hot | `--send` or default | An environment key may sign unattended |
 | Wallet | `--sign --for 0x…` | A human approves in their browser wallet |
 | Cold | `--unsigned --for 0x…` | A multisig/offline signer needs prepared transactions |
 
 Honor an explicit creator choice. Otherwise run `abx capabilities --json`, the command help, and
-`abx remote abx`. Prefer `--sponsor` when the provider advertises the active chain, the command and
-transaction group are eligible, and sponsorship is enabled—especially on a testnet, where it removes
-wallet and faucet setup. Sponsorship is provider policy, not protocol support: if it is unavailable,
-paused, or ineligible, fall back to the appropriate bring-your-own lane rather than treating the ABX
-operation as unsupported.
+`abx remote abx`. Prefer `--embedded` when the provider advertises the wallet on the active chain.
+It self-pays when native funds cover value plus quoted fees; otherwise eligible zero-value calls
+use sponsorship. Non-zero-value transactions need funds. Honor live wallet/payment capabilities;
+if unavailable, choose a bring-your-own lane. Never switch an explicitly chosen signer.
 
 Select the lane before the JSON dry run. The signer can affect ownership, salts, and predicted
 addresses. If the lane changes, rerun the dry run and summarize the revised plan before execution.
@@ -216,10 +215,9 @@ human confirmation authorizes execution.
 8. Run command help, then a JSON dry run.
 9. Confirm the plan and only then execute.
 
-For an eligible first-party account, `--sponsor` replaces local key and faucet setup with an
-account-bound creator wallet. The first use opens a Privy agent grant; later commands reuse that
-grant for up to 30 days, unless the creator revokes it first. Do not ask for another browser approval when the
-CLI resumes an existing grant. Use sponsorship only when the live descriptor and account
-capabilities advertise the active chain. Test the exact flow on the reported paired testnet before
-production. Read [services.md](services.md) before using it. Sponsorship is zero-value and never a
-reason to skip the dry run or transaction summary.
+For an eligible first-party account, `--embedded` uses the account-bound wallet without a local key.
+One reusable agent grant covers both native self-payment and sponsorship. Do not request another
+grant when the payer changes. The provider must advertise the network/payment capabilities; fund
+the same address on the active chain when self-payment is needed. Read [services.md](services.md),
+prove the paired testnet flow and review the dry run before sending. Only sponsored calls must
+have zero native value; self-paid calls may carry value when the wallet covers value plus fees.
