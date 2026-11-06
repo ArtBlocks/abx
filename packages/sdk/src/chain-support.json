@@ -36,7 +36,7 @@
       "environment": "testnet",
       "pairedChain": "arbitrum",
       "contractStatus": "deployed",
-      "supportLevel": "experimental"
+      "supportLevel": "supported"
     },
     {
       "key": "base",
@@ -45,7 +45,7 @@
       "environment": "production",
       "pairedChain": "base-sepolia",
       "contractStatus": "deployed",
-      "supportLevel": "beta"
+      "supportLevel": "supported"
     },
     {
       "key": "robinhood",
@@ -63,7 +63,7 @@
       "environment": "production",
       "pairedChain": "sepolia",
       "contractStatus": "deployed",
-      "supportLevel": "beta"
+      "supportLevel": "supported"
     },
     {
       "key": "arbitrum",
@@ -72,7 +72,7 @@
       "environment": "production",
       "pairedChain": "arbitrum-sepolia",
       "contractStatus": "deployed",
-      "supportLevel": "beta"
+      "supportLevel": "supported"
     }
   ]
 }

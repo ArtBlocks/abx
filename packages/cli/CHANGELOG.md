@@ -1,5 +1,61 @@
 # @artblocks/abx-cli
 
+## 0.8.1
+
+### Patch Changes
+
+- 80d67eb: Include the automatic creator-wallet payment policy in Series previews, code previews and resume
+  plans. Require the field in every structured deploy plan so future lanes cannot silently omit it.
+- 1154ed1: Explain OS credential-store access before restoring a creator-wallet grant. Stop after denied or
+  failed credential reads instead of automatically starting another browser authorization flow.
+  Keep reusable grants in the OS credential store and document macOS Keychain prompts.
+
+## 0.8.0
+
+### Minor Changes
+
+- f1654fd: Add automatic creator-wallet payment: sufficiently funded wallets pay native value and network
+  fees; eligible zero-value calls otherwise use sponsorship. Introduce `--embedded` with `--sponsor`
+  as its backwards-compatible alias, reuse one agent grant, and verify returned signing payloads
+  against the local transaction intent before signing. Self-payment requires live provider support.
+  Structured deploy plans use schema version 3 with the automatic payment policy.
+
+### Patch Changes
+
+- Updated dependencies [f1654fd]
+  - @artblocks/abx-sdk@0.8.0
+  - @artblocks/abx-indexer@0.1.10
+  - @artblocks/abx-storage@0.1.10
+  - @artblocks/abx-token-api@0.2.9
+
+## 0.7.4
+
+### Patch Changes
+
+- e497ffe: Mark Arbitrum Sepolia, Arbitrum, Base, and Ethereum mainnet as supported. Align the network registry,
+  CLI capabilities, qualification notices, and public network table with their supported status.
+- Updated dependencies [e497ffe]
+  - @artblocks/abx-sdk@0.7.1
+  - @artblocks/abx-indexer@0.1.9
+  - @artblocks/abx-storage@0.1.9
+  - @artblocks/abx-token-api@0.2.8
+
+## 0.7.3
+
+### Patch Changes
+
+- c77b9d9: Allow the sponsored signing lane on Arbitrum and Arbitrum Sepolia when the live provider and account advertise eligibility. Update command help and bundled agent guidance for controlled network rollouts; recognizing these chains does not grant sponsorship.
+
+## 0.7.2
+
+### Patch Changes
+
+- d86143f: Add selectively loaded ecosystem discovery references for every selectable ABX network, with shared
+  official tooling, ERC-20 and external token-launch ideas, and input provenance. Favor resilient
+  same-chain EVM reads and self-contained output; disclose lifetime service dependencies, owner-controlled
+  replacement, fallback behavior, and account/credential requirements for service-dependent designs.
+- 6fe1f7c: Broaden skill ideation to programmable digital objects, clarify state-changing hook capabilities, and keep concept exploration separate from implementation.
+
 ## 0.7.1
 
 ### Patch Changes

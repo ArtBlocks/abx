@@ -10,18 +10,23 @@ ABX is adding EVM networks. This table is the central human-readable list.
 | Base Sepolia | `84532` | Testnet | Supported, default | Deployed | Available |
 | Sepolia | `11155111` | Testnet | Supported | Deployed | No |
 | Robinhood Chain Testnet | `46630` | Testnet | Experimental | Deployed | No |
-| Arbitrum Sepolia | `421614` | Testnet | Experimental | Deployed | No |
-| Base | `8453` | Production | Beta | Deployed | Available |
+| Arbitrum Sepolia | `421614` | Testnet | Supported | Deployed | Available |
+| Base | `8453` | Production | Supported | Deployed | Available |
 | Robinhood Chain | `4663` | Production | Beta | Deployed | No |
-| Ethereum | `1` | Production | Beta | Deployed | No |
-| Arbitrum | `42161` | Production | Beta | Deployed | No |
+| Ethereum | `1` | Production | Supported | Deployed | No |
+| Arbitrum | `42161` | Production | Supported | Deployed | Available |
+
+Sponsorship is available to eligible accounts and may be limited or paused. Check the live service
+descriptor and your account capabilities before relying on sponsored gas in the `--embedded` lane. Wallet self-payment is a separate live
+capability and requires funds on the selected network.
 
 `Supported` networks are ready for their stated environment. `Experimental` networks are under
-qualification. `Beta` networks use real funds and irreversible state while ABX remains pre-1.0.
+qualification. `Beta` networks are still under production qualification.
 The CLI refuses disabled networks.
 
 Before a production transaction, run the same flow on the paired testnet. Review the network, signer,
-transaction group, value, and locks. ABX has not had an independent third-party audit.
+transaction group, value, and locks. ABX has not had a comprehensive independent security audit.
+See [Third-party audits](/docs/reference/audits) for limited-scope reports and the maintainer response.
 
 The machine-readable sources of truth are
 [`chain-support.json`](https://github.com/ArtBlocks/abx/blob/main/packages/sdk/src/chain-support.json)

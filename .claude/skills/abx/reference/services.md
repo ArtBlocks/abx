@@ -112,50 +112,50 @@ the API key or account. A creator can always opt out by setting their own `ABX_R
 
 ## Creator wallet and sponsorship
 
-An account with a verified email can use one persistent ABX creator wallet. The
-`ABX_SERVICES_API_KEY` identifies the account but cannot sign. `--sponsor` discovers the provider's
-`abx-creator-wallet/v1` endpoint and reuses the wallet created during login. `abx auth wallet`
-provisions or shows it explicitly when needed. The first sponsored command
-asks the human to match one code and approve a Privy agent grant. The CLI keeps the rotating grant in
-the operating system's credential store and reuses it for up to 30 days, unless the creator revokes
-it first. The request-signing key remains memory-only. A reused grant removes another browser step; it does
-not remove the dry run, transaction summary, or production confirmation.
+An account with a verified email has one persistent creator wallet. Its API key cannot sign.
+`--embedded` discovers `abx-creator-wallet/v1` and reuses that wallet. `--sponsor` is a legacy alias
+for this same automatic lane. Use `abx auth wallet` to provision/show the address before a dry run.
 
-The approval is authority for the agent to use the creator wallet, not approval of one displayed
-transaction. Review each exact network and transaction plan in the terminal. The creator can inspect
-and revoke active grants at `https://services.abx.io/authorize`.
+The default payment policy is automatic: when the provider advertises self-payment on the active
+network and the wallet can cover native transaction value plus quoted fees, it pays its own gas.
+Otherwise, eligible zero-value calls use sponsorship. Non-zero native value always requires enough
+funds for value plus fees. Balances belong to each network; never infer funding from another chain
+or from ERC-20 balances. Older providers retain sponsored-only behavior until they advertise self-payment.
 
-Treat the live descriptor and account capabilities as the authority for sponsored networks. The
-public [network table](https://docs.abx.io/docs/reference/deployments) is the human-readable summary,
-but it does not guarantee sponsorship for an account or moment. When the creator has not selected
-another signer, prefer this lane for an eligible testnet operation. For production, prove the flow on
-the paired testnet and repeat the production warning before confirmation. Before using it:
+One Privy agent grant authorizes wallet use, including transfers and gas spending. The CLI stores
+its rotating grant in the OS credential store for up to 30 days unless revoked. Do not ask for a
+separate grant when payment changes, or another browser approval when a grant is reusable. Manage
+or revoke grants at `https://services.abx.io/authorize`. Review exact actions before sending; an agent
+grant is not a per-transaction human approval.
 
-1. run `abx auth login` if the account has no API key;
-2. inspect `abx capabilities --json` and the command help;
-3. run the same command with `--dry-run --json`;
-4. summarize the network, creator-wallet address, transaction group, zero value, permanent choices,
-   and any experimental or beta status;
-5. repeat with `--sponsor`; if no usable grant exists, give the human the verified URL and code and
-   resume the same command after approval.
+Before the first embedded-wallet write in a session, explain that macOS may ask whether Node can
+access the saved ABX authorization in Keychain. The Mac password stays with macOS; this is distinct
+from the browser wallet grant. If the human denies access or reports unexplained recurring prompts,
+stop wallet operations. Do not repeat credential probes, switch Node installations, or request
+replacement grants to work around that denial. Use one consistent Node runtime for qualification.
 
-The lane accepts zero-value calls and receipt-dependent staged content groups up to the live network
-and provider policy. ABX does not impose an additional per-transaction gas ceiling. Use
-`abx deploy-contract` for exact already-compiled creation bytecode; its sponsored path calls the
-keyless CREATE2 proxy because provider-backed raw creation is unsupported. The constructor therefore
-sees the proxy as `msg.sender`; use explicit constructor arguments for ownership. ABX does not
-compile or audit it. Never add retries around a sponsored write. An `unknown` outcome means the
-provider may have submitted it: preserve the operation ID and reconcile status before any new send.
-Use `abx auth operation <operation-id>` for that read-only reconciliation. If Services has confirmed
-an operation but a public RPC cannot return its receipt, the confirmation and transaction hash still
-stand; switch RPCs or inspect the hash, never replay the write.
+Before sending, inspect live descriptor/account capabilities, run command help and a JSON dry run,
+and summarize the active chain, creator-wallet address, native value, transaction group, estimated
+fees and permanent choices. Honor an explicit bring-your-own signer choice. Repeat production risks
+and prove the same flow on the paired testnet before production.
 
-Sponsorship is optional service policy, not protocol support. `--send`, `--sign`, and `--unsigned`
-remain first-class bring-your-own alternatives. Honor an explicit choice of any of them. If the
-provider does not advertise the chain, the account is ineligible, or the transaction group exceeds
-policy, select one of those lanes rather than refusing the underlying operation. Do not use
-sponsorship on a production network unless the live descriptor, account capabilities, and command
-all explicitly support it. Never infer eligibility merely because the CLI recognizes the lane.
+The CLI independently checks the service-returned payload against its local intent, including the
+wallet, chain, recipient, calldata, value, gas limit, payer and native fee ceilings. A mismatch must
+stop before signing. Fees on Base include estimated L1/operator charges in the funding reserve;
+these rollup fees can change. The chosen payer and fee bounds are shown before submission.
+
+Receipt-dependent staged content uses the same wallet serially, quoting each transaction before it
+is prepared. `deploy-contract` routes exact creation bytecode through the keyless CREATE2 proxy;
+pass ownership explicitly because the constructor caller is the proxy. ABX does not compile or audit it.
+
+Once prepared, payment mode and fee ceilings cannot change. Never retry an uncertain result or
+switch payers after submission. Preserve the operation ID and use `abx auth operation <operation-id>`
+for read-only reconciliation. A provider-confirmed transaction remains submitted even if another
+RPC cannot find its receipt; inspect the hash rather than replaying it.
+
+`--send`, `--sign`, and `--unsigned` remain first-class alternatives. Funding cannot bypass a disabled
+wallet, revoked authorization, unsupported network or provider policy. Sponsorship eligibility is
+separate from network/protocol support and wallet self-payment.
 
 ## Feedback targets
 

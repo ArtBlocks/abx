@@ -1,9 +1,9 @@
 ---
 title: "Custom mechanics"
-description: "Add mint and parameter rules without forking the token contract."
+description: "Add lifecycle actions and rules without forking the token contract."
 ---
 
-Most custom mechanics do not need a custom token. Keep the canonical ABX clone and put the new rule in
+Most custom mechanics do not need a custom token. Keep the canonical ABX clone and put the behavior in
 a separate controller contract.
 
 ## Extension points
@@ -11,15 +11,28 @@ a separate controller contract.
 | Point | Set with | Job |
 | --- | --- | --- |
 | Minter | `abx set-minter` | Takes payment or checks eligibility before minting. |
-| Configure hook | `abx set-param-hooks --configure` | Accepts or rejects a parameter write. |
-| Transfer hook | `abx set-param-hooks --transfer` | Accepts or rejects a mint, transfer, or burn. |
-| Augment hook | `abx set-param-hooks --augment` | Adds values when `tokenData` is read. |
+| Configure hook | `abx set-param-hooks --configure` | Executes contract actions before a governed parameter write persists; may reject it. |
+| Transfer hook | `abx set-param-hooks --transfer` | Executes contract actions during mint, transfer, or burn; may reject the move. |
+| Augment hook | `abx set-param-hooks --augment` | Adds values when `tokenData` is read; cannot change state. |
 
 One controller may be both the minter and a hook.
 
 Parameter hooks exist only on `SeriesCode` and `EditionCode`, the contracts created by
 `abx deploy-code`. An image series cannot gain hooks later. `--burnable` and `--copies` are also fixed
 at deployment.
+
+## Actions beyond validation
+
+A parameter edit can trigger a swap through an AMM's official router, create an asset through a
+factory, or update a shared resource. A transfer can trigger settlement or other financial actions.
+Configure hooks run before the new value persists; transfer hooks run after ownership/balance
+changes, within the same transaction. If a hook reverts, the operation and its on-chain actions roll
+back. Augment hooks are read-only; off-chain effects are a separate execution model.
+
+Custom contracts must authenticate the calling token and arrange funding and permissions explicitly.
+Editing an NFT does not grant access to its holder's wallet or forward payment to the hook. Bound
+spending and slippage, guard reentrancy and repeated triggers, and test every lifecycle path before
+using financial actions. Hook installation alone grants no mint, burn, or transfer authority.
 
 ## Transfer lock
 
