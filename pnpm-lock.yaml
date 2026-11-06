@@ -120,6 +120,9 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
+      parse5:
+        specifier: 7.3.0
+        version: 7.3.0
 
   packages/storage:
     dependencies:

@@ -662,7 +662,7 @@ const COMMAND_HELP: Record<string, string> = {
   inspect: `
   ${bold('abx inspect')} <script.js> ${dim('— static analysis of a generative script + a lane recommendation. Read-only; the script is never executed.')}
     ${g('--dep <name@version>[,…]')}   the on-chain deps you plan to declare, so the assembled-document size estimate is realistic (e.g. --dep p5@1.0.0)
-    Reports: script size → on-chain chunks; detected libraries; the traits the script reports AND whether they can be
+    Reports: inline HTML compatibility warnings; script size → on-chain chunks; detected libraries; the traits the script reports AND whether they can be
     reproduced ON-CHAIN (seeded p5 LCG + integer/threshold traits → exact; Math.random / float-boundary → not); the
     estimated assembled document size → whether a single ${g('tokenURI')} eth_call fits (template/fully-on-chain viability).
     Ends with a recommended lane (fully-on-chain / resolver / directory). Run it BEFORE ${g('abx deploy-code')} to derive the

@@ -56,21 +56,20 @@ export const ABX_JS = `(function () {
 `;
 
 /**
- * Inline-document safety — the one HTML parsing rule that matters when embedding
- * content inside <script> elements: the parser ends the element at the first
- * `</script`, regardless of JS string/comment context. Two content shapes, two
- * semantics-preserving escapes:
+ * Inline-document encoding for two content shapes. HTML recognizes script delimiters even in
+ * JS strings/comments. This closing-tag escape handles ordinary `</script` sequences; it does not
+ * cover every HTML script-data state (see inlineScriptUnterminatedAt in inspect.ts).
  *
- *  - JS source (libraries, creator scripts): `</script` → `<\/script`. In valid JS the
- *    sequence can only occur inside a string, template, regex, or comment — contexts
- *    where `\/` is identical to `/` — so the transform never changes behavior.
+ *  - JS source (libraries, creator scripts): `</script` → `<\/script`. This preserves ordinary
+ *    string values but can change raw tagged-template text (for example String.raw). It is delivery
+ *    encoding, not JavaScript validation or a guarantee of unchanged behavior for every program.
  *  - JSON (the injected `window.abxTokenData`): every `<` → `\u003c`. `<` only occurs
  *    inside JSON strings (never in the syntax), and `\u003c` parses to the same
  *    character — the canonical (hashed) serialization is untouched; only the delivery
  *    form differs.
  */
 
-/** JS source safe to inline inside a <script> element. Case-insensitive because HTML end tags
+/** Escape script-closing sequences in JS source. Case-insensitive because HTML end tags
  *  are; the on-chain generator matches this (see `AbxGenerator._escapedScript`). */
 export function escapeInlineScript(src: string): string {
   return src.replace(/<\/(script)/gi, '<\\/$1');
