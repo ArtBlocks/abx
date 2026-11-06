@@ -81,3 +81,17 @@ test('source positions use UTF-16 offsets across Unicode and previously escaped 
   const source = 'var emoji="🎨"; var a="</SCRIPT>";\nvar s="<!--<script>";';
   assert.equal(inlineScriptUnterminatedAt(source), source.indexOf('<!--'));
 });
+
+
+test('comment terminator exits double-escaped state to data; a later script opener alone cannot re-enter', () => {
+  // HTML 13.2.5.29 switches to script data, not escaped, on the `>` in `-->`.
+  // Changing that transition to escaped would incorrectly warn on this valid embedded script.
+  const source = 'var s="<!--<script>--><script>";';
+  assert.equal(inlineScriptUnterminatedAt(source), null);
+  assert.equal(hasAfter(parse(buildGeneratorDocument(source, '{}', []) + '<p id="abx-inline-after">after</p>')), true);
+
+  // A fresh comment opener after the terminator DOES allow double-escaped state again.
+  const unterminated = 'var s="<!--<script>--><!--<script>";';
+  assert.equal(inlineScriptUnterminatedAt(unterminated), unterminated.lastIndexOf('<!--'));
+  assert.equal(hasAfter(parse(buildGeneratorDocument(unterminated, '{}', []) + '<p id="abx-inline-after">after</p>')), false);
+});

@@ -263,6 +263,9 @@ export function inlineScriptUnterminatedAt(src: string): number | null {
         return i === shellClose ? null : i; // unreachable before the shell after escaping; defensive
       }
     } else if (doc[i] === '>' && doc[i - 1] === '-' && doc[i - 2] === '-') {
+      // Both escaped-dash-dash and double-escaped-dash-dash return to script data on `>`.
+      // In particular, `<!--<script>--><script>` terminates normally: the second opener is data.
+      // https://html.spec.whatwg.org/multipage/parsing.html#script-data-double-escaped-dash-dash-state
       state = 'data'; // `-->` (including the `<!-->` / `<!--->` short forms)
     } else if (state === 'escaped') {
       if (scriptTagAt(doc, i, '</')) return i === shellClose ? null : i;
