@@ -22,7 +22,7 @@ import {
   type PublicClient,
 } from '@artblocks/abx-sdk';
 import {formatEther, formatGwei, type TransactionReceipt} from 'viem';
-import {CreatorAgentAuthorization, CreatorAuthorizationError} from './creator-agent.js';
+import {CreatorAgentAuthorization, restoreOrAuthorizeCreatorAgent} from './creator-agent.js';
 import {CreatorKeyringStore} from './creator-keyring.js';
 import {quoteCreatorPayment, assertCreatorSigningRequest, preflightCreatorPayment} from './creator-payment.js';
 import {warn} from './output.js';
@@ -285,40 +285,32 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
     warn('Could not use the OS credential store. This authorization works for the current command only.');
   };
   const store = new CreatorKeyringStore(wallet.providerAppId, wallet.address);
-  let authorization = new CreatorAgentAuthorization({
+  const authorization = new CreatorAgentAuthorization({
     appId: wallet.providerAppId,
     store,
     onPersistenceError: persistenceWarning,
   });
   try {
-    let canPersist = true;
-    let newlyApproved = false;
-    let wallets;
-    try {
-      wallets = await authorization.restore();
-    } catch (error) {
-      if (error instanceof CreatorAuthorizationError) throw error;
-      persistenceWarning();
-      canPersist = false;
-      authorization.dispose();
-      authorization = new CreatorAgentAuthorization({appId: wallet.providerAppId});
-      wallets = null;
-    }
-    if (!wallets) {
-      newlyApproved = true;
-      const device = await authorization.start();
-      const verificationUrl = device.verificationUriComplete ?? device.verificationUri;
-      console.log(`\n  Authorize this agent to use your ABX creator wallet:`);
-      console.log(`  ${verificationUrl}`);
-      console.log(`  Code: ${device.userCode}\n`);
-      openBrowser(verificationUrl);
-      wallets = await authorization.wait();
-    }
+    const {wallets, newlyApproved} = await restoreOrAuthorizeCreatorAgent(authorization, {
+      checkingStore: () => {
+        console.log(`  Checking the saved ABX creator-wallet authorization for ${wallet.address} in your OS credential store.`);
+        if (process.platform === 'darwin') {
+          console.log('  macOS may ask whether Node can access it. This is saved-authorization access; your Mac password stays with macOS.');
+        }
+      },
+      device: (device) => {
+        const verificationUrl = device.verificationUriComplete ?? device.verificationUri;
+        console.log(`\n  Authorize this agent to use your ABX creator wallet:`);
+        console.log(`  ${verificationUrl}`);
+        console.log(`  Code: ${device.userCode}\n`);
+        openBrowser(verificationUrl);
+      },
+    });
     const authorized = wallets.find(
       (candidate) => candidate.chainType === 'ethereum' && candidate.address.toLowerCase() === wallet.address.toLowerCase(),
     );
     if (!authorized) throw new Error(`Privy authorized a different wallet; expected ${wallet.address}.`);
-    if (newlyApproved && canPersist) {
+    if (newlyApproved) {
       try {
         await authorization.remember();
         console.log(`  Agent access saved in your OS credential store. Manage or revoke it at ${CREATOR_GRANTS_URL}.\n`);

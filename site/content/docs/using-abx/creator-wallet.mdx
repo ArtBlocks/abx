@@ -43,6 +43,14 @@ system credential store and reuses it for up to 30 days unless revoked. There is
 for sponsorship or self-payment. Review the network, transaction value, and permanent settings
 before sending. [Manage agent access](https://services.abx.io/authorize) to review or revoke grants.
 
+On macOS, Keychain may ask whether **Node** can access the saved ABX authorization. Your Mac password
+stays with macOS. This protects access to the cached grant; it does not approve a transaction.
+One-time Keychain permission can prompt again on later access, and different Node installations or
+wallet accounts may need their own permission. The CLI explains credential-store access before it
+begins. If reading the saved grant fails or you deny that read, ABX stops rather than automatically
+starting another grant.
+Retry only when you intend to allow access to the expected Node installation.
+
 Once an operation is prepared, its payment mode and fee ceilings are fixed. An uncertain submission
 is reconciled rather than retried with another payer. Preserve the transaction hash and operation ID;
 use `abx auth operation <operation-id>` for read-only recovery.
