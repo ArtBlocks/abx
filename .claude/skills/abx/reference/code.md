@@ -93,6 +93,21 @@ or augment hook, with resilient fallback output. Do not recommend HTTP-dependent
 default; even an on-chain script can depend on a service forever. Apply the
 [durability guidance](ecosystem/durability.md) before proposing an essential external service.
 
+### Inline HTML compatibility
+
+`inspect`, `deploy-code --script` (including EditionCode), and `replace-script` warn when raw source
+would leave the generated inline script unterminated: a `<!--` followed by `<script` can trigger it,
+even inside a JS string or comment. A lone `<!--` is not enough. The existing generator handles
+ordinary `</script` sequences; do not label every script-tag string unsupported.
+
+Treat the warning as a rendering compatibility finding, not a malicious-code verdict or general
+JavaScript validation. Explain that storing bytes successfully does not prove the artwork runs.
+Correct the source for its actual JS context (in an ordinary string, `'<!-' + '-'` avoids the
+literal opener); never blindly rewrite source or add `-->`. The checks are local, warning-only,
+and preserve the uploaded bytes and current generator behavior. Preview the generated HTML before
+uploading or locking. `replace-script` can repair an unlocked program; `lock-script` freezes its
+stored bytes permanently.
+
 ## Plan JavaScript projects
 
 ### On-chain program, hosted resolution

@@ -4,7 +4,19 @@
  */
 import vm from 'node:vm';
 import {toHex, type Hex} from 'viem';
-import {joinScriptChunks, splitScriptChunks} from '@artblocks/abx-sdk';
+import {inlineScriptUnterminatedAt, joinScriptChunks, splitScriptChunks} from '@artblocks/abx-sdk';
+
+/** Warn without changing source or rejecting a write; HTML parsing ignores JS string/comment context. */
+export function warnInlineScriptHtml(source: string, at = inlineScriptUnterminatedAt(source)): void {
+  if (at === null) return;
+  const before = source.slice(0, at).split('\n');
+  const line = before.length;
+  const column = before[before.length - 1].length + 1;
+  // Diagnostics stay on stderr so a structured deployment plan remains readable as JSON.
+  console.error(`  ⚠ Inline HTML compatibility (line ${line}, column ${column}): <!-- followed by <script leaves the generated inline script unterminated; the browser never runs the program.`);
+  console.error("    In an ordinary string literal, split a token (for example '<!-' + '-'); choose an edit appropriate to its JavaScript context. HTML also sees these sequences inside strings and comments.");
+  console.error('    Preview the generated page before uploading or locking. This is a local warning: the source bytes and generator are unchanged.');
+}
 
 /**
  * Plan the on-chain script chunks for a template-mode deploy. The generator joins with `'\n'`;
@@ -21,6 +33,7 @@ export function planOnChainScript(source: string, chunkSize?: number): Hex[] {
         'chunks with a newline; this is a toolkit bug, not something to work around.',
     );
   }
+  warnInlineScriptHtml(source);
   return parts.map((b) => toHex(b));
 }
 

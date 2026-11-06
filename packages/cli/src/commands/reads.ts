@@ -8,6 +8,7 @@ import {existsSync, readFileSync} from 'node:fs';
 import {basename, resolve as resolvePath} from 'node:path';
 import {getAddress, isAddress} from 'viem';
 import {SqliteStore} from '@artblocks/abx-indexer';
+import {warnInlineScriptHtml} from '../script-chunks.js';
 import {
   type Address,
   analyzeScript,
@@ -198,6 +199,8 @@ export async function cmdInspect(path: string | undefined, flags: Flags) {
     if (a.runtime.wrongGlobal) warn(`  found instead: ${bold(a.runtime.wrongGlobal)}.`);
     info(`the mint ${bold('seed')} and collector ${bold('params')} will NOT reach it → every token renders IDENTICALLY, and traits stay empty. Read state the one supported way: ${bold('var td = (window.abx && abx.tokenData) || {}')} then ${bold('td.seed')} / ${bold('td.<paramKey>')} (flat), report with ${bold('abx.traits({…})')}. Contract + a worked example: the skill's "Authoring the program" section.`);
   }
+
+  warnInlineScriptHtml(source, a.inlineHtml?.at);
 
   step('Traits');
   if (a.traits.present) {
