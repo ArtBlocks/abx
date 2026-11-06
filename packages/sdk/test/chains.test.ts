@@ -38,15 +38,15 @@ test('chain registry separates recognized networks from selectable networks', ()
   assert.equal(chainSupportByKey('robinhood-testnet')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood-testnet')?.supportLevel, 'experimental');
   assert.equal(chainSupportByKey('arbitrum-sepolia')?.contractStatus, 'deployed');
-  assert.equal(chainSupportByKey('arbitrum-sepolia')?.supportLevel, 'experimental');
+  assert.equal(chainSupportByKey('arbitrum-sepolia')?.supportLevel, 'supported');
   assert.equal(chainSupportByKey('base')?.contractStatus, 'deployed');
-  assert.equal(chainSupportByKey('base')?.supportLevel, 'beta');
+  assert.equal(chainSupportByKey('base')?.supportLevel, 'supported');
   assert.equal(chainSupportByKey('robinhood')?.contractStatus, 'deployed');
   assert.equal(chainSupportByKey('robinhood')?.supportLevel, 'beta');
   assert.equal(chainSupportByKey('ethereum')?.contractStatus, 'deployed');
-  assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'beta');
+  assert.equal(chainSupportByKey('ethereum')?.supportLevel, 'supported');
   assert.equal(chainSupportByKey('arbitrum')?.contractStatus, 'deployed');
-  assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'beta');
+  assert.equal(chainSupportByKey('arbitrum')?.supportLevel, 'supported');
 });
 
 test('registry ids agree with viem chain metadata, including disabled production networks', () => {
@@ -81,7 +81,7 @@ test('Ethereum has independent keyless default RPCs', () => {
   ]);
 });
 
-test('Base has a keyless default RPC for beta access', () => {
+test('Base has keyless default RPCs', () => {
   assert.deepEqual(resolveRpcUrls('base'), ['https://mainnet.base.org', 'https://base-rpc.publicnode.com']);
 });
 

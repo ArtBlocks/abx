@@ -1273,6 +1273,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: '1of1' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
         // The 1/1 lane's InitParams has no minter/primaryPayee field at all — `null` here means
         // "no concept on this lane", not "unset".
@@ -1455,6 +1456,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: '1of1' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
       roles: {signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null, primaryPayee: null, minter: null},
       royalty: {bps: royaltyBps, capBps: maxRoyaltyBps, burnable},
@@ -1872,6 +1874,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: '1of1-edition' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -1998,6 +2001,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: '1of1-edition' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -2507,6 +2511,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'series' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         // A staged on-chain collection is many chunk-write txs, one per file — that per-token detail
         // is printed above (`previewImageStaging`), not re-derived here; `legs` just names the shape.
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per token)', 'deploy'] : null},
@@ -2661,6 +2666,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: 'series' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per token)', 'deploy'] : null},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -3131,6 +3137,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'series-edition' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per id)', 'deploy'] : null},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -3252,6 +3259,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: 'series-edition' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per id)', 'deploy'] : null},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -3542,7 +3550,7 @@ export const DEPLOY_CODE_FLAGS = new Set([
   // storage (directory mode) — mirrors storageOverrides()
   'backend', 'endpoint', 'bucket', 'region', 'prefix', 'public-base', 'gateway', 'mode', 'api-url', 'upload-url', 'provider', 'storage-signer',
   // signing lane + safety + trust anchor ('send' = the default lane, stated explicitly; see SHARED_DEPLOY_FLAGS)
-  'send', 'sign', 'sponsor', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'sponsor', 'embedded', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   // preview / confirm
   'dry-run', 'confirm', 'yes',
   'json', // the deployed address as data, narration to stderr
@@ -3569,7 +3577,7 @@ export const SHARED_DEPLOY_FLAGS = [
   // ignored — the guard firing on the tool's own documentation. Explicit is also better than bare for
   // a script or an agent: the lane that signs and sends is worth stating out loud.
   'send',
-  'sign', 'sponsor', 'unsigned', 'for', 'sign-url-file', 'dry-run', 'confirm', 'yes', 'salt', 'factory', 'bootstrap-factory', 'port', 'renderer', 'public-base-url',
+  'sign', 'sponsor', 'embedded', 'unsigned', 'for', 'sign-url-file', 'dry-run', 'confirm', 'yes', 'salt', 'factory', 'bootstrap-factory', 'port', 'renderer', 'public-base-url',
   '721c', // opt-in ERC-721C enrollment (recommended | 0x…) — every deploy path takes it
   'json', // the deployed address as data, narration to stderr — every deploy path takes it
 ];
@@ -4587,6 +4595,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         // here would hit its temporal dead zone. `laneFromFlags` is pure (flags only), so call it
         // directly; the sent-side emit, below `const lane = …`, uses the hoisted binding instead.
         lane: laneFromFlags(flags),
+        paymentPolicy: laneFromFlags(flags) === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -4815,6 +4824,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: isEdition ? 'code-edition' : 'code',
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       roles: {signer: owner, owner, royaltyReceiver: null, primaryPayee: null, minter: null},
       royalty: null,
       // renderer/image: null — both are InitParams facts fixed at the ORIGINAL deploy (like
@@ -5091,6 +5101,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'code' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -5209,7 +5220,7 @@ export const DEPLOY_CODE_EDITION_FLAGS = new Set<string>([
   'max', 'mint-count', 'mint-all', 'no-mint', 'mint-amount', 'unpaused', 'minter', 'primary-payee', 'royalty-bps', 'royalty-cap', 'burnable', '721c',
   'schema', 'no-seed', 'seed-source',
   'public-base-url', 'onchain-uri', 'generator', 'renderer', 'port',
-  'send', 'sign', 'sponsor', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'sponsor', 'embedded', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   'dry-run', 'confirm', 'yes', 'json', 'copies',
   // storage (directory mode + --image-base's off-chain still) — mirrors storageOverrides(), same
   // allowlist entries as the 721 twin's DEPLOY_CODE_FLAGS.
@@ -5684,6 +5695,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'code-edition' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -5801,6 +5813,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: 'code-edition' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: planSetupLegs},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,

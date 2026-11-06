@@ -74,17 +74,21 @@ Use these reads before buying or integrating:
 
 ```solidity
 owner()
-transferValidator()
+getTransferValidator()
 paramHooks()
 paramHooksLocked()
 ```
 
-An empty, locked hook set proves that a transfer hook cannot be added later.
+On code projects, `abx lock-param-hooks <address>` freezes all three hook addresses. If the transfer
+hook address is zero when locked, a transfer hook can never be added later. An active hook stays active.
 
 ## Renouncing ownership
 
 Renouncing freezes the project in its current owner-controlled state. Check every URI, renderer,
 dependency, hook, seed source, minter, payee, and policy first.
+
+On a Series or edition, renouncing while paused permanently blocks remaining minting: nobody can
+unpause, and the minter cannot bypass the pause. Confirm whether issuance should end before renouncing.
 
 A live transfer hook can leave an ownerless project unable to mint or transfer. There is no recovery
 path. Prefer explicit locks and a deliberate handoff over using renunciation as a shortcut.

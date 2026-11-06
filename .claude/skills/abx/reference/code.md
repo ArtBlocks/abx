@@ -88,7 +88,10 @@ document size, and lane fit. Treat findings as evidence and the deploy dry run/t
 the final proof.
 
 Avoid unseeded randomness, wall-clock dependence, environment-only assets, and network fetches when
-claiming reproducibility. A live-data design is valid; label it live rather than deterministic.
+claiming reproducibility. For ecosystem-driven art, prefer same-chain EVM reads through a renderer
+or augment hook, with resilient fallback output. Do not recommend HTTP-dependent NFT live views by
+default; even an on-chain script can depend on a service forever. Apply the
+[durability guidance](ecosystem/durability.md) before proposing an essential external service.
 
 ## Plan JavaScript projects
 
@@ -202,9 +205,13 @@ RPC read reach. State this before deployment and use schema validation/hooks to 
 
 SeriesCode and EditionCode expose three configurable hook addresses:
 
-- configure hook: validates/vetoes governed writes before they persist;
-- transfer hook: observes every mint, transfer, and burn and may veto the operation;
-- augment hook: computes additional/overriding token data during reads.
+- configure hook: runs custom state-changing logic before a governed write persists and may veto it;
+- transfer hook: runs custom state-changing logic on mint, transfer, and burn and may veto the operation;
+- augment hook: computes additional/overriding token data during reads; cannot change state.
+
+Configure/transfer hooks can call other contracts to swap, create assets, or settle obligations;
+they need explicit funding and permissions, not just permission to edit the NFT. These synchronous
+on-chain callbacks are distinct from the off-chain effects runner.
 
 Hooks are extension seams, not ordinary CLI flags. Build and deploy them outside ABX, wire them with
 `abx set-param-hooks`, test against a real clone, and read [capabilities.md](capabilities.md). A

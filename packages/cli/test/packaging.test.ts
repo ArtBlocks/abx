@@ -80,6 +80,24 @@ test('skill install --target migrates the legacy trigger and installs only the r
   assert.match(output, /archived legacy .*abx-self-host.*\.abx-skill-backups/);
   assert.match(output, /installed the abx skill/);
   assert.ok(existsSync(join(target, 'abx', 'SKILL.md')));
+  const ecosystemPath = join('reference', 'ecosystem');
+  const canonical = join(resolveBundledSkill()!, ecosystemPath);
+  const installed = join(target, 'abx', ecosystemPath);
+  const files = (root: string, directory = ''): string[] =>
+    readdirSync(join(root, directory), {withFileTypes: true}).flatMap((entry) => {
+      const path = join(directory, entry.name);
+      return entry.isDirectory() ? files(root, path) : [path];
+    }).sort();
+  const expectedFiles = files(canonical);
+  assert.ok(expectedFiles.length > 0);
+  assert.deepEqual(files(installed), expectedFiles, 'install must preserve the complete nested reference tree');
+  for (const path of expectedFiles) {
+    assert.deepEqual(
+      readFileSync(join(installed, path)),
+      readFileSync(join(canonical, path)),
+      `nested ecosystem reference ${path} must survive installation`,
+    );
+  }
   assert.equal(existsSync(legacy), false);
   const backups = join(target, '.abx-skill-backups');
   const archived = readdirSync(backups).find((name) => name.startsWith('abx-self-host-'));

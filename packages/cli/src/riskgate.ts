@@ -39,7 +39,8 @@ export function laneFromFlags(flags: Flags): Lane {
   // lane they did not choose — an agent writing `--send --sign` from two different help lines gets a
   // browser wallet page when it meant the env key, and reads the wait as a hang. Refuse instead: the
   // precedence order below is an implementation detail, not an interface.
-  const named = (['send', 'sign', 'sponsor', 'unsigned'] as const).filter((k) => flags[k] !== undefined);
+  const normalized = flags.embedded !== undefined ? {...flags, sponsor: flags.embedded} : flags;
+  const named = (['send', 'sign', 'sponsor', 'unsigned'] as const).filter((k) => normalized[k] !== undefined);
   if (named.length > 1) {
     throw new Error(
       `pick ONE signing lane, not ${named.length}: ${named.map((n) => `--${n}`).join(' and ')}. ` +
@@ -272,7 +273,7 @@ async function simulateDryRun(
       const gasPrice = await client.getGasPrice();
       const value = prepared.value && prepared.value !== '0x0' ? BigInt(prepared.value) : 0n;
       const cost = gas * gasPrice + value;
-      const reason = 'the transaction executes in simulation; live sponsorship policy is checked only when it is sent';
+      const reason = 'the transaction executes in simulation; creator-wallet gas payment is selected and checked when it is sent';
       if (narrate) console.log(`    ${dim(label)} ${dim(`provider check pending — ${reason}`)}`);
       return {status: 'unknown', reason, estimatedGas: gas.toString(), estimatedCostWei: cost.toString()};
     } catch (err) {
@@ -361,6 +362,7 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
         dryRun: true,
         sent: false,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         expectedSigner: expectedSigner ?? null,
         transaction: prepared,
         // `transaction.gasFloor` (when present) is a PROVEN MINIMUM used to detect an implausible

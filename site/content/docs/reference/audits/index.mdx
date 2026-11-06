@@ -1,0 +1,19 @@
+---
+title: "Third-party audits"
+description: "Published third-party reports, their scope and quality, and the ABX maintainer response."
+---
+
+This section records third-party audit reports reviewed by ABX maintainers. A report's presence here
+does not establish coverage of the whole protocol or every deployed generation. Quality assessments
+and dispositions below are the maintainers' assessment, separate from the reporter's severity labels.
+
+## Report summary
+
+| Date | Report | Scope | Quality assessment | Response |
+| --- | --- | --- | --- | --- |
+| 2026-10-30 | [LeftClaw Services #1106](/docs/reference/audits/leftclaw-1106) | `SeriesCode.sol` at `1e3061e`, with composed contracts read for context | Low | Existing safeguards verified; documentation clarified; three potential contract changes recorded for evaluation in issue #43. No immediate contract patch identified. |
+
+ABX has not had a comprehensive independent security audit. Read each report's scope, method,
+inaccuracies, and response before relying on its conclusions.
+
+For new vulnerabilities, use the [private security reporting process](https://github.com/ArtBlocks/abx/security/advisories/new).

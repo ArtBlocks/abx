@@ -1,5 +1,22 @@
 # @artblocks/abx-sdk
 
+## 0.8.0
+
+### Minor Changes
+
+- f1654fd: Add automatic creator-wallet payment: sufficiently funded wallets pay native value and network
+  fees; eligible zero-value calls otherwise use sponsorship. Introduce `--embedded` with `--sponsor`
+  as its backwards-compatible alias, reuse one agent grant, and verify returned signing payloads
+  against the local transaction intent before signing. Self-payment requires live provider support.
+  Structured deploy plans use schema version 3 with the automatic payment policy.
+
+## 0.7.1
+
+### Patch Changes
+
+- e497ffe: Mark Arbitrum Sepolia, Arbitrum, Base, and Ethereum mainnet as supported. Align the network registry,
+  CLI capabilities, qualification notices, and public network table with their supported status.
+
 ## 0.7.0
 
 ### Minor Changes

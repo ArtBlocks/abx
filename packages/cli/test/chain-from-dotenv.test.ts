@@ -78,10 +78,10 @@ test('an unknown chain in .env is REFUSED, not silently ignored', () => {
     }
   });
   assert.match(out, /is not a recognized chain/);
-  assert.match(out, /Selectable production networks: Base \(base, beta\), Robinhood Chain \(robinhood, beta\), Ethereum \(ethereum, beta\), Arbitrum \(arbitrum, beta\)/);
+  assert.match(out, /Selectable production networks: Base \(base, supported\), Robinhood Chain \(robinhood, beta\), Ethereum \(ethereum, supported\), Arbitrum \(arbitrum, supported\)/);
 });
 
-test('Base is selectable but every substantive invocation prints the production-beta warning', () => {
+test('Base is supported without a qualification warning', () => {
   const result = withDotEnv('ABX_CHAIN=base\n', (dir) =>
     spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
       cwd: dir,
@@ -91,10 +91,9 @@ test('Base is selectable but every substantive invocation prints the production-
     }),
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /Base production beta \(chain 8453\)/);
-  assert.match(result.stderr, /Real funds and irreversible state are at risk/);
+  assert.doesNotMatch(result.stderr, /experimental \(chain|production beta \(chain/);
   const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
-  assert.equal(capabilities.chains.find((chain) => chain.key === 'base')?.supportLevel, 'beta');
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'base')?.supportLevel, 'supported');
 });
 
 test('Robinhood Chain is selectable but every substantive invocation prints the production-beta warning', () => {
@@ -130,7 +129,7 @@ test('Robinhood Chain Testnet is selectable but every substantive invocation pri
   assert.equal(capabilities.chains.find((chain) => chain.key === 'robinhood-testnet')?.supportLevel, 'experimental');
 });
 
-test('Arbitrum Sepolia is selectable but every substantive invocation prints the experimental warning', () => {
+test('Arbitrum Sepolia is supported without a qualification warning', () => {
   const result = withDotEnv('ABX_CHAIN=arbitrum-sepolia\n', (dir) =>
     spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
       cwd: dir,
@@ -140,13 +139,12 @@ test('Arbitrum Sepolia is selectable but every substantive invocation prints the
     }),
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /Arbitrum Sepolia experimental \(chain 421614\)/);
-  assert.match(result.stderr, /testnet integration is under qualification/);
+  assert.doesNotMatch(result.stderr, /experimental \(chain|production beta \(chain/);
   const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
-  assert.equal(capabilities.chains.find((chain) => chain.key === 'arbitrum-sepolia')?.supportLevel, 'experimental');
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'arbitrum-sepolia')?.supportLevel, 'supported');
 });
 
-test('Arbitrum is selectable but every substantive invocation prints the production-beta warning', () => {
+test('Arbitrum is supported without a qualification warning', () => {
   const result = withDotEnv('ABX_CHAIN=arbitrum\n', (dir) =>
     spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
       cwd: dir,
@@ -156,14 +154,12 @@ test('Arbitrum is selectable but every substantive invocation prints the product
     }),
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /Arbitrum production beta \(chain 42161\)/);
-  assert.match(result.stderr, /Real funds and irreversible state are at risk/);
-  assert.match(result.stderr, /Prove the flow on arbitrum-sepolia/);
+  assert.doesNotMatch(result.stderr, /experimental \(chain|production beta \(chain/);
   const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
-  assert.equal(capabilities.chains.find((chain) => chain.key === 'arbitrum')?.supportLevel, 'beta');
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'arbitrum')?.supportLevel, 'supported');
 });
 
-test('Ethereum is selectable but every substantive invocation prints the production-beta warning', () => {
+test('Ethereum is supported without a qualification warning', () => {
   const result = withDotEnv('ABX_CHAIN=ethereum\n', (dir) =>
     spawnSync('node', ['--import', 'tsx', `${CLI_SRC}/main.ts`, 'capabilities', '--json'], {
       cwd: dir,
@@ -173,9 +169,7 @@ test('Ethereum is selectable but every substantive invocation prints the product
     }),
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /Ethereum production beta \(chain 1\)/);
-  assert.match(result.stderr, /Real funds and irreversible state are at risk/);
-  assert.match(result.stderr, /Prove the flow on sepolia/);
+  assert.doesNotMatch(result.stderr, /experimental \(chain|production beta \(chain/);
   const capabilities = JSON.parse(result.stdout) as {chains: Array<{key: string; supportLevel: string}>};
-  assert.equal(capabilities.chains.find((chain) => chain.key === 'ethereum')?.supportLevel, 'beta');
+  assert.equal(capabilities.chains.find((chain) => chain.key === 'ethereum')?.supportLevel, 'supported');
 });
