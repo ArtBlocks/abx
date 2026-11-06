@@ -111,9 +111,15 @@ A code project can set three hooks:
 
 | Hook | When it runs | What it can do |
 | --- | --- | --- |
-| Configure | Before a write | Inspect or reject the new value |
-| Augment | During a read | Add or replace computed token data |
-| Transfer | During mint, transfer, or burn | Update state or reject the move |
+| Configure | Before a governed write persists | Execute contract actions, inspect or reject the new value |
+| Augment | During a read | Add or replace computed token data; read-only |
+| Transfer | After ownership/balance changes, within mint, transfer, or burn | Execute contract actions, update state or reject the move |
+
+Configure and transfer hooks can call other contracts in the same transaction: for example, a
+holder-authorized parameter edit could trigger an AMM swap, or a transfer could create an asset or
+settle an obligation. A reverting hook rolls back the operation and its on-chain actions. The hook
+needs explicit funding and permissions; it does not automatically gain access to the holder's wallet.
+These on-chain callbacks are separate from [off-chain effects](/docs/protocol/effects).
 
 A reverting transfer hook blocks the transfer. Because a mint is a transfer from the zero address, it
 can block minting too.

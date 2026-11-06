@@ -7,8 +7,9 @@ const accepted = new Map([
     {
       module: 'bigint-buffer',
       severity: 'high',
-      path:
+      paths: [
         'packages__storage-arweave>@ardrive/turbo-sdk>@solana/spl-token>@solana/buffer-layout-utils>bigint-buffer',
+      ],
       reason:
         'no upstream fix; the affected toBigIntLE path belongs to Turbo\'s Solana support, while ABX restricts Turbo tokens to arweave or ethereum',
     },
@@ -18,10 +19,24 @@ const accepted = new Map([
     {
       module: 'elliptic',
       severity: 'low',
-      path:
+      paths: [
         'packages__storage-arweave>@ardrive/turbo-sdk>@cosmjs/proto-signing>@cosmjs/crypto>elliptic',
+      ],
       reason:
         'no upstream fix; ABX supplies a viem-backed Ethereum signer and does not use Turbo\'s Cosmos/Kyve signing path',
+    },
+  ],
+  [
+    'GHSA-mrhx-c7xc-m3w5',
+    {
+      module: 'zod',
+      severity: 'high',
+      paths: [
+        'packages__storage-arweave>@ardrive/turbo-sdk>@permaweb/aoconnect>zod',
+        'packages__storage-arweave>@ardrive/turbo-sdk>x402-fetch>x402>wagmi>@wagmi/connectors>@walletconnect/ethereum-provider>@reown/appkit>@reown/appkit-wallet>zod',
+      ],
+      reason:
+        'fixed only in zod 4; these zod 3 copies are unreachable — turbo-sdk 1.43.0 declares but never imports @permaweb/aoconnect, and appkit-wallet loads only behind WalletConnect\'s browser QR modal',
     },
   ],
 ]);
@@ -107,8 +122,8 @@ for (const advisory of Object.values(report.advisories)) {
     !rule ||
     advisory.module_name !== rule.module ||
     advisory.severity !== rule.severity ||
-    paths.length !== 1 ||
-    paths[0] !== rule.path
+    paths.length !== rule.paths.length ||
+    !paths.every((path) => rule.paths.includes(path))
   ) {
     unexpected.push({
       id: id ?? String(advisory.id),
