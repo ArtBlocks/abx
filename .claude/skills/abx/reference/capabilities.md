@@ -51,6 +51,16 @@ active chain, artifacts, signer, storage, addresses, transaction count, and meas
 
 A custom mechanic normally lives beside a canonical token rather than replacing it.
 
+Configure and transfer hooks are state-changing contract callbacks, not just validators. They can
+call an AMM, deploy through a factory, or settle an obligation in the triggering transaction using
+the external protocol's official interfaces. Augment hooks are read-only. These callbacks are
+distinct from off-chain effects workers.
+
+For either state-changing hook, authenticate the calling token and arrange funding, approvals, and
+controller/minter permissions explicitly. Installation grants no automatic transfer, mint, or
+spending authority, and the callback receives no automatic payment from the initiating wallet.
+Bound spending and slippage, guard reentrancy and repeated triggers, and test every lifecycle path.
+
 | Seam | Wired with | Runs | Can veto? |
 |---|---|---|---|
 | Custom minter | `abx set-minter --minter 0x…` | before/calling issuance | it controls whether it calls mint |
@@ -81,10 +91,12 @@ a Series/edition before deploying.
 
 ### Configure hook
 
-The configure hook receives the proposed typed parameter write before it persists. Its revert rejects
-the write. It can enforce monotonicity, one-time writes, cross-contract authorization, payload shape,
-or size bounds. For blob-backed strings/bytes, validate length before reading large data and read the
-provided data pointer using the documented SSTORE2 convention.
+The configure hook receives the proposed typed parameter write before it persists. It can execute
+contract actions as well as enforce monotonicity, one-time writes, cross-contract authorization,
+payload shape, or size bounds. A holder-authorized edit could trigger a swap through an official AMM
+router or creation through a factory. If the hook reverts, the write and its on-chain actions revert.
+For blob-backed strings/bytes, validate length before reading large data and read the provided data
+pointer using the documented SSTORE2 convention.
 
 The previously stored value remains visible during validation, enabling comparisons. A rejected
 write may still have paid for preparatory blob storage; front ends should simulate before asking for a
@@ -92,17 +104,17 @@ signature.
 
 ### Transfer hook
 
-The transfer hook runs for mints (`from == 0`), ordinary transfers, and burns (`to == 0`). Reverting
-vetoes the entire operation. It can implement vesting, soulbinding, redemption, escrow settlement,
-provenance counters, and lifecycle rules.
+The transfer hook runs after ownership/balance changes for mints (`from == 0`), ordinary transfers,
+and burns (`to == 0`), within the same transaction. It can execute contract actions for redemption,
+escrow settlement, asset creation, or other lifecycle rules, as well as enforce vesting or soulbinding.
+Its revert rolls back the entire operation and its on-chain actions.
 
 On ERC-721 projects it also receives self-transfers (`from == to`) because those emit `Transfer`.
 That is intentional; a hook concerned only with ownership-set changes should ignore the case itself.
 ERC-1155 projects skip self-transfers and zero-amount entries before invoking the hook.
 
-It cannot initiate a transfer; it only observes or rejects one. Burn-based mechanics require the
-collection to have been deployed burnable. On editions, ids may have many holders, so shared per-id
-state cannot model a single current owner.
+Burn-based mechanics require a burnable collection. On editions, ids may have many holders, so
+shared per-id state cannot model a single current owner.
 
 ### Augment hook
 
@@ -124,6 +136,8 @@ token-data object.
 | Soulbound or timed transfer lock | transfer hook | deploy-code; hook also sees mint |
 | Burn-to-redeem/combine | external controller/minter + burnable; optional transfer/augment hooks | ABX provides seams, not the atomic combine implementation |
 | Escrow tied to token lifecycle | minter + transfer hook | external value-holding contract |
+| Parameter edit triggers a swap or asset creation | configure hook + official router/factory | custom contract; explicit funding, authority, spending bounds, and replay protection |
+| Transfer triggers settlement or asset creation | transfer hook + external controller/protocol | custom contract; explicit authority and lifecycle/reentrancy tests |
 | Monotonic level/high-water mark | governed param + configure hook | schema and old-value comparison |
 | Structured collector configuration | governed param + configure hook | typed payload and bounded size |
 | Holder of another token may configure | schema address auth or configure hook | cross-contract read |
@@ -139,7 +153,6 @@ When several routes work, prefer the smallest authority surface. Use the stock f
 instead of custom Solidity for an ordinary sale; use a schema without a hook when static authorization
 is sufficient; use an on-chain renderer only when its durability/reach/cost trade is desired.
 
-A transfer hook only observes or vetoes a burn; it does not initiate two burns or mint a replacement.
 For combine mechanics, prove the controller's burn authorization and canonical mint call against a
 real clone, make the transition atomic and replay-safe, and define pair/history storage. On ERC-721,
 `--max` is a lifetime id cap and burns do not reopen slots, so reserve replacement-id headroom or use

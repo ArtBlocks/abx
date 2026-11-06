@@ -364,7 +364,7 @@ test('dry run: sponsored direct CREATE estimates exact initcode without treating
   );
   assert.equal(sawTarget, undefined);
   assert.equal(simulation.status, 'unknown');
-  assert.match(simulation.reason as string, /live sponsorship policy/i);
+  assert.match(simulation.reason as string, /creator-wallet gas payment/i);
   assert.equal(simulation.estimatedGas, String((140_000n * 125n) / 100n));
   assert.equal(simulation.balanceWei, undefined);
 });
