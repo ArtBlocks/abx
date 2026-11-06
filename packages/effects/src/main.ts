@@ -29,7 +29,28 @@ import {renderEffect} from './render.js';
  * One-shot repair mode (the `abx render` escape hatch rides this):
  *   pnpm abx-effects --once <address> [tokenId…]
  */
+const USAGE = `usage: abx-effects                              start the runner (HTTP on ABX_EFFECTS_PORT, default 8788, plus the sweep loop)
+       abx-effects --once <address> [tokenId…]  render one project's missing work once and exit
+       abx-effects --help | -h                  print this help
+
+Configuration is read from the environment (and .env): ABX_RESOLVER_URL, ABX_RPC_URL, ABX_EFFECTS_PORT,
+ABX_EFFECTS_INTERVAL_MS, ABX_EFFECTS_CONCURRENCY, ABX_EFFECTS_TOKEN, ABX_ENVIRONMENT_ID,
+ABX_RESOLVER_ADMIN_TOKEN, and the storage backend settings. See https://docs.abx.io.`;
+
 async function main(): Promise<void> {
+  // Parse arguments before loading .env or building the runner, so --help and a typo never start
+  // a server or touch storage.
+  const args = process.argv.slice(2);
+  if (args[0] === '--help' || args[0] === '-h') {
+    console.log(USAGE);
+    return;
+  }
+  if (args.length && args[0] !== '--once') {
+    console.error(`abx-effects: unknown argument '${args[0]}'\n\n${USAGE}`);
+    process.exitCode = 1;
+    return;
+  }
+
   loadDotEnv();
   const resolverUrl = (readEnv('ABX_RESOLVER_URL') ?? 'http://localhost:8787').replace(/\/$/, '');
   // Unset ⇒ no client (this runner tolerates that — only augment hooks + data-backed params need
@@ -53,7 +74,6 @@ async function main(): Promise<void> {
     authToken: readEnv('ABX_EFFECTS_TOKEN'),
   });
 
-  const args = process.argv.slice(2);
   if (args[0] === '--once') {
     const [address, ...tokenIds] = args.slice(1);
     if (!address) throw new Error('usage: abx-effects --once <address> [tokenId…]');
