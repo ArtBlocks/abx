@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.8.5
+
+### Patch Changes
+
+- 4be15b5: Show rejected wallet connections and failed transaction verification in the signing page, preserve the connected signer across account changes, and render transaction details as text.
+
 ## 0.8.4
 
 ### Patch Changes
