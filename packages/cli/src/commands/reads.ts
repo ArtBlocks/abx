@@ -43,6 +43,8 @@ import {
   previewConfigFromFlags,
   previewDepTags,
   shootPreview,
+  checkPreview,
+  CHECK_EXIT,
   startPreviewServer,
 } from '../preview.js';
 import {type RemoteTarget, remoteFlag, requireRemoteToken} from '../remote.js';
@@ -60,6 +62,12 @@ import {type ServedTokenUri, decodeOnChainJson, fetchServedTokenUri, prettyBody,
  * can't open a browser.
  */
 export async function cmdPreview(flags: Flags) {
+  // Only --check yields a machine verdict; the studio and --shoot paths stay plain human output.
+  if (flags.check === 'true') return withJson(flags, async (emit) => cmdPreviewBody(flags, emit));
+  return cmdPreviewBody(flags);
+}
+
+async function cmdPreviewBody(flags: Flags, emit?: (payload: Record<string, unknown>) => void) {
   warnStrayFlags(flags, PREVIEW_FLAGS as Set<string>, 'preview');
   const cfg = previewConfigFromFlags(flags);
   const shootDir = flags.shoot && flags.shoot !== 'true' ? String(flags.shoot) : flags.shoot === 'true' ? 'abx-preview' : undefined;
@@ -82,9 +90,33 @@ export async function cmdPreview(flags: Flags) {
   }
 
   // `--shoot` takes an ephemeral port (0), so only the studio lane can collide.
-  const previewPort = shootDir ? 0 : Number(flags.port ?? DEFAULT_PREVIEW_PORT);
+  const checkMode = flags.check === 'true';
+  const previewPort = shootDir || checkMode ? 0 : Number(flags.port ?? DEFAULT_PREVIEW_PORT);
   if (previewPort !== 0) await assertPortFree(previewPort, 'preview');
   const server = await startPreviewServer(cfg, previewPort);
+
+  if (checkMode) {
+    const runs = Math.max(2, Number(flags.runs ?? 3) || 3);
+    step(`Determinism check — ${count} seeds, ${runs} fresh-context runs each`);
+    try {
+      const report = await checkPreview(server.url, count, {
+        runs,
+        width: Number(flags.width ?? 1000) || 1000,
+        timeoutMs: Number(flags['timeout-ms'] ?? 10_000) || 10_000,
+        params: parsePreviewParams(flags.param as string | undefined),
+      });
+      if (emit && flags.json !== undefined) emit({...report});
+      else console.log(JSON.stringify(report, null, 2));
+      process.exitCode = CHECK_EXIT[report.verdict];
+    } catch (err) {
+      // No browser / no Playwright is a harness failure, never "your program drifted".
+      console.error((err as Error).message);
+      process.exitCode = CHECK_EXIT.harness;
+    } finally {
+      await server.close();
+    }
+    return;
+  }
 
   if (shootDir) {
     step(`Render ${count} seeds headlessly`);
