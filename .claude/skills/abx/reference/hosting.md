@@ -273,3 +273,17 @@ and reference self-hosted resolvers support token-root routing from a chain-deri
 rebuilt with the projection. No contract update or private routing registry is required. On-chain
 data documents and external creator hosts do not inherit the resolver's HTTP headers. Use runtime
 token data for identity, not `location.pathname`; new content URLs have no identifying path.
+
+### Reference hosting trust boundary
+
+The self-hosted resolver/effects toolkit supports collections controlled by one trusted operator.
+Do not recommend it as a multi-tenant sandbox for unrelated creators. Content origins protect browser
+isolation; untrusted rendering also requires worker/network isolation and resource controls.
+Project-controlled server fetches use public HTTP(S) destinations only, including after DNS and
+redirect validation. Entry documents are capped at 16 MiB decoded / 10 seconds.
+
+Preview and browser signing are loopback-only. Preview excludes hidden files and symlinks outside its
+build root. Open the exact signing URL printed by the CLI; its session secret is temporary and private.
+Public effects listeners require a nonempty ABX_EFFECTS_TOKEN. Deterministic cloud image templates
+must use `<publicBase>/<chainId>/<lowercase-contract-address>/{id}.png` (or another path under that
+collection prefix). New `--image-base` code deployments add that namespace automatically. Explain the required prefix migration for an existing custom template.

@@ -1,7 +1,9 @@
+import {fetchPublicContent, ContentNetworkError} from '@artblocks/abx-sdk/node';
 import {contentRequestLabel, contentDigestFromLabel, contentRootPath} from '@artblocks/abx-sdk';
 import {createServer, type IncomingMessage, type Server, type ServerResponse} from 'node:http';
 import {
   ABX_JS,
+  publicProjectState,
   projectContentPolicy,
   projectContentRequestKind,
   isolateProjectContent,
@@ -83,6 +85,8 @@ function controlPlaneCtx(indexer: SelfHostIndexer, storage: StorageBackend, base
 }
 
 export interface ServerOptions {
+  /** Alternate operator-owned transport, primarily for isolated fixtures. Defaults to checked public fetching. */
+  fetchContent?: typeof fetch;
   indexer: SelfHostIndexer;
   port?: number;
   baseUrl?: string;
@@ -125,7 +129,10 @@ export async function resolveContent(
   // off-chain custody, located by the on-chain hash of the image
   if (image && (image.representation === R.keccak256 || image.representation === R.sha256)) {
     const stored = await storage.get(image.value);
-    if (stored) return {contentType: stored.contentType, body: stored.bytes};
+    if (stored) {
+      if (!verifyAgainstHash(stored.bytes, image)) throw new Error('Stored image failed its on-chain integrity check.');
+      return {contentType: stored.contentType, body: stored.bytes};
+    }
   }
   // graceful placeholder — the deterministic fallback the on-chain renderer also uses,
   // so a token with no resolvable image looks the same whether served here or self-resolved.
@@ -307,8 +314,9 @@ export function createTokenApiServer(opts: ServerOptions): Server {
         if (!path) return sendJson(res, 404, {error: 'not found'});
         routingUrl = path + requestUrl.search;
       }
-      await route(req, res, indexer, baseUrl, storage, sendContent, contentPolicy.contentDomain, publicContent, routingUrl);
+      await route(req, res, indexer, baseUrl, storage, sendContent, contentPolicy.contentDomain, publicContent, routingUrl, opts.fetchContent);
     } catch (err) {
+      if (err instanceof ContentNetworkError) return sendJson(res, 502, {code: 'internal_error', error: 'content fetch refused by this host’s public-network or response limits'});
       // NEVER hand a raw internal error to the client. An unexpected failure here is usually an
       // upstream RPC error, and viem's message embeds the full endpoint URL — which for a keyed
       // endpoint IS a credential. On a multi-tenant provider that would leak the operator's RPC key
@@ -355,6 +363,7 @@ async function route(
   contentDomain?: string,
   publicContent = false,
   routingUrl = req.url,
+  fetchContent: typeof fetch = fetchPublicContent,
 ): Promise<void> {
   res.setHeader('access-control-allow-origin', '*');
   res.setHeader('access-control-expose-headers', 'link');
@@ -448,7 +457,7 @@ async function route(
     }
     if (availability === 'not-a-code-project') return sendJson(res, 404, {error: 'no live view — not a code project'});
     if (publicContent) return sendContent('', 'text/html; charset=utf-8', 'no-store');
-    const view = await resolveLiveView(chainClientLazy(), state, token);
+    const view = await resolveLiveView(chainClientLazy(), state, token, fetchContent);
     if (!view) {
       return sendJson(res, 404, {
         error: 'no live view — this project has a `code` field whose locator is not serveable (the `code` field is locators-only: ipfs/arweave/url)',
@@ -549,7 +558,7 @@ async function route(
       // GET /api/project/:addr
       const state = indexer.getProject(address);
       if (!state) return unknownProject(res);
-      return sendJson(res, 200, state);
+      return sendJson(res, 200, publicProjectState(state));
     }
     return sendError(res, 404, 'unknown_route', 'unknown api route', {
       routes: ['/api/projects', '/api/watch', '/api/project/:address', '/api/project/:address/artifacts', '/api/project/:address/effects', '/api/project/:address/verify', '/api/deps/:chainId/:address'],
@@ -786,6 +795,7 @@ async function serveFieldArtifact(
     if (entry.representation === R.keccak256 || entry.representation === R.sha256) {
       const stored = await storage.get(entry.value);
       if (stored) {
+        if (!verifyAgainstHash(stored.bytes, entry)) throw new Error('Stored field failed its on-chain integrity check.');
         return sendContent(stored.bytes, stored.contentType || 'application/octet-stream', 'public, max-age=300');
       }
       const bridged = display.contentLocators?.[entry.value.toLowerCase()];
@@ -803,7 +813,9 @@ async function serveFieldArtifact(
       return;
     }
   } catch (err) {
-    return sendJson(res, 502, {error: `field '${field}' failed to resolve: ${(err as Error).message}`});
+    const detail = (err as Error).message ?? 'unknown error';
+    console.error(`[server] field '${field}' failed to resolve: ${detail}`);
+    return sendJson(res, 502, {error: `field '${field}' failed to resolve${upstreamHint(detail)}`});
   }
   return sendJson(res, 404, {error: `'${field}' (${entry.representation}) is not byte-servable from this node`});
 }

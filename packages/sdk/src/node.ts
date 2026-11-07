@@ -121,3 +121,5 @@ export function resolveDataDir(options: ResolveDataDirOptions = {}): DataDirReso
 export function nodeInflate(bytes: Uint8Array): Uint8Array {
   return new Uint8Array(gunzipSync(bytes));
 }
+
+export {contentBrowserEnvironment, CONTENT_BROWSER_ARGS, fetchPublicContent, contentDestination, isPublicAddress, startContentProxy, ContentNetworkError, type PublicNetworkOptions, type PublicFetchOptions} from './public-network.js';

@@ -218,10 +218,15 @@ export class SelfHostIndexer {
     const key = address.toLowerCase();
     const running = this.inFlight.get(key);
     if (running) {
-      if (!opts.full || running.full) return running.promise;
-      // A forced replay can't be satisfied by an in-flight incremental — chain it on.
-      const chained = running.promise.catch(() => undefined).then(() => this.reindex(address, opts));
-      return this.track(key, chained, true);
+      // A fetched delta or a different scan boundary is work, not a duplicate request.
+      if (opts.logs === undefined && opts.blockTag === undefined && (!opts.full || running.full)) return running.promise;
+      // Preserve work arriving after the current scan. On failure, scan from the stored watermark
+      // rather than folding only a later tail that could skip the failed window.
+      const chained = running.promise.then(
+        () => this.reindex(address, opts),
+        () => this.reindex(address, {...opts, logs: undefined, toBlock: undefined}),
+      );
+      return this.track(key, chained, !!opts.full);
     }
     return this.track(key, this.reindex(address, opts), !!opts.full);
   }

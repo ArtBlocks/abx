@@ -473,3 +473,13 @@ test('liveViewAvailability: an EditionCode WITH a folded script is ready', () =>
   } as never);
   assert.equal(liveViewAvailability(ready), 'ready');
 });
+
+test('directory reads refuse private URLs and collection-controlled private gateway prefixes', async () => {
+  for (const collectionFields of [
+    [{field: 'code', representation: 'url', value: stringToHex('http://127.0.0.1:9/internal?.html')}],
+    [{field: 'code', representation: 'ipfs', value: stringToHex('dummy')}, {field: 'abx_gateway_ipfs', representation: 'inline', value: stringToHex('http://169.254.169.254/')}],
+  ]) {
+    resetEntryDocumentCache();
+    await assert.rejects(resolveLiveView(client, codeState({collectionFields} as never), driftToken()), /public HTTP/);
+  }
+});

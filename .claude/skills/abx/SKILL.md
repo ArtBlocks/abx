@@ -219,6 +219,7 @@ lane. Read [capabilities.md](reference/capabilities.md) before designing a custo
 - Static projects, editions, placement, costs, and deploy confirmation → [deploy.md](reference/deploy.md)
 - Programs, renderers, thumbnails, traits, PostParams, seeds, and dependencies → [code.md](reference/code.md)
 - First-party hosted services, OAuth device login, and core/provider feedback → [services.md](reference/services.md)
+- The reference self-hosted toolkit is for collections controlled by one trusted operator, not unrelated tenants. Explain its network, preview, signing, and storage limits in the hosting reference.
 - Generic remotes, self-hosted resolvers/effects, storage, lifecycle, and migration → [hosting.md](reference/hosting.md)
 - Existing-project reads, mint/sales, fields, transfers, authority, and locks → [operate.md](reference/operate.md)
 - Failure classification, resume, RPC/storage/rendering faults, and retry discipline → [diagnose.md](reference/diagnose.md)

@@ -20,7 +20,7 @@
  * preview document, never a parallel harness.
  */
 import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
-import {readFile, mkdir, writeFile} from 'node:fs/promises';
+import {readFile, realpath, mkdir, writeFile} from 'node:fs/promises';
 import {createHash, randomBytes} from 'node:crypto';
 import {dirname, extname, join, resolve as resolvePath} from 'node:path';
 import {createRequire} from 'node:module';
@@ -381,6 +381,10 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void (async () => {
       const u = new URL(req.url ?? '/', 'http://localhost');
+      const host = new URL(`http://${req.headers.host ?? 'invalid'}`).hostname;
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
+        res.writeHead(403); res.end('invalid host'); return;
+      }
       const send = (code: number, type: string, body: string | Buffer) => {
         // Never cache: the whole point is that a refresh picks up the edit you just made.
         res.writeHead(code, {'content-type': type, 'cache-control': 'no-store'});
@@ -415,8 +419,9 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
         // Directory mode: serve the build's own assets under a fixed base.
         if (cfg.source.kind === 'dir' && u.pathname.startsWith('/__abx_code/')) {
           const rel = decodeURIComponent(u.pathname.slice('/__abx_code/'.length));
-          const root = resolvePath(cfg.source.path);
-          const target = resolvePath(join(root, rel));
+          if (rel.split(/[\\/]/).some((part) => part.startsWith('.'))) return send(404, 'text/plain', 'not found');
+          const root = await realpath(resolvePath(cfg.source.path));
+          const target = await realpath(resolvePath(join(root, rel)));
           // Path-traversal guard: a build asset can never escape the declared root.
           if (target !== root && !target.startsWith(root + '/')) return send(403, 'text/plain', 'forbidden');
           const body = await readFile(target);
@@ -433,7 +438,7 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
   const actual = await new Promise<number>((res2, rej) => {
     server.on('error', rej);
     // Port 0 ⇒ let the OS pick, so a busy studio port never blocks a --shoot run.
-    server.listen(port, () => res2((server.address() as {port: number}).port));
+    server.listen(port, '127.0.0.1', () => res2((server.address() as {port: number}).port));
   });
 
   return {

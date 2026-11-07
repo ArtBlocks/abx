@@ -691,15 +691,15 @@ test('deterministic lane: still lands at the on-chain-named S3 key; idempotent v
     client: null,
     storage,
     effects: [effect],
-    fetchState: async () => withImageTemplate(codeState(0x0e1a40n), 'https://cdn.test/orbit/{id}.png'),
+    fetchState: async () => withImageTemplate(codeState(0x0e1a40n), 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/{id}.png'),
     log: () => {},
   });
 
   const first = await runner.sweepProject(ADDR);
   assert.deepEqual(first, {ran: 1, skipped: 0, failed: 0, errors: []});
   // token 0 → the exact object the on-chain url-template names (publicBase stripped), plus its marker.
-  assert.ok(storage.objects.has('orbit/0.png'), 'still written to the deterministic key');
-  assert.ok(storage.objects.has('orbit/0.png.abxhash'), 'inputsHash marker written');
+  assert.ok(storage.objects.has('31337/0xabcd000000000000000000000000000000000001/0.png'), 'still written to the deterministic key');
+  assert.ok(storage.objects.has('31337/0xabcd000000000000000000000000000000000001/0.png.abxhash'), 'inputsHash marker written');
 
   const second = await runner.sweepProject(ADDR);
   assert.deepEqual(second, {ran: 0, skipped: 1, failed: 0, errors: []});
@@ -823,18 +823,18 @@ test('deterministic lane: the registry row carries the stable public URL as its 
     client: null,
     storage,
     effects: [fakeEffect()],
-    fetchState: async () => withImageTemplate(codeState(1n), 'https://cdn.test/orbit/{id}.png'),
+    fetchState: async () => withImageTemplate(codeState(1n), 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/{id}.png'),
     log: () => {},
     recordArtifact: (row) => void rows.push(row),
   });
   await runner.sweepProject(ADDR);
   const img = rows.find((r) => r.outputKey === 'image')!;
-  assert.equal(img.locator, 'https://cdn.test/orbit/0.png'); // the on-chain-named object, not a hash key
+  assert.equal(img.locator, 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/0.png'); // the on-chain-named object, not a hash key
 
   // and the skip path records it too (sidecar marker matched, storage.has(key) never would)
   rows.length = 0;
   await runner.sweepProject(ADDR);
-  assert.equal(rows.find((r) => r.outputKey === 'image')?.locator, 'https://cdn.test/orbit/0.png');
+  assert.equal(rows.find((r) => r.outputKey === 'image')?.locator, 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/0.png');
 });
 
 test('deterministic lane: a param change overwrites the SAME key (stable URL, no proliferation)', async () => {
@@ -846,17 +846,17 @@ test('deterministic lane: a param change overwrites the SAME key (stable URL, no
     client: null,
     storage,
     effects: [effect],
-    fetchState: async () => withImageTemplate(codeState(palette), 'https://cdn.test/orbit/{id}.png'),
+    fetchState: async () => withImageTemplate(codeState(palette), 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/{id}.png'),
     log: () => {},
   });
 
   await runner.sweepProject(ADDR);
-  const before = new TextDecoder().decode((await storage.getObject!('orbit/0.png.abxhash'))!.bytes);
+  const before = new TextDecoder().decode((await storage.getObject!('31337/0xabcd000000000000000000000000000000000001/0.png.abxhash'))!.bytes);
 
   palette = 0xff0000n; // a collector changes the palette param → new inputsHash
   const res = await runner.sweepProject(ADDR);
   assert.deepEqual(res, {ran: 1, skipped: 0, failed: 0, errors: []}); // re-rendered
-  const after = new TextDecoder().decode((await storage.getObject!('orbit/0.png.abxhash'))!.bytes);
+  const after = new TextDecoder().decode((await storage.getObject!('31337/0xabcd000000000000000000000000000000000001/0.png.abxhash'))!.bytes);
   assert.notEqual(before, after); // marker advanced
   // ONE image object + ONE marker — overwritten in place, so the on-chain URL never changes.
   assert.equal(storage.objects.size, 2);
@@ -938,4 +938,21 @@ test('remote capture fallback uses the configured path and ignores a diagnostic 
     assert.equal((await runner.sweepProject(ADDR)).failed, 0);
     assert.equal(captured, `https://resolver.test/provider/a/31337/${ADDR}/0`);
   } finally { globalThis.fetch = realFetch; }
+});
+
+test('a collection cannot choose another collection storage namespace', async () => {
+  const storage = memoryCloud('https://cdn.test');
+  await storage.putObject!('someone-else/0.png', {bytes: new TextEncoder().encode('victim'), contentType: 'image/png'});
+  const runner = new EffectRunner({resolverUrl: 'http://resolver.test', client: null, storage, effects: [fakeEffect()], fetchState: async () => withImageTemplate(codeState(1n), 'https://cdn.test/someone-else/{id}.png'), log: () => {}});
+  const stats = await runner.sweepProject(ADDR);
+  assert.equal(stats.failed, 1);
+  assert.match(stats.errors[0], /storage namespace/);
+  assert.equal(new TextDecoder().decode((await storage.getObject!('someone-else/0.png'))!.bytes), 'victim');
+});
+
+test('public effects listeners require a nonempty token', () => {
+  for (const authToken of [undefined, '', '   ']) {
+    const runner = new EffectRunner({resolverUrl: 'http://resolver.test', client: null, storage: memoryStorage(), effects: [], authToken});
+    assert.throws(() => runner.startHttp(0, '0.0.0.0'), /ABX_EFFECTS_TOKEN/);
+  }
 });

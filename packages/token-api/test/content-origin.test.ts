@@ -81,6 +81,7 @@ async function fixture(
     port: 0,
     baseUrl: 'https://resolver.test',
     contentDomain: domain,
+    fetchContent: globalThis.fetch,
     storage,
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

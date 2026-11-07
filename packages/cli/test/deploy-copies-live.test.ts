@@ -178,7 +178,7 @@ test('deploy-code --copies + --image-base is ACCEPTED: bakes a per-id url-templa
     '--for', FOR, '--dry-run',
   ]);
   assert.equal(code, 0, out);
-  assert.match(out, /on-chain url-template.*stills\.example\.com\/\{id\}\.png/);
+  assert.match(out, /on-chain url-template.*stills\.example\.com\/84532\/\{contract\}\/\{id\}\.png/);
   assert.match(out, /3 id\(s\) × 10 cop(y|ies)/); // 3 premint ids, 10 copies each — the multi-id × multi-copy case
 });
 

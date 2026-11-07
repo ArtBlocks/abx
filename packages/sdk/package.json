@@ -62,6 +62,7 @@
     "sync-abis": "tsx scripts/sync-abis.ts"
   },
   "dependencies": {
+    "ipaddr.js": "^2.5.0",
     "viem": "^2.56.5"
   },
   "devDependencies": {

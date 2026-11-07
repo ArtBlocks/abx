@@ -246,7 +246,7 @@ test('deploy-code --image-base plans an on-chain image url-template', async () =
   );
   assert.equal(code, 0, out);
   assert.match(out, /on-chain url-template/i);
-  assert.match(out, /https:\/\/cdn\.example\/orbit\/\{id\}\.png/);
+  assert.match(out, /https:\/\/cdn\.example\/orbit\/11155111\/\{contract\}\/\{id\}\.png/);
   assert.doesNotMatch(out, /unrecognized flag/i);
 });
 

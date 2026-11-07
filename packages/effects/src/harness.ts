@@ -671,7 +671,10 @@ export class EffectRunner {
    *     synchronous sweep, returns the stats.
    *  Both require `Authorization: Bearer <authToken>` when one is configured (a public runner
    *  with an open force-render endpoint is a resource-burn hole); `/health` stays open. */
-  startHttp(port: number): Server {
+  startHttp(port: number, host = '127.0.0.1'): Server {
+    if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !this.opts.authToken?.trim()) {
+      throw new Error('A public effects listener requires a nonempty ABX_EFFECTS_TOKEN.');
+    }
     const server = createServer(async (req, res) => {
       try {
         const url = new URL(req.url ?? '/', 'http://localhost');
@@ -716,7 +719,7 @@ export class EffectRunner {
         res.end(JSON.stringify({error: (err as Error).message}));
       }
     });
-    server.listen(port);
+    server.listen(port, host);
     return server;
   }
 
@@ -768,9 +771,19 @@ export class EffectRunner {
       return null;
     }
     const url = template.split('{id}').join(token.tokenId);
-    const prefix = `${publicBase}/`;
-    if (!url.startsWith(prefix)) return null; // template points at a different host — leave it to the normal path
-    return {objectKey: url.slice(prefix.length), url};
+    let objectKey: string;
+    try {
+      const base = new URL(`${publicBase.replace(/\/$/, '')}/`);
+      const target = new URL(url);
+      if (target.origin !== base.origin || !target.pathname.startsWith(base.pathname)) return null;
+      objectKey = decodeURIComponent(target.pathname.slice(base.pathname.length));
+    } catch {return null;}
+    const ownPrefix = `${state.chainId}/${state.address.toLowerCase()}/`;
+    if (!objectKey.startsWith(ownPrefix) || objectKey.split('/').some((p) => p === '..' || p === '.')) {
+      throw new Error(`Deterministic image template must use the collection's storage namespace: ${ownPrefix}`);
+    }
+    return {objectKey, url};
+
   }
 
   private async getState(address: string): Promise<ProjectState | null> {

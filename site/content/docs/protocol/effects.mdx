@@ -62,3 +62,25 @@ visible here so a param change that re-addressed a render is diagnosable rather 
 
 `--remote <name|url>` reads the hosted resolver instead of this node's local projection. The report
 identifies which service answered.
+
+## Reference worker deployment limits
+
+The reference worker is for one trusted operator's collections. It does not provide a multi-tenant
+sandbox. Rendering uses a fresh browser context and a checked HTTP proxy: public network dependencies
+remain available; private network destinations are refused. The configured resolver origin is an
+operator-owned exception so a co-located local resolver remains usable. Rendering uses proxied web
+traffic; non-proxied WebRTC UDP and QUIC are disabled. Collector browsers retain their own behavior.
+
+Without `ABX_EFFECTS_TOKEN`, the HTTP trigger server listens on `127.0.0.1` only. A public listener
+(`ABX_EFFECTS_HOST=0.0.0.0`) requires a nonempty token. Generated container deployments select that
+public mode and refuse to start without the token. `/health` remains public; `/run` and `/notify`
+require `Authorization: Bearer <token>` in public mode. `--once` needs no HTTP listener.
+
+For deterministic cloud thumbnails, the on-chain `image` URL template must select an object under
+`<publicBase>/<chainId>/<lowercase-contract-address>/`, for example
+`https://cdn.example/8453/0x0000000000000000000000000000000000000001/{id}.png`.
+`abx deploy-code --image-base` and `abx deploy-edition-code --image-base` add the namespace
+automatically, resolving the factory-predicted collection address before signing.
+Templates outside that collection namespace are rejected before rendering. Existing self-hosters
+using a custom prefix must update their image template to receive further deterministic thumbnail
+writes; existing stored objects are not moved or deleted automatically.
