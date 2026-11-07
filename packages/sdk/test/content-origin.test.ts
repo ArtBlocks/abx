@@ -252,3 +252,11 @@ test('malformed provider templates fall back without unbounded placeholder match
   const key = {chainId: 8453, address: ADDRESS, tokenId: '7'};
   assert.equal(discoveredLiveViewUrl('https://resolver.test', {liveViewUrlTemplate: '{{|'.repeat(50000)}, key), `https://resolver.test${path}`);
 });
+
+
+test('fallback live views preserve the configured resolver path prefix', () => {
+  const key = {chainId: 8453, address: ADDRESS, tokenId: '7'};
+  for (const content of [undefined, {scheme: 'future', liveViewUrlTemplate: 'https://other.test/'}]) {
+    assert.equal(discoveredLiveViewUrl('https://resolver.test/provider/', content, key), `https://resolver.test/provider${path}`);
+  }
+});

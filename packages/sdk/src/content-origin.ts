@@ -200,7 +200,9 @@ export function discoveredLiveViewUrl(
   content: {liveViewUrlTemplate: string; scheme?: string} | undefined,
   key: ContentRouteKey,
 ): string {
-  const fallback = new URL(`/a/${key.chainId}/${key.address}/${key.tokenId}`, baseUrl).href;
+  let end = baseUrl.length;
+  while (end > 0 && baseUrl[end - 1] === '/') end--;
+  const fallback = new URL(`${baseUrl.slice(0, end)}/a/${key.chainId}/${key.address}/${key.tokenId}`).href;
   if (
     !content ||
     typeof content.liveViewUrlTemplate !== 'string' ||

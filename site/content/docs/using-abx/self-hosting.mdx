@@ -92,7 +92,8 @@ a restricted marketplace wrapper. Image and artifact routes redirect without cha
 bytes. The response's canonical `Link` header identifies the direct URL. Service descriptors advertise
 `content.domain`, `content.scheme`, and `content.liveViewUrlTemplate`; `abx remote` displays these.
 SDK clients can use `discoveredLiveViewUrl` to expand a provider's template or fall back to `/a/` for
-an unknown scheme. Do not infer token coordinates from the browser path; use the ABX runtime's token
+an unknown scheme. Fallbacks retain the configured resolver path prefix; a descriptor’s diagnostic
+base URL does not override that transport. Do not infer token coordinates from the browser path; use the ABX runtime's token
 identity. Relative resources must be valid at `/` or use explicit URLs.
 
 The SQLite index stores a disposable reverse lookup for token hashes, backfills existing projections
