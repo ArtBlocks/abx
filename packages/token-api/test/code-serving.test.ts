@@ -483,3 +483,11 @@ test('directory reads refuse private URLs and collection-controlled private gate
     await assert.rejects(resolveLiveView(client, codeState({collectionFields} as never), driftToken()), /public HTTP/);
   }
 });
+
+test('compressed inline fields cannot expand past the host content limit', async () => {
+  const {gzipSync} = await import('node:zlib');
+  const {toHex} = await import('viem');
+  const {resolveFieldBytes} = await import('../src/resolve.js');
+  const packed = gzipSync(Buffer.alloc(16 * 1024 * 1024 + 1));
+  await assert.rejects(resolveFieldBytes(client, {field: 'attachment', representation: 'inline-gzip', value: toHex(packed)}), {code: 'ERR_BUFFER_TOO_LARGE'});
+});

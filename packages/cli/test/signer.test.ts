@@ -132,11 +132,12 @@ test('wallet receipts must match the complete pending intent and cannot predate 
   const signer = '0x1111111111111111111111111111111111111111' as const;
   const target = '0x2222222222222222222222222222222222222222' as const;
   const intended = {to: target, data: '0x1234', value: '0x3'} as never;
-  const actual = {from: signer, to: target, input: '0x1234' as const, value: 3n, nonce: 7};
-  const receipt = {from: signer, status: 'success'} as never;
+  const hash = ('0x' + '11'.repeat(32)) as `0x${string}`;
+  const actual = {hash, from: signer, to: target, input: '0x1234' as const, value: 3n, nonce: 7};
+  const receipt = {transactionHash: hash, from: signer, status: 'success'} as never;
   assert.doesNotThrow(() => assertWalletTransaction(intended, signer, actual, receipt, 7));
   for (const change of [{from: target}, {to: signer}, {input: '0x5678'}, {value: 4n}, {nonce: 6}]) {
     assert.throws(() => assertWalletTransaction(intended, signer, {...actual, ...change} as typeof actual, receipt, 7), /does not match/);
   }
-  assert.throws(() => assertWalletTransaction(intended, signer, actual, {from: signer, status: 'reverted'} as never, 7), /does not match/);
+  assert.throws(() => assertWalletTransaction(intended, signer, actual, {transactionHash: hash, from: signer, status: 'reverted'} as never, 7), /does not match/);
 });

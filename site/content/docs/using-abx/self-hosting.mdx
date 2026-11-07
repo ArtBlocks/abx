@@ -13,7 +13,7 @@ that explicitly supports third-party creators for that use case.
 
 Project-controlled server fetches accept public HTTP(S) destinations. Private, loopback, link-local,
 and reserved network addresses are refused, including DNS answers and redirect hops. Entry documents
-have a 16 MiB decoded response limit, a 10-second fetch deadline, and a five-redirect limit; only documents up to 1 MiB enter
+have a 16 MiB decoded response limit, a 10-second fetch deadline, and a five-redirect limit; gzip field/dependency expansion is also limited to 16 MiB; only documents up to 1 MiB enter
 the 32-entry cache. These are host limits, not restrictions on ABX contracts or on collectors' browsers.
 A refused destination is not fetched by the server or converted into an unsafe fallback.
 

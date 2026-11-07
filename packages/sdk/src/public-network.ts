@@ -239,13 +239,14 @@ export async function startContentProxy(
       delete headers['proxy-authorization'];
       delete headers['proxy-connection'];
       const upstream = httpRequest(
-        url,
         {
+          hostname: target.address,
+          port: Number(url.port || 80),
+          path: url.pathname + url.search,
           method: req.method,
           headers,
           agent: false,
           family: target.family,
-          lookup: (_host, _opts, cb) => cb(null, target.address, target.family),
         },
         (response) => {
           res.writeHead(response.statusCode ?? 502, response.headers);

@@ -420,8 +420,8 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   };
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
     try {
+      const url = new URL(req.url ?? '/', 'http://localhost');
       const host = new URL(`http://${req.headers.host ?? 'invalid'}`).hostname;
       const supplied = req.headers['x-abx-session-token'] ?? url.searchParams.get('session') ?? '';
       const authenticated = typeof supplied === 'string' && supplied.length === sessionToken.length && timingSafeEqual(Buffer.from(supplied), Buffer.from(sessionToken));
@@ -446,7 +446,7 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         // Hard server-side guard: never let the deployer/owner resolve to anything but the
         // expected signer (the page enforces this too, but the CLI builds owner/mintTo from
         // whatever connects, so a wrong signer here would silently mis-own the contract).
-        if (!isAddress(signer) || (connectedAddress && signer.toLowerCase() !== connectedAddress.toLowerCase())) {
+        if (!isAddress(signer, {strict: false}) || (connectedAddress && signer.toLowerCase() !== connectedAddress.toLowerCase())) {
           res.writeHead(400); res.end('invalid signer'); return;
         }
         if (signer && opts.expectedSigner && (signer as string).toLowerCase() !== opts.expectedSigner.toLowerCase()) {
@@ -592,10 +592,10 @@ p{margin:0 0 8px;color:#c9c9d0}
 /** Reject unrelated, reverted, or earlier transactions before their receipts feed another write. */
 export function assertWalletTransaction(
   intended: PreparedTx, signer: Address,
-  actual: {from: Address; to: Address | null; input: Hex; value: bigint; nonce: number},
+  actual: {hash: Hex; from: Address; to: Address | null; input: Hex; value: bigint; nonce: number},
   receipt: TransactionReceipt, minimumNonce: number,
 ): void {
-  if (receipt.status !== 'success' || actual.from.toLowerCase() !== signer.toLowerCase() || receipt.from.toLowerCase() !== signer.toLowerCase() ||
+  if (actual.hash.toLowerCase() !== receipt.transactionHash.toLowerCase() || receipt.status !== 'success' || actual.from.toLowerCase() !== signer.toLowerCase() || receipt.from.toLowerCase() !== signer.toLowerCase() ||
       (actual.to?.toLowerCase() ?? null) !== (intended.to?.toLowerCase() ?? null) ||
       actual.input.toLowerCase() !== intended.data.toLowerCase() || actual.value !== BigInt(intended.value) || actual.nonce < minimumNonce) {
     throw new Error('Wallet transaction does not match the requested direct transaction. Inspect it before retrying; wrapped smart-account and multisig workflows require --unsigned.');

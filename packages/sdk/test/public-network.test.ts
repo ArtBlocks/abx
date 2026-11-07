@@ -168,3 +168,9 @@ test('browser child environments exclude service credentials and ambient proxy b
     { PATH: '/usr/bin', TZ: 'UTC' },
   );
 });
+
+test('Node dependency inflation caps decoded output before allocating an oversized result', async () => {
+  const { nodeInflate } = await import('../src/node.js');
+  const packed = gzipSync(Buffer.alloc(16 * 1024 * 1024 + 1));
+  assert.throws(() => nodeInflate(packed), { code: 'ERR_BUFFER_TOO_LARGE' });
+});

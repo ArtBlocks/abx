@@ -34,7 +34,7 @@ export const READER_ABI = [
   },
 ] as const;
 
-const gunzip = (b: Uint8Array): Uint8Array => new Uint8Array(gunzipSync(Buffer.from(b)));
+const gunzip = (b: Uint8Array): Uint8Array => new Uint8Array(gunzipSync(Buffer.from(b), {maxOutputLength: 16 * 1024 * 1024}));
 
 /** Resolve a field to its content bytes (decoding inline/gzip/reader), or null if not byte content here. */
 export async function resolveFieldBytes(
