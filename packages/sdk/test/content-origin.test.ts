@@ -78,6 +78,7 @@ test('public live views contain only a restricted wrapper, with matching script/
   );
   const html = await result.text();
   assert.equal(result.status, 200);
+  assert.equal(result.headers.get('vary'), 'Sec-Fetch-Dest');
   assert.ok(!html.includes('projectProgram'));
   assert.ok(html.includes(`<iframe src="${direct}"`));
   assert.equal(result.headers.get('link'), `<${direct}>; rel="canonical"`);
@@ -148,5 +149,20 @@ test('content frames accept only HTTP(S) URLs without credentials', () => {
   credentialed.password = 'fixture';
   for (const url of ['javascript:alert(1)', 'data:text/html,hello', credentialed.href]) {
     assert.throws(() => projectContentFrame(url));
+  }
+});
+
+test('top-level browser navigation redirects while iframe navigation keeps the marketplace wrapper', async () => {
+  for (const destination of ['document', 'iframe']) {
+    const response = isolateProjectContent(
+      policy,
+      `https://resolver.test${path}?mode=1`,
+      new Response('program', {headers: {'content-type': 'text/html'}}),
+      destination,
+    );
+    assert.equal(response.headers.get('vary'), 'Sec-Fetch-Dest');
+    assert.equal(response.status, destination === 'document' ? 302 : 200);
+    if (destination === 'document') assert.equal(response.headers.get('location'), `${direct}?mode=1`);
+    else assert.match(await response.text(), /<iframe /);
   }
 });

@@ -131,7 +131,12 @@ export function projectContentFrame(url: string, cacheControl = 'no-store'): Res
 }
 
 /** Apply to every publisher byte response. Without DNS configuration, documents use opaque origins. */
-export function isolateProjectContent(policy: ProjectContentPolicy, requestUrl: string, response: Response): Response {
+export function isolateProjectContent(
+  policy: ProjectContentPolicy,
+  requestUrl: string,
+  response: Response,
+  fetchDestination?: string,
+): Response {
   const headers = new Headers(response.headers);
   headers.set('x-content-type-options', 'nosniff');
   headers.set('referrer-policy', 'no-referrer');
@@ -148,13 +153,24 @@ export function isolateProjectContent(policy: ProjectContentPolicy, requestUrl: 
       );
     } else if (projectContentRequestKind(policy, requestUrl) === 'public') {
       const cache = headers.get('cache-control') ?? 'no-store';
-      // Byte artifacts must remain byte-exact. Only the assembled live view uses a wrapper.
-      if (url.pathname.startsWith('/a/') && /^text\/html(?:\s*;|$)/i.test(headers.get('content-type') ?? '')) {
-        return projectContentFrame(target, cache);
+      const liveView = url.pathname.startsWith('/a/') && /^text\/html(?:\s*;|$)/i.test(headers.get('content-type') ?? '');
+      // Browser navigation follows HTTP redirects so capturers see the final document's status.
+      // Frames and server-side marketplace downloads retain the copyable wrapper. This hint only
+      // selects between two safe representations; it never permits publisher bytes on this origin.
+      if (liveView && fetchDestination !== 'document') {
+        const frame = projectContentFrame(target, cache);
+        frame.headers.set('vary', 'Sec-Fetch-Dest');
+        return frame;
       }
       return new Response(null, {
         status: 302,
-        headers: {location: target, link: `<${target}>; rel="canonical"`, 'cache-control': cache, 'x-content-type-options': 'nosniff'},
+        headers: {
+          location: target,
+          link: `<${target}>; rel="canonical"`,
+          'cache-control': cache,
+          'x-content-type-options': 'nosniff',
+          ...(liveView ? {vary: 'Sec-Fetch-Dest'} : {}),
+        },
       });
     }
   }

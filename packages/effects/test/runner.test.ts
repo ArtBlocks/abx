@@ -860,3 +860,62 @@ test('deterministic lane: a param change overwrites the SAME key (stable URL, no
   // ONE image object + ONE marker — overwritten in place, so the on-chain URL never changes.
   assert.equal(storage.objects.size, 2);
 });
+
+for (const discovered of [false, true]) {
+  test(`captures use the ${discovered ? 'advertised' : 'configured'} direct content origin`, async () => {
+    const realFetch = globalThis.fetch;
+    let captured = '';
+    globalThis.fetch = (async (url: unknown) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes('/.well-known/')
+            ? {interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [31337], content: {domain: 'content.test'}}
+            : [],
+        ),
+        {status: 200, headers: {'content-type': 'application/json'}},
+      )) as typeof fetch;
+    try {
+      const effect: EffectModule = {
+        ...fakeEffect(),
+        async run(ctx) {
+          captured = ctx.liveViewUrl;
+          return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+        },
+      };
+      const runner = new EffectRunner({
+        resolverUrl: 'https://resolver.test',
+        contentDomain: discovered ? undefined : 'content.test',
+        client: null,
+        storage: discovered ? locatorStorage() : memoryStorage(),
+        effects: [effect],
+        adminToken: discovered ? 'fixture-token' : undefined,
+        fetchState: async () => codeState(1n),
+        log: () => {},
+      });
+      const stats = await runner.sweepProject(ADDR);
+      assert.equal(stats.failed, 0);
+      assert.equal(captured, `https://31337-${ADDR.toLowerCase()}.content.test/a/31337/${ADDR}/0`);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+}
+
+test('local transport aliases use the configured public origin for content routing', async () => {
+  const prior = process.env.ABX_PUBLIC_BASE_URL;
+  process.env.ABX_PUBLIC_BASE_URL = 'http://127.0.0.1:8787';
+  let captured = '';
+  try {
+    const effect: EffectModule = {...fakeEffect(), async run(ctx) {
+      captured = ctx.liveViewUrl;
+      return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+    }};
+    const runner = new EffectRunner({resolverUrl: 'http://localhost:8787', contentDomain: 'localhost:8787', client: null,
+      storage: memoryStorage(), effects: [effect], fetchState: async () => codeState(1n), log: () => {}});
+    assert.equal((await runner.sweepProject(ADDR)).failed, 0);
+    assert.equal(captured, `http://31337-${ADDR.toLowerCase()}.localhost:8787/a/31337/${ADDR}/0`);
+  } finally {
+    if (prior === undefined) delete process.env.ABX_PUBLIC_BASE_URL;
+    else process.env.ABX_PUBLIC_BASE_URL = prior;
+  }
+});

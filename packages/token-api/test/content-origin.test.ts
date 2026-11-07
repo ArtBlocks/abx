@@ -56,11 +56,12 @@ const storage = {id: 'memory', get: async () => null, has: async () => false} as
 async function fixture(
   domain: string | undefined,
   run: (
-    read: (path: string, host?: string, method?: string) => Promise<{status: number; headers: Record<string, unknown>; body: string}>,
+    read: (path: string, host?: string, method?: string, destination?: string) => Promise<{status: number; headers: Record<string, unknown>; body: string}>,
   ) => Promise<void>,
+  project = state,
 ) {
   const store = new SqliteStore(mkdtempSync(join(tmpdir(), 'abx-content-origin-')));
-  store.putProject(state);
+  store.putProject(project);
   const server = createTokenApiServer({
     indexer: new SelfHostIndexer(store),
     port: 0,
@@ -70,9 +71,9 @@ async function fixture(
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as {port: number}).port;
-  const read = (path: string, host = 'resolver.test', method = 'GET') =>
+  const read = (path: string, host = 'resolver.test', method = 'GET', destination?: string) =>
     new Promise<{status: number; headers: Record<string, unknown>; body: string}>((resolve, reject) => {
-      const req = request({hostname: '127.0.0.1', port, path, method, headers: {host}}, (res) => {
+      const req = request({hostname: '127.0.0.1', port, path, method, headers: {host, ...(destination ? {'sec-fetch-dest': destination} : {})}}, (res) => {
         let body = '';
         res.setEncoding('utf8');
         res.on('data', (part) => {
@@ -117,4 +118,22 @@ test('self-hosted documents have opaque origins when no content domain is config
     assert.match(String(result.headers['content-security-policy']), /sandbox allow-scripts/);
     assert.equal(String(result.headers['content-security-policy']).includes('allow-same-origin'), false);
   });
+});
+
+test('live-view HTTP responses distinguish browser navigation from marketplace downloads', async () => {
+  await fixture('content.test', async (read) => {
+    const live = `/a/${chainId}/${address}/0?mode=1`;
+    const target = `https://${chainId}-${address}.content.test${live}`;
+    const download = await read(live);
+    assert.equal(download.status, 200);
+    assert.match(download.body, /<iframe /);
+    assert.equal(download.headers.vary, 'Sec-Fetch-Dest');
+    const navigation = await read(live, 'resolver.test', 'GET', 'document');
+    assert.equal(navigation.status, 302);
+    assert.equal(navigation.headers.location, target);
+    assert.equal(navigation.headers.vary, 'Sec-Fetch-Dest');
+    const frame = await read(live, 'resolver.test', 'GET', 'iframe');
+    assert.equal(frame.status, 200);
+    assert.match(frame.body, /<iframe /);
+  }, {...state, contractType: 'code', script: {chunkCount: 1, locked: false, digest: null}} as ProjectState);
 });
