@@ -137,3 +137,14 @@ test('live-view HTTP responses distinguish browser navigation from marketplace d
     assert.match(frame.body, /<iframe /);
   }, {...state, contractType: 'code', script: {chunkCount: 1, locked: false, digest: null}} as ProjectState);
 });
+
+test('default localhost effects transport can read control data with a local content domain', async () => {
+  await fixture('localhost:8787', async (read) => {
+    const host = 'localhost:8787';
+    assert.equal((await read('/.well-known/abx-service', host)).status, 200);
+    const result = await read(`/api/project/${address}`, host);
+    assert.equal(result.status, 200);
+    assert.equal(JSON.parse(result.body).address, address);
+    assert.equal((await read('/api/projects', `${chainId}-${address}.localhost:8787`)).status, 404);
+  });
+});

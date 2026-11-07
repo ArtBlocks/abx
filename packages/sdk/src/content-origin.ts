@@ -83,7 +83,12 @@ export function projectContentRequestKind(policy: ProjectContentPolicy, requestU
   if (!policy.contentDomain) return 'public';
   const url = new URL(requestUrl);
   const domain = new URL(`${policy.contentScheme}//${policy.contentDomain}`);
-  if (url.hostname === domain.hostname) return url.pathname === '/health' ? 'health' : 'reject';
+  if (url.hostname === domain.hostname) {
+    // Co-located tools use localhost for control reads while collection subdomains use it as
+    // their local content suffix. The root is only a public alias; project hosts stay restricted.
+    if (domain.hostname === 'localhost') return 'public';
+    return url.pathname === '/health' ? 'health' : 'reject';
+  }
   if (!url.hostname.endsWith(`.${domain.hostname}`)) return 'public';
   if (url.port !== domain.port) return 'reject';
   const label = url.hostname.slice(0, -(domain.hostname.length + 1));
