@@ -1,5 +1,24 @@
 # @artblocks/abx-effects
 
+## 0.1.11
+
+### Patch Changes
+
+- b48af22: Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+  discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+  wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.
+
+  Top-level browser live-view requests use HTTP redirects so existing capture clients see the final
+  artwork status. Marketplace frames and server-side downloads retain the embeddable wrapper.
+
+- 11b9636: `abx-effects --help` and `-h` now print usage and exit instead of starting the runner, and an unrecognized first argument exits 1 with usage instead of starting the HTTP server and sweep loop. `--once` and the no-argument runner are unchanged.
+- Updated dependencies [935fb00]
+- Updated dependencies [b48af22]
+- Updated dependencies [9e1129e]
+- Updated dependencies [8be5eab]
+  - @artblocks/abx-sdk@0.9.0
+  - @artblocks/abx-storage@0.1.11
+
 ## 0.1.10
 
 ### Patch Changes

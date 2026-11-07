@@ -1,5 +1,29 @@
 # @artblocks/abx-token-api
 
+## 0.2.10
+
+### Patch Changes
+
+- 935fb00: Serve resolver project documents on collection-scoped content origins configured by
+  ABX_CONTENT_DOMAIN. Preserve existing metadata and animation URLs, provide marketplace-compatible
+  live-view wrappers and canonical direct links, and keep artifact bytes unchanged across redirects.
+  Self-hosted documents use opaque-origin sandboxing when no content domain is configured. Advertise
+  content addressing in service discovery and document the browser storage and wallet implications.
+- b48af22: Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+  discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+  wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.
+
+  Top-level browser live-view requests use HTTP redirects so existing capture clients see the final
+  artwork status. Marketplace frames and server-side downloads retain the embeddable wrapper.
+
+- Updated dependencies [935fb00]
+- Updated dependencies [b48af22]
+- Updated dependencies [9e1129e]
+- Updated dependencies [8be5eab]
+  - @artblocks/abx-sdk@0.9.0
+  - @artblocks/abx-indexer@0.1.11
+  - @artblocks/abx-storage@0.1.11
+
 ## 0.2.9
 
 ### Patch Changes
