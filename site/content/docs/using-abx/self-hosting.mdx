@@ -82,8 +82,9 @@ The dedicated domain should hold no application sessions or sensitive cookies. S
 have separate DOM and browser storage, but parent-domain cookies can still be shared. The collection
 is the trust boundary: all tokens in it share that collection's origin.
 
-Existing live-view URLs return a restricted marketplace wrapper. Opened directly, the wrapper
-navigates to the collection origin; embedded or copied by a marketplace, it frames that origin.
+Existing live-view URLs redirect top-level browser navigation to the collection origin. Frames
+and server-side downloads receive a restricted marketplace wrapper that frames that origin; its
+script also navigates standalone clients that do not send browser fetch metadata.
 Image and artifact byte routes redirect without changing committed bytes. The response's `Link`
 header with `rel="canonical"` identifies the direct content URL. Service descriptors advertise
 `content.domain` and `content.liveViewUrlTemplate`; `abx remote` displays these when available.

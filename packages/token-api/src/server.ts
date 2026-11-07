@@ -285,9 +285,12 @@ export function createTokenApiServer(opts: ServerOptions): Server {
       const sendContent: ContentSender = async (body, contentType, cacheControl) => {
         // The policy needs headers, not the artwork payload. Keep large byte artifacts out of
         // Response buffering; only the small generated wrapper has a replacement body.
-        const response = isolateProjectContent(contentPolicy, requestUrl.href, new Response(null, {
-          headers: {'content-type': contentType, 'cache-control': cacheControl},
-        }));
+        const response = isolateProjectContent(
+          contentPolicy,
+          requestUrl.href,
+          new Response(null, {headers: {'content-type': contentType, 'cache-control': cacheControl}}),
+          typeof req.headers['sec-fetch-dest'] === 'string' ? req.headers['sec-fetch-dest'] : undefined,
+        );
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(response.body ? Buffer.from(await response.arrayBuffer()) : response.status === 200 ? body : undefined);
       };

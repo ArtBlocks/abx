@@ -162,8 +162,8 @@ or the onchain base URI.
 
 The first-party provider serves metadata at `resolver.abx.io` and project documents from collection
 subdomains of `abxcontent.app`. Accounts and creator controls remain at `services.abx.io`. Existing
-metadata and animation URLs continue to work; live views use an embeddable wrapper that loads the
-project's own origin. Artifact and image URLs redirect to their collection's content host.
+metadata and animation URLs continue to work; top-level browser views redirect to the project's own
+origin, while marketplace frames and downloads receive an embeddable wrapper that loads that origin. Artifact and image URLs redirect to their collection's content host.
 
 For direct viewing or application integrations, read the service descriptor's `content` advertisement
 with `abx remote abx`, or use the live-view response's canonical `Link` header. Keep the chain,
