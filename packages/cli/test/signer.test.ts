@@ -149,7 +149,7 @@ test('rendered signing page reports rejected connections and escapes transaction
   try {
     const url = new URL(boundUrl(file));
     const html = await (await fetch(url)).text();
-    const source = html.match(/<script>([\s\S]*?)<\/script>/)![1]!;
+    const source = html.match(/<script>([\s\S]*?)<\/script>/i)![1]!;
     const elements = new Map<string, {className: string; textContent: string; innerHTML: string; style: Record<string, string>; disabled: boolean}>();
     const element = (id: string) => {if (!elements.has(id)) elements.set(id, {className: '', textContent: '', innerHTML: '', style: {}, disabled: false}); return elements.get(id)!;};
     const context = createContext({document: {getElementById: element}, window: {}, location: {search: url.search}, URLSearchParams,
