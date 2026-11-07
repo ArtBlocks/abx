@@ -235,8 +235,8 @@ export interface ServiceDescriptor {
    *  `baseUrl` (or the descriptor origin for an older descriptor). This keeps a remote a provider
    *  profile rather than forcing every capability into one HTTP process. */
   endpoints?: Record<string, ServiceInterfaceEndpoint>;
-  /** Direct collection-scoped content addressing. Metadata and animation URLs remain stable. */
-  content?: {domain: string; liveViewUrlTemplate: string};
+  /** Provider-advertised direct content addressing. Metadata and animation URLs remain stable. */
+  content?: {domain: string; liveViewUrlTemplate: string; scheme?: string};
 }
 
 export type ServiceInterfaceSupportLevel = 'experimental' | 'beta' | 'supported';

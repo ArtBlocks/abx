@@ -1,3 +1,4 @@
+import {contentRequestLabel, contentDigestFromLabel, contentRootPath} from '@artblocks/abx-sdk';
 import {createServer, type IncomingMessage, type Server, type ServerResponse} from 'node:http';
 import {
   ABX_JS,
@@ -273,7 +274,7 @@ export function createTokenApiServer(opts: ServerOptions): Server {
       requestUrl.pathname = pathUrl.pathname;
       requestUrl.search = pathUrl.search;
       const kind = projectContentRequestKind(contentPolicy, requestUrl.href);
-      if (kind === 'reject' || (kind === 'content' && !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET'))) {
+      if (kind === 'reject' || (['content', 'legacy'].includes(kind) && !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET'))) {
         return sendJson(res, 404, {error: 'not found'});
       }
       if (kind === 'health') return sendJson(res, 200, {ok: true});
@@ -294,11 +295,19 @@ export function createTokenApiServer(opts: ServerOptions): Server {
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(response.body ? Buffer.from(await response.arrayBuffer()) : response.status === 200 ? body : undefined);
       };
-      const publicContent = kind === 'public' && !!contentPolicy.contentDomain && isProjectContentPath(requestUrl.pathname);
+      const publicContent = ['public', 'legacy'].includes(kind) && !!contentPolicy.contentDomain && isProjectContentPath(requestUrl.pathname);
       if (publicContent && ['GET', 'HEAD'].includes(req.method ?? 'GET') && !requestUrl.pathname.startsWith('/a/')) {
         return sendContent('', 'application/octet-stream', 'no-store');
       }
-      await route(req, res, indexer, baseUrl, storage, sendContent, contentPolicy.contentDomain, publicContent);
+      let routingUrl = req.url;
+      if (kind === 'content' && requestUrl.pathname === '/') {
+        const label = contentRequestLabel(contentPolicy, requestUrl.href)!;
+        const key = indexer.store.getContentRoute(contentDigestFromLabel(label)!);
+        const path = key && contentRootPath(label, key);
+        if (!path) return sendJson(res, 404, {error: 'not found'});
+        routingUrl = path + requestUrl.search;
+      }
+      await route(req, res, indexer, baseUrl, storage, sendContent, contentPolicy.contentDomain, publicContent, routingUrl);
     } catch (err) {
       // NEVER hand a raw internal error to the client. An unexpected failure here is usually an
       // upstream RPC error, and viem's message embeds the full endpoint URL — which for a keyed
@@ -345,10 +354,11 @@ async function route(
   sendContent: ContentSender,
   contentDomain?: string,
   publicContent = false,
+  routingUrl = req.url,
 ): Promise<void> {
   res.setHeader('access-control-allow-origin', '*');
   res.setHeader('access-control-expose-headers', 'link');
-  const url = new URL(req.url ?? '/', 'http://localhost');
+  const url = new URL(routingUrl ?? '/', 'http://localhost');
   const parts = url.pathname.split('/').filter(Boolean);
   const method = req.method ?? 'GET';
 

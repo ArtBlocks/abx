@@ -75,27 +75,47 @@ resolver, then set on the resolver and its effects worker:
 ABX_CONTENT_DOMAIN=content.example.net
 ```
 
-Each collection is served at `https://{chainId}-{address}.content.example.net`, retaining the existing
-`/a/`, `/t/`, and `/c/` paths and query parameters. A content host serves only its own collection's
-read routes and the ABX runtime; account, dashboard, control, and other collections' routes are refused.
-The dedicated domain should hold no application sessions or sensitive cookies. Sibling subdomains
-have separate DOM and browser storage, but parent-domain cookies can still be shared. The collection
-is the trust boundary: all tokens in it share that collection's origin.
+Each token's live application is served at `https://t-{digest}.content.example.net/`, with query
+parameters and fragments preserved. The digest is the full SHA-256 of the canonical UTF-8 string
+`abx-content-v1:token:{chainId}:{lowercaseAddress}:{decimalTokenId}`, encoded as lowercase, unpadded
+RFC 4648 base32. The complete label is 54 characters even for the largest uint256 token ID. Use the
+SDK's `contentOriginLabel` or discovery helper rather than implementing a provider's hostname policy
+in artwork. Token artifacts retain their protocol paths on that token's origin. Collection artifacts
+use a separate `c-` origin (the hash preimage is `abx-content-v1:collection:{chainId}:{lowercaseAddress}`).
+A content host refuses other tokens, account, dashboard, and control routes. Keep application
+sessions and sensitive cookies off the dedicated domain: sibling origins separate DOM and storage,
+but parent-domain cookies can be shared. Token editions share an origin for all copies of one ID.
 
-Existing live-view URLs redirect top-level browser navigation to the collection origin. Frames
-and server-side downloads receive a restricted marketplace wrapper that frames that origin; its
-script also navigates standalone clients that do not send browser fetch metadata.
-Image and artifact byte routes redirect without changing committed bytes. The response's `Link`
-header with `rel="canonical"` identifies the direct content URL. Service descriptors advertise
-`content.domain` and `content.liveViewUrlTemplate`; `abx remote` displays these when available.
-On-chain metadata and self-contained on-chain HTML do not change.
+Existing `/a/` URLs and the older `{chainId}-{address}` collection hosts remain entrypoints:
+top-level browser navigation redirects to the token origin; frames and server-side downloads receive
+a restricted marketplace wrapper. Image and artifact routes redirect without changing committed
+bytes. The response's canonical `Link` header identifies the direct URL. Service descriptors advertise
+`content.domain`, `content.scheme`, and `content.liveViewUrlTemplate`; `abx remote` displays these.
+SDK clients can use `discoveredLiveViewUrl` to expand a provider's template or fall back to `/a/` for
+an unknown scheme. Do not infer token coordinates from the browser path; use the ABX runtime's token
+identity. Relative resources must be valid at `/` or use explicit URLs.
+
+The SQLite index stores a disposable reverse lookup for token hashes, backfills existing projections
+on startup, and maintains it during indexing. An independently hosted resolver can rebuild the same
+URLs from chain state without this provider's database. Unknown hashes and unavailable tokens fail
+with the same lifecycle rules as `/a/`. No inventory of possible unminted IDs is generated.
+
+Keep contract-facing token and collection URI bases on the resolver (`https://resolver.example/t`
+and `https://resolver.example/c`). Contracts append their chain/address/token coordinates; the
+content domain is a browser delivery layer, not a replacement metadata base. This also applies to
+on-chain applications that fetch HTTP resources: discover their canonical URL or follow the resolver
+entrypoint. Fully on-chain URI renderers still return their own data documents; external IPFS,
+Arweave, or creator-hosted URLs retain those hosts' security policies. This resolver cannot impose
+HTTP isolation on documents served elsewhere or directly embedded as data URIs.
 
 For local development, use `ABX_PUBLIC_BASE_URL=http://127.0.0.1:8787` with
-`ABX_CONTENT_DOMAIN=localhost:8787` to enable HTTP collection subdomains on the same port. The `localhost` root remains available for
-local effects-runner control reads; its collection subdomains serve only collection content.
-Use HTTPS for public content domains. Configure DNS and certificates before enabling the
-setting in production. Changing a content origin starts a new browser-storage namespace and may
-require a fresh wallet connection.
+`ABX_CONTENT_DOMAIN=localhost:8787` for HTTP token subdomains on the same port. The `localhost` root
+remains a public alias for local control reads. Use HTTPS for public domains and configure wildcard
+DNS and certificates before enabling the setting. Moving to a new origin resets browser storage and
+may require a fresh wallet connection. Without a content domain, opaque-origin sandboxing prevents
+shared-origin DOM access but limits storage and wallet integrations; do not remove that sandbox to
+make untrusted multi-project hosting work. Provider-specific embeds that copy artwork into their own
+origin must supply their own sandbox and isolation.
 
 ## SQLite maintenance
 

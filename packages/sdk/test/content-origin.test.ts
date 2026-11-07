@@ -3,6 +3,12 @@ import {createHash} from 'node:crypto';
 import {test} from 'node:test';
 import {
   contentProjectFromPath,
+  contentOriginLabel,
+  contentRouteDigest,
+  contentDigestFromLabel,
+  contentRootPath,
+  discoveredLiveViewUrl,
+  TOKEN_CONTENT_SCHEME,
   isolateProjectContent,
   isProjectContentPath,
   projectContentFrame,
@@ -14,11 +20,15 @@ import {
 const ADDRESS = '0x0123456789012345678901234567890123456789';
 const path = `/a/8453/${ADDRESS}/7`;
 const policy = projectContentPolicy('https://resolver.test', 'content.test');
-const direct = `https://8453-${ADDRESS}.content.test${path}`;
+const label = contentOriginLabel({chainId: 8453, address: ADDRESS, tokenId: '7'});
+const direct = `https://${label}.content.test/`;
 
-test('collection content addresses preserve paths and token parameters', () => {
+test('token content addresses use root paths and preserve query and fragment', () => {
   assert.equal(projectContentUrl(policy, `${path}?abx=abc&mode=1#mint`), `${direct}?abx=abc&mode=1#mint`);
-  assert.equal(projectContentUrl(policy, `/a/1/${ADDRESS}/7`), `https://1-${ADDRESS}.content.test/a/1/${ADDRESS}/7`);
+  assert.equal(
+    projectContentUrl(policy, `/a/1/${ADDRESS}/7`),
+    `https://${contentOriginLabel({chainId: 1, address: ADDRESS, tokenId: '7'})}.content.test/`,
+  );
   assert.deepEqual(contentProjectFromPath(`/t/8453/${ADDRESS.toUpperCase().replace('0X', '0x')}/7`), {chainId: 8453, address: ADDRESS});
 });
 
@@ -42,19 +52,21 @@ test('domain configuration rejects URL components, overlapping hosts and invalid
   assert.equal(projectContentPolicy('http://localhost:8787', 'localhost:8788').contentScheme, 'http:');
 });
 
-test('content hosts admit only their own collection read routes', () => {
+test('token content hosts admit only their own token read routes', () => {
   assert.equal(projectContentRequestKind(policy, direct), 'content');
   for (const suffix of ['/v1/projects', '/admin-console', '/device', '/oauth/token', '/signup', '/api/projects']) {
-    assert.equal(projectContentRequestKind(policy, `https://8453-${ADDRESS}.content.test${suffix}`), 'reject', suffix);
+    assert.equal(projectContentRequestKind(policy, `https://${label}.content.test${suffix}`), 'reject', suffix);
   }
-  assert.equal(projectContentRequestKind(policy, direct.replace('/a/8453/', '/a/1/')), 'reject');
-  assert.equal(projectContentRequestKind(policy, direct.replace('/7', '/7/extra')), 'reject');
+  assert.equal(projectContentRequestKind(policy, `https://${label}.content.test/a/1/${ADDRESS}/7`), 'reject');
+  assert.equal(projectContentRequestKind(policy, `https://${label}.content.test${path}/extra`), 'reject');
   assert.equal(projectContentRequestKind(policy, `https://nested.8453-${ADDRESS}.content.test${path}`), 'reject');
   assert.equal(projectContentRequestKind(policy, `https://08453-${ADDRESS}.content.test${path}`), 'reject');
   assert.equal(projectContentRequestKind(policy, `https://content.test${path}`), 'reject');
   assert.equal(projectContentRequestKind(policy, 'https://content.test/health'), 'health');
   assert.equal(projectContentRequestKind(policy, `https://resolver.test${path}`), 'public');
-  assert.equal(projectContentRequestKind(policy, `https://8453-${ADDRESS}.content.test/abx.js`), 'content');
+  assert.equal(projectContentRequestKind(policy, `https://${label}.content.test/abx.js`), 'content');
+  assert.equal(projectContentRequestKind(policy, `https://${label}.content.test/a/8453/${ADDRESS}/8`), 'reject');
+  assert.equal(projectContentRequestKind(policy, `https://8453-${ADDRESS}.content.test${path}`), 'legacy');
 });
 
 test('all byte-serving surfaces are identified, including collection fields and effects', () => {
@@ -172,5 +184,71 @@ test('the localhost content root remains a public control-plane alias in local d
   assert.equal(projectContentRequestKind(local, 'http://localhost:8787/.well-known/abx-service'), 'public');
   assert.equal(projectContentRequestKind(local, 'http://localhost:8787/api/projects'), 'public');
   assert.equal(projectContentRequestKind(local, `http://8453-${ADDRESS}.localhost:8787/api/projects`), 'reject');
-  assert.equal(projectContentRequestKind(local, `http://8453-${ADDRESS}.localhost:8787${path}`), 'content');
+  assert.equal(projectContentRequestKind(local, `http://8453-${ADDRESS}.localhost:8787${path}`), 'legacy');
+  assert.equal(projectContentRequestKind(local, `http://${label}.localhost:8787/`), 'content');
+});
+
+test('full digests remain canonical and fixed length for every uint256 token id', () => {
+  const keys = ['0', '7', '10000000', (2n ** 256n - 1n).toString()].map((tokenId) => ({chainId: 8453, address: ADDRESS, tokenId}));
+  for (const key of keys) {
+    const label = contentOriginLabel(key);
+    assert.equal(label.length, 54);
+    assert.equal(contentDigestFromLabel(label), contentRouteDigest(key));
+    assert.equal(contentRootPath(label, key), `/a/8453/${ADDRESS}/${key.tokenId}`);
+  }
+  assert.equal(new Set(keys.map(contentOriginLabel)).size, keys.length);
+  assert.notEqual(contentOriginLabel(keys[0]), contentOriginLabel({...keys[0], chainId: 1}));
+  assert.equal(contentOriginLabel(keys[0]), contentOriginLabel({...keys[0], address: ADDRESS.toUpperCase().replace('0X', '0x')}));
+  for (const tokenId of ['-1', '01', '1e7', (2n ** 256n).toString()]) assert.throws(() => contentOriginLabel({...keys[0], tokenId}));
+  assert.equal(contentDigestFromLabel(`t-${'a'.repeat(51)}b`), null);
+  assert.equal(contentDigestFromLabel(`t-${'a'.repeat(51)}`), null);
+  assert.equal(contentRootPath(label, {...keys[0], tokenId: '8'}), null);
+});
+
+test('discovery honors provider templates and falls back for unknown future schemes', () => {
+  const key = {chainId: 8453, address: ADDRESS, tokenId: '7'};
+  assert.equal(
+    discoveredLiveViewUrl(
+      'https://resolver.test',
+      {scheme: TOKEN_CONTENT_SCHEME, liveViewUrlTemplate: 'https://{tokenOrigin}.content.test/'},
+      key,
+    ),
+    direct,
+  );
+  assert.equal(
+    discoveredLiveViewUrl(
+      'https://resolver.test',
+      {liveViewUrlTemplate: 'https://{chainId}-{address}.content.test/a/{chainId}/{address}/{tokenId}'},
+      key,
+    ),
+    `https://8453-${ADDRESS}.content.test${path}`,
+  );
+  assert.equal(
+    discoveredLiveViewUrl('https://resolver.test', {scheme: 'future', liveViewUrlTemplate: 'https://unsafe.test/'}, key),
+    `https://resolver.test${path}`,
+  );
+});
+
+test('legacy collection hosts never execute token or collection publisher bytes', async () => {
+  for (const path of [`/a/8453/${ADDRESS}/7`, `/t/8453/${ADDRESS}/7/data/animation_url`, `/c/8453/${ADDRESS}/data/banner_image`]) {
+    const response = isolateProjectContent(
+      policy,
+      `https://8453-${ADDRESS}.content.test${path}`,
+      new Response('publisher', {headers: {'content-type': 'text/html'}}),
+    );
+    assert.ok(!(await response.text()).includes('publisher'));
+    assert.ok(response.status === 302 || response.headers.get('content-security-policy')?.includes("default-src 'none'"));
+  }
+});
+
+
+test('token hostname matches the language-independent SHA-256/base32 vector', () => {
+  assert.equal(contentRouteDigest({chainId: 8453, address: ADDRESS, tokenId: '7'}), '0x9ca54d7a31812fb2bf5c1f7ac277c5c54003f64ba79c137f2b3f3eaeb956b934');
+  assert.equal(label, 't-tssu26rrqex3fp24d55me56fyvaah5slu6obg7zlh47k5okwxe2a');
+});
+
+
+test('malformed provider templates fall back without unbounded placeholder matching', () => {
+  const key = {chainId: 8453, address: ADDRESS, tokenId: '7'};
+  assert.equal(discoveredLiveViewUrl('https://resolver.test', {liveViewUrlTemplate: '{{|'.repeat(50000)}, key), `https://resolver.test${path}`);
 });
