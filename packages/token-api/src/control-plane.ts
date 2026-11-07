@@ -20,6 +20,8 @@ import {
   isBoundOutput,
   locatorRejectionReason,
   normalizeAttributes,
+  projectContentPolicy,
+  projectContentDiscovery,
   renderArtifactKey,
   resolveChain,
   summarizeAnchorGeneration,
@@ -48,6 +50,7 @@ export interface ControlPlaneContext {
   chainKey: string;
   /** The public base this node believes it serves — echoed in the descriptor. */
   baseUrl: string;
+  contentDomain?: string;
 }
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -344,6 +347,8 @@ export async function serviceDescriptor(ctx: ControlPlaneContext): Promise<Servi
     contractGenerations: supportedContractGenerations(),
     baseUrl: ctx.baseUrl,
   };
+  const content = projectContentDiscovery(projectContentPolicy(ctx.baseUrl, ctx.contentDomain));
+  if (content) descriptor.content = content;
   if (controlPlane) {
     descriptor.auth = {
       scheme: 'bearer',
