@@ -70,3 +70,5 @@ export {
   abxFixedPriceMinter1155Abi,
   spineEventAbi,
 } from './abi/index.js';
+
+export {publicProjectState} from './public-state.js';

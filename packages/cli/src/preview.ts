@@ -20,9 +20,9 @@
  * preview document, never a parallel harness.
  */
 import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
-import {readFile, mkdir, writeFile} from 'node:fs/promises';
+import {readFile, realpath, mkdir, writeFile} from 'node:fs/promises';
 import {createHash, randomBytes} from 'node:crypto';
-import {dirname, extname, join, resolve as resolvePath} from 'node:path';
+import {dirname, extname, isAbsolute, join, relative as relativePath, resolve as resolvePath} from 'node:path';
 import {createRequire} from 'node:module';
 import {PARAM_TYPES, canonicalTokenDataJson, type ParsedDependencyRef} from '@artblocks/abx-sdk';
 import {buildGeneratorDocument, injectTokenDataIntoHtml, registryDepUrl} from '@artblocks/abx-token-api';
@@ -181,13 +181,29 @@ const REPORT_SNIPPET = `<script>(function(){
   setTimeout(post, 400); setTimeout(post, 1500);
 })();</script>`;
 
+class PreviewPathError extends Error {
+  constructor(readonly status: 403 | 404) {super(status === 403 ? 'forbidden' : 'not found');}
+}
+
+/** Entry documents and assets share the same canonical filesystem boundary. */
+async function previewAssetPath(rootPath: string, rel: string): Promise<string> {
+  if (rel.split(/[\\/]/).some((part) => part.startsWith('.'))) throw new PreviewPathError(404);
+  const root = await realpath(resolvePath(rootPath));
+  const target = await realpath(resolvePath(root, rel));
+  const canonical = relativePath(root, target);
+  const parts = canonical.split(/[\\/]/);
+  if (isAbsolute(canonical) || parts[0] === '..') throw new PreviewPathError(403);
+  if (parts.some((part) => part.startsWith('.'))) throw new PreviewPathError(404);
+  return target;
+}
+
 async function renderViewDocument(cfg: PreviewConfig, seed: string, tokenId: string, params: Record<string, string>, withReport: boolean): Promise<string> {
   const {json} = previewTokenData(cfg, seed, tokenId, params);
   const {tags} = previewDepTags(cfg.deps);
   if (cfg.source.kind === 'dir') {
     // Directory mode mirrors the resolver's primary serving path: fetch the build's own entry
     // document and inject tokenData into it (the build ships its own abx.js by convention).
-    const html = await readFile(join(cfg.source.path, 'index.html'), 'utf8');
+    const html = await readFile(await previewAssetPath(cfg.source.path, 'index.html'), 'utf8');
     const injected = injectTokenDataIntoHtml(html, json, '/__abx_code/');
     return withReport ? injected.replace(/<\/body>/i, `${REPORT_SNIPPET}</body>`) : injected;
   }
@@ -381,6 +397,10 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void (async () => {
       const u = new URL(req.url ?? '/', 'http://localhost');
+      const host = new URL(`http://${req.headers.host ?? 'invalid'}`).hostname;
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
+        res.writeHead(403); res.end('invalid host'); return;
+      }
       const send = (code: number, type: string, body: string | Buffer) => {
         // Never cache: the whole point is that a refresh picks up the edit you just made.
         res.writeHead(code, {'content-type': type, 'cache-control': 'no-store'});
@@ -415,16 +435,14 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
         // Directory mode: serve the build's own assets under a fixed base.
         if (cfg.source.kind === 'dir' && u.pathname.startsWith('/__abx_code/')) {
           const rel = decodeURIComponent(u.pathname.slice('/__abx_code/'.length));
-          const root = resolvePath(cfg.source.path);
-          const target = resolvePath(join(root, rel));
-          // Path-traversal guard: a build asset can never escape the declared root.
-          if (target !== root && !target.startsWith(root + '/')) return send(403, 'text/plain', 'forbidden');
+          const target = await previewAssetPath(cfg.source.path, rel);
           const body = await readFile(target);
           return send(200, MIME[extname(target).toLowerCase()] ?? 'application/octet-stream', body);
         }
 
         send(404, 'text/plain', 'not found');
       } catch (err) {
+        if (err instanceof PreviewPathError) return send(err.status, 'text/plain', err.message);
         send(500, 'text/plain', `preview error: ${(err as Error).message}`);
       }
     })();
@@ -433,7 +451,7 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
   const actual = await new Promise<number>((res2, rej) => {
     server.on('error', rej);
     // Port 0 ⇒ let the OS pick, so a busy studio port never blocks a --shoot run.
-    server.listen(port, () => res2((server.address() as {port: number}).port));
+    server.listen(port, '127.0.0.1', () => res2((server.address() as {port: number}).port));
   });
 
   return {

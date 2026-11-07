@@ -473,3 +473,21 @@ test('liveViewAvailability: an EditionCode WITH a folded script is ready', () =>
   } as never);
   assert.equal(liveViewAvailability(ready), 'ready');
 });
+
+test('directory reads refuse private URLs and collection-controlled private gateway prefixes', async () => {
+  for (const collectionFields of [
+    [{field: 'code', representation: 'url', value: stringToHex('http://127.0.0.1:9/internal?.html')}],
+    [{field: 'code', representation: 'ipfs', value: stringToHex('dummy')}, {field: 'abx_gateway_ipfs', representation: 'inline', value: stringToHex('http://169.254.169.254/')}],
+  ]) {
+    resetEntryDocumentCache();
+    await assert.rejects(resolveLiveView(client, codeState({collectionFields} as never), driftToken()), /public HTTP/);
+  }
+});
+
+test('compressed inline fields cannot expand past the host content limit', async () => {
+  const {gzipSync} = await import('node:zlib');
+  const {toHex} = await import('viem');
+  const {resolveFieldBytes} = await import('../src/resolve.js');
+  const packed = gzipSync(Buffer.alloc(16 * 1024 * 1024 + 1));
+  await assert.rejects(resolveFieldBytes(client, {field: 'attachment', representation: 'inline-gzip', value: toHex(packed)}), {code: 'ERR_BUFFER_TOO_LARGE'});
+});

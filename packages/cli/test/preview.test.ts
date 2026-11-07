@@ -101,3 +101,32 @@ test('schemas and deps parse off the flags into the config', () => {
   assert.deepEqual(cfg.schemas.map((s) => s.key), ['palette', 'mood']);
   assert.equal(cfg.deps.length, 1);
 });
+
+test('directory preview contains filesystem reads and requires a local Host', async () => {
+  const {mkdtemp, mkdir, writeFile, symlink, rm} = await import('node:fs/promises');
+  const {tmpdir} = await import('node:os');
+  const {join} = await import('node:path');
+  const {startPreviewServer} = await import('../src/preview.js');
+  const root = await mkdtemp(join(tmpdir(), 'abx-preview-boundary-'));
+  await mkdir(join(root, 'build')); await writeFile(join(root, 'build/index.html'), 'art');
+  await writeFile(join(root, 'build/.env'), 'DUMMY_SECRET'); await writeFile(join(root, 'outside'), 'DUMMY_OUTSIDE');
+  await symlink(join(root, 'outside'), join(root, 'build/link'));
+  await symlink(join(root, 'build/.env'), join(root, 'build/note'));
+  const preview = await startPreviewServer({source: {kind: 'dir', path: join(root, 'build')}, schemas: [], deps: []}, 0);
+  try {
+    const base = `http://127.0.0.1:${preview.port}`;
+    assert.equal((await fetch(`${base}/__abx_code/index.html`)).status, 200);
+    assert.equal((await fetch(`${base}/__abx_code/.env`)).status, 404);
+    assert.equal((await fetch(`${base}/__abx_code/link`)).status, 403);
+    assert.equal((await fetch(`${base}/__abx_code/note`)).status, 404);
+    await rm(join(root, 'build/index.html'));
+    await symlink(join(root, 'build/.env'), join(root, 'build/index.html'));
+    assert.equal((await fetch(`${base}/view`)).status, 404);
+    await rm(join(root, 'build/index.html'));
+    await symlink(join(root, 'outside'), join(root, 'build/index.html'));
+    assert.equal((await fetch(`${base}/view`)).status, 403);
+    const {request} = await import('node:http');
+    const status = await new Promise<number | undefined>((resolve) => {const req = request(base, {headers: {host: 'untrusted.test'}}, (res) => {res.resume(); resolve(res.statusCode);}); req.end();});
+    assert.equal(status, 403);
+  } finally {await preview.close(); await rm(root, {recursive: true, force: true});}
+});

@@ -1,3 +1,4 @@
+import {once} from 'node:events';
 /**
  * Service-facing commands: `serve` (the token API + dashboard), `deploy-resolver` /
  * `deploy-effects` (scaffold a hosted resolver / effect runner for a provider the operator owns),
@@ -15,7 +16,7 @@ import {
   readdirSync,
   writeFileSync,
 } from 'node:fs';
-import {join as joinPath, resolve as resolvePath} from 'node:path';
+import {join as joinPath, relative as relativePath, resolve as resolvePath} from 'node:path';
 import {createInterface} from 'node:readline';
 import {SqliteStore} from '@artblocks/abx-indexer';
 import {
@@ -200,7 +201,7 @@ export async function cmdEffects(flags: Flags): Promise<void> {
   // 300s: the sweep is the SAFETY FLOOR — the resolver's chain watcher POSTs /notify the moment
   // settled state changes, so the interval only catches a missed ping / cold start / new project.
   const intervalMs = Number(flags['interval-ms'] ?? process.env.ABX_EFFECTS_INTERVAL_MS ?? 300_000);
-  runner.startHttp(port);
+  await once(runner.startHttp(port), 'listening');
   runner.startLoop(intervalMs);
   console.log(`\n  ${g('●')} ${bold('effect runner up')}  ${dim(`resolver ${resolverUrl} · port ${port} · sweep ${intervalMs}ms (safety floor)`)}`);
   info('auto-renders every new mint + PostParam change: the resolver\'s chain watcher notifies this runner the moment settled state changes (set ABX_EFFECTS_URL=http://localhost:' + port + ' on the resolver). Needs a local Chromium (`npx playwright install chromium`).');
@@ -713,8 +714,9 @@ export async function cmdDeployResolver(flags: Flags) {
     }
   }
 
-  const art = resolverArtifact({provider, app, domain, chain: CHAIN, fromSource, sourcePackages, pnpmVersion});
   const outDir = resolvePath(joinPath(dir, provider));
+  const envFile = relativePath(outDir, resolvePath('.env'));
+  const art = resolverArtifact({provider, app, domain, chain: CHAIN, fromSource, sourcePackages, pnpmVersion, envFile});
 
   console.log(bold(`\n  ABX Self-Host Toolkit — provision resolver (${provider})`));
   info(fromSource ? `image: ${bold('from source')} ${dim('(DEV — builds from vendored workspace source; production uses the npm image)')}` : `image: ${bold('npm')} ${dim('(production — installs the published @artblocks/abx-cli; add --from-source for a local pre-publish build)')}`);
@@ -842,8 +844,9 @@ export async function cmdDeployEffects(flags: Flags) {
     /* fall back to the provisioner's pinned default */
   }
 
-  const art = effectsArtifact({app, resolverUrl: cleanResolver, chain: CHAIN, intervalMs, environmentId, storageBackend, sourcePackages, pnpmVersion});
   const outDir = resolvePath(joinPath(dir, 'effects'));
+  const envFile = relativePath(outDir, resolvePath('.env'));
+  const art = effectsArtifact({app, resolverUrl: cleanResolver, chain: CHAIN, intervalMs, environmentId, storageBackend, sourcePackages, pnpmVersion, envFile});
 
   console.log(bold(`\n  ABX Self-Host Toolkit — provision effects runner (fly)`));
   info(`resolver: ${bold(cleanResolver)} ${dim('(reads token state + publishes renders here)')}`);

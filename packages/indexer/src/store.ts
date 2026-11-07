@@ -450,6 +450,7 @@ export class SqliteStore implements Store {
     this.db.exec(SCHEMA);
     this.migrate();
     this.migrateSeq();
+    this.db.exec('UPDATE projects SET rpc_url=NULL WHERE rpc_url IS NOT NULL');
     this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS tokens_content_digest_idx ON tokens(content_digest)');
     // Upgrade existing local projections without RPC or a full replay. Only old rows lack a key.
     const missing = this.db.prepare(`SELECT t.project_address, t.token_id, p.chain_id FROM tokens t JOIN projects p ON p.address=t.project_address WHERE t.content_digest IS NULL`).iterate() as Iterable<{project_address: string; token_id: string; chain_id: number}>;
@@ -867,7 +868,7 @@ export class SqliteStore implements Store {
           state.toBlock,
           state.eventCount,
           state.reconstructedAt,
-          state.rpcUrl ?? null,
+          null, // legacy column: transport configuration is never projection data
         );
 
       // tokens: upsert every token in the new state, then delete any id that's no longer present
@@ -1146,7 +1147,6 @@ export class SqliteStore implements Store {
       toBlock: p.to_block,
       eventCount: p.event_count,
       reconstructedAt: p.reconstructed_at,
-      rpcUrl: p.rpc_url ?? undefined,
     };
   }
 }

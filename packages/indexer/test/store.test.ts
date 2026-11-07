@@ -181,7 +181,8 @@ function editionState(address = EDITION_ADDR, over: Partial<ProjectState> = {}):
 // must still refuse to cache it), so round-trip assertions compare against this nulled projection
 // of the input rather than the input itself.
 function nulledUris(state: ProjectState): ProjectState {
-  return {...state, contractURI: null, tokens: state.tokens.map((t) => ({...t, tokenURI: null}))};
+  const {rpcUrl: _rpcUrl, ...publicState} = state;
+  return {...publicState, contractURI: null, tokens: state.tokens.map((t) => ({...t, tokenURI: null}))};
 }
 
 test('round-trips a project byte-for-byte (nested tokens/commitments/events)', () => {

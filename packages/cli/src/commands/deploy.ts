@@ -1,3 +1,4 @@
+import {collectionImageTemplate, resolveImageNamespace} from '../image-template.js';
 /**
  * Deploy commands — the biggest domain, kept as ONE module (they share the salt/dry-run/staging
  * machinery too tightly to split further without duplicating it):
@@ -4093,10 +4094,10 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     } else if (/(^|\/\/)s3[.-][^/]*amazonaws\.com/i.test(base) || /\.s3[.-][^/]*amazonaws\.com/i.test(base)) {
       warn(`--image-base ${base} looks like the S3 API host — marketplaces can read it ONLY if the bucket has public-read (or you front it with CloudFront/a domain). If it's not public, use that URL in ${bold('ABX_S3_ENDPOINT')} and pass a public URL here instead.`);
     }
-    const imageTemplate = base.includes('{id}') ? base : `${base.replace(/\/+$/, '')}/{id}.png`;
+    const imageTemplate = collectionImageTemplate(base, resolveChain(CHAIN).id, process.env.ABX_S3_PUBLIC_BASE);
     contractFields.push({field: encodeTag(F.image), representation: encodeTag(R.urlTemplate), value: toHex(imageTemplate)});
     identityFields.push('image');
-    info(`collection image → on-chain url-template ${bold(imageTemplate)} ${dim('(off-chain thumbnail at a deterministic per-token URL; the effect runner overwrites each key)')}`);
+    info(`collection image → on-chain url-template ${bold(imageTemplate)} (collection address resolved before signing) ${dim('(off-chain thumbnail at a deterministic per-token URL; the effect runner overwrites each key)')}`);
     // Name the EXACT upload vars the runner needs (an agent guessed R2_* names that abx never reads,
     // breaking the upload). --image-base is the public READ base; these are the write side.
     info(`  ${dim('the runner uploads stills here via')} ${bold('ABX_S3_ENDPOINT · ABX_S3_BUCKET · ABX_S3_ACCESS_KEY_ID · ABX_S3_SECRET_ACCESS_KEY')} ${dim('(set ABX_S3_PUBLIC_BASE to this same --image-base; `abx storage show` checks them; details → reference/hosting.md)')}`);
@@ -4651,7 +4652,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   // baking a misleading localhost (the renderer is authoritative while set) — the same rule as
   // the 1/1's on-chain lane. The renderers themselves are set as setup-multicall legs, so the
   // on-chain lane flips on atomically WITH the content/params it resolves from.
-  const initParamsFor = (owner: Address) => ({
+  const initParamsFor = (owner: Address, clone: Address) => ({
     owner,
     name,
     symbol,
@@ -4678,7 +4679,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     mintTo: foldIntoInit && mintCount > 0 ? owner : zeroAddress,
     mintCount: foldIntoInit ? BigInt(mintCount) : 0n,
     tokenFields: [],
-    contractFields,
+    contractFields: resolveImageNamespace(contractFields, clone),
   });
   // `setupLegGroups` (the shared, resume-compatible builder) and the fresh-deploy batch shape
   // (`freshDeployBatches`) are hoisted above — see the comment there for why. Build the REAL
@@ -4696,7 +4697,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
       mints: Array.from({length: setupMintCount}, () => mintSetupLeg(g.mints.data)),
     });
     const setupTxs = codeSetupTxsFromBatches(batches, {contract: clone, chainId: cid, deps: deps.map((d) => d.display)});
-    const txs = [prepareDeploySeriesCode({factory, params: initParamsFor(owner), salt, chainId: cid, clone}), ...setupTxs];
+    const txs = [prepareDeploySeriesCode({factory, params: initParamsFor(owner, clone), salt, chainId: cid, clone}), ...setupTxs];
     return {clone, txs};
   };
 
@@ -5544,9 +5545,9 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
     } else if (/(^|\/\/)s3[.-][^/]*amazonaws\.com/i.test(base) || /\.s3[.-][^/]*amazonaws\.com/i.test(base)) {
       warn(`--image-base ${base} looks like the S3 API host — marketplaces can read it ONLY if the bucket has public-read (or you front it with CloudFront/a domain). If it's not public, use that URL in ${bold('ABX_S3_ENDPOINT')} and pass a public URL here instead.`);
     }
-    const imageTemplate = base.includes('{id}') ? base : `${base.replace(/\/+$/, '')}/{id}.png`;
+    const imageTemplate = collectionImageTemplate(base, resolveChain(CHAIN).id, process.env.ABX_S3_PUBLIC_BASE);
     contractFields.push({field: encodeTag(F.image), representation: encodeTag(R.urlTemplate), value: toHex(imageTemplate)});
-    info(`collection image → on-chain url-template ${bold(imageTemplate)} ${dim('(off-chain thumbnail at a deterministic per-id URL; the effect runner overwrites each key once a copy is minted)')}`);
+    info(`collection image → on-chain url-template ${bold(imageTemplate)} (collection address resolved before signing) ${dim('(off-chain thumbnail at a deterministic per-id URL; the effect runner overwrites each key once a copy is minted)')}`);
     info(`  ${dim('the runner uploads stills here via')} ${bold('ABX_S3_ENDPOINT · ABX_S3_BUCKET · ABX_S3_ACCESS_KEY_ID · ABX_S3_SECRET_ACCESS_KEY')} ${dim('(set ABX_S3_PUBLIC_BASE to this same --image-base; `abx storage show` checks them; details → reference/hosting.md)')}`);
     const s3Base = process.env.ABX_S3_PUBLIC_BASE?.replace(/\/+$/, '');
     if (s3Base && !imageTemplate.startsWith(`${s3Base}/`)) {
@@ -5566,7 +5567,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   // there for a renderer-only, no-program drop, which this function refuses anyway — every
   // edition-code deploy has a program). A setup large enough to miss the `eth_estimateGas` ceiling
   // (a big script) splits into MORE than one setup transaction — see `planCodeSetupBatches`.
-  const initParamsFor = (owner: Address): EditionCodeInitParams => ({
+  const initParamsFor = (owner: Address, clone: Address): EditionCodeInitParams => ({
     owner,
     name,
     symbol,
@@ -5589,7 +5590,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
     mintCount: 0n,
     mintAmount: 0n,
     tokenFields: [],
-    contractFields,
+    contractFields: resolveImageNamespace(contractFields, clone),
   });
   // Gas-bounded setup-transaction legs — script chunks, schemas, deps, on-chain-URI wiring are all
   // OWNER-INDEPENDENT (only a mint call's calldata embeds the owner+id+amount; its gas is a flat
@@ -5628,7 +5629,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
       planCodeSetupBatches({chunks: chunkLegs, config: configLegs, mints: mintLegsFor(owner)}),
       {contract: clone, chainId, deps: deps.map((d) => d.display)},
     );
-    const txs = [prepareDeployEditionCode({factory, params: initParamsFor(owner), salt, chainId, clone}), ...setupTxs];
+    const txs = [prepareDeployEditionCode({factory, params: initParamsFor(owner, clone), salt, chainId, clone}), ...setupTxs];
     return {clone, txs};
   };
   // deps ride the same setup batch as chunks/schemas/mints when everything fits one transaction, so

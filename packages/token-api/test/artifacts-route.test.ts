@@ -36,10 +36,10 @@ function memoryStorage(): StorageBackend {
   };
 }
 
-async function withNode(run: (base: string, indexer: SelfHostIndexer) => Promise<void>): Promise<void> {
+async function withNode(run: (base: string, indexer: SelfHostIndexer) => Promise<void>, storage?: StorageBackend): Promise<void> {
   const store = new SqliteStore(mkdtempSync(join(tmpdir(), 'abx-artifacts-')));
   const indexer = new SelfHostIndexer(store);
-  const server: Server = createTokenApiServer({indexer, port: 0, baseUrl: 'http://localhost', storage: memoryStorage()});
+  const server: Server = createTokenApiServer({indexer, port: 0, baseUrl: 'http://localhost', storage: storage ?? memoryStorage()});
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   const base = `http://127.0.0.1:${(server.address() as {port: number}).port}`;
   try {
@@ -162,4 +162,21 @@ test('the unknown-route listing advertises artifacts, so a client can discover i
     const body = (await res.json()) as {routes?: string[]};
     assert.ok(body.routes?.includes('/api/project/:address/artifacts'), 'route listing must include artifacts');
   });
+});
+
+test('field failures keep transport details off both public data routes', async () => {
+  const storage = {...memoryStorage(), async get() {throw new Error('429 upstream https://rpc.test/v2/DUMMY_OPERATOR_KEY');}};
+  await withNode(async (base, indexer) => {
+    const state = seriesState([tok('0', 'live')]);
+    state.collectionFields.push({field: 'attachment', representation: 'keccak256', value: `0x${'11'.repeat(32)}`});
+    indexer.store.putProject(state);
+    for (const path of [`/c/${CHAIN_ID}/${ADDR}/data/attachment`, `/t/${CHAIN_ID}/${ADDR}/0/data/attachment`]) {
+      const res = await fetch(base + path); assert.equal(res.status, 502);
+      const body = await res.text(); assert.doesNotMatch(body, /DUMMY_OPERATOR_KEY|rpc\.test/); assert.match(body, /rate-limited/);
+    }
+    const original = indexer.getProject.bind(indexer);
+    indexer.getProject = (address) => ({...original(address)!, rpcUrl: 'https://rpc.test/DUMMY_OPERATOR_KEY'});
+    const res = await fetch(`${base}/api/project/${ADDR}`);
+    assert.equal(res.status, 200); assert.doesNotMatch(await res.text(), /DUMMY_OPERATOR_KEY|rpcUrl/);
+  }, storage);
 });

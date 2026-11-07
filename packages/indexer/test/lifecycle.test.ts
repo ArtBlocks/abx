@@ -172,3 +172,24 @@ test('a failing run clears the in-flight slot so the next trigger retries', asyn
     cleanup();
   }
 });
+
+test('fetched deltas are applied in order behind an older scan, followed by a requested replay', async () => {
+  const {indexer, cleanup} = fresh();
+  try {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {release = r;});
+    const calls: unknown[] = [];
+    (indexer as unknown as {reindex: unknown}).reindex = async (_address: Address, opts: unknown) => {
+      calls.push(opts); if (calls.length === 1) await gate;
+      return {state: {} as ProjectState, mode: 'incremental', elapsedMs: 1};
+    };
+    const first = indexer.reindexShared(ADDR);
+    const delta = {logs: [] as never[], toBlock: 120n};
+    const second = indexer.reindexShared(ADDR, delta);
+    const third = indexer.reindexShared(ADDR, {full: true});
+    assert.equal(calls.length, 1);
+    release(); await Promise.all([first, second, third]);
+    assert.deepEqual(calls, [{}, delta, {full: true}]);
+    assert.equal(indexer.isCatchingUp(ADDR), false);
+  } finally {cleanup();}
+});

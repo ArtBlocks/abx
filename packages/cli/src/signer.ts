@@ -1,3 +1,5 @@
+import {randomBytes, timingSafeEqual} from 'node:crypto';
+import {isAddress, verifyMessage} from 'viem';
 import {createServer, type IncomingMessage, type ServerResponse, type Server} from 'node:http';
 import type {AddressInfo} from 'node:net';
 import {writeFileSync} from 'node:fs';
@@ -134,7 +136,7 @@ async function listenAvailable(server: Server, preferred: number): Promise<numbe
         resolve(false); // EADDRINUSE (or any bind failure) → unavailable; caller retries / falls back
       };
       server.once('error', onError);
-      server.listen(port, () => {
+      server.listen(port, '127.0.0.1', () => {
         server.removeListener('error', onError);
         resolve(true);
       });
@@ -142,7 +144,7 @@ async function listenAvailable(server: Server, preferred: number): Promise<numbe
 
   // ~1.8s of quick retries: reclaim the friendly port the moment a draining prior session lets go.
   for (let i = 0; i < 6; i++) {
-    if (await tryListen(preferred)) return preferred;
+    if (await tryListen(preferred)) return (server.address() as AddressInfo).port;
     await sleep(300);
   }
   // Still held (a stuck/abandoned session) → don't block or crash; take a fresh ephemeral port.
@@ -408,6 +410,9 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   let pendingReject: ((e: Error) => void) | null = null;
   let index = 0;
   let finished = false;
+  let connectedAddress: Address | undefined;
+  const sessionToken = randomBytes(32).toString('hex');
+  const usedHashes = new Set<string>();
 
   const fail = (e: Error) => {
     pendingReject?.(e);
@@ -415,9 +420,18 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   };
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    res.setHeader('access-control-allow-origin', '*');
-    const url = new URL(req.url ?? '/', 'http://localhost');
     try {
+      const url = new URL(req.url ?? '/', 'http://localhost');
+      const host = new URL(`http://${req.headers.host ?? 'invalid'}`).hostname;
+      const supplied = req.headers['x-abx-session-token'] ?? url.searchParams.get('session') ?? '';
+      const authenticated = typeof supplied === 'string' && supplied.length === sessionToken.length && timingSafeEqual(Buffer.from(supplied), Buffer.from(sessionToken));
+      const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(host) || !sameOrigin || !authenticated) {
+        res.writeHead(403); res.end('invalid signing session'); return;
+      }
+      res.setHeader('cache-control', 'no-store');
+      res.setHeader('referrer-policy', 'no-referrer');
+      res.setHeader('content-security-policy', "frame-ancestors 'none'");
       if (url.pathname === '/') {
         res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
         // A finished session must NOT re-serve the live connect page: a stale hit (an old tab, a
@@ -432,6 +446,9 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         // Hard server-side guard: never let the deployer/owner resolve to anything but the
         // expected signer (the page enforces this too, but the CLI builds owner/mintTo from
         // whatever connects, so a wrong signer here would silently mis-own the contract).
+        if (!isAddress(signer, {strict: false}) || (connectedAddress && signer.toLowerCase() !== connectedAddress.toLowerCase())) {
+          res.writeHead(400); res.end('invalid signer'); return;
+        }
         if (signer && opts.expectedSigner && (signer as string).toLowerCase() !== opts.expectedSigner.toLowerCase()) {
           res.writeHead(409, {'content-type': 'application/json'});
           res.end(JSON.stringify({ok: false, error: `connected ${signer} but this is prepared for ${opts.expectedSigner}`}));
@@ -439,7 +456,8 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         }
         res.writeHead(200, {'content-type': 'application/json'});
         res.end(JSON.stringify({ok: true}));
-        if (signer) resolveConnect(signer as Address);
+        connectedAddress = signer as Address;
+        resolveConnect(connectedAddress);
         return;
       }
       if (url.pathname === '/next') {
@@ -456,6 +474,11 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         // caller (send vs signMessage) knows which it queued.
         const {index: i, txHash, signature} = JSON.parse((await readBody(req)) || '{}');
         const value = (txHash ?? signature) as Hex | undefined;
+        if (current && current.index === i && value && pendingResolve && current.kind === 'msg') {
+          if (!connectedAddress || !await verifyMessage({address: connectedAddress, message: {raw: current.msg!.messageHex}, signature: value}).catch(() => false)) {
+            res.writeHead(400); res.end(JSON.stringify({error: 'signature does not match this message and signer'})); return;
+          }
+        }
         res.writeHead(200, {'content-type': 'application/json'});
         res.end(JSON.stringify({ok: true}));
         if (current && current.index === i && value && pendingResolve) {
@@ -479,7 +502,7 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   });
 
   const boundPort = await listenAvailable(server, preferredPort);
-  const signUrl = `http://localhost:${boundPort}`;
+  const signUrl = `http://localhost:${boundPort}?session=${sessionToken}`;
   console.log(`\n  ${purple('◆')} ${bold('wallet signing')}  ${dim(`(${chain.name}${opts.total ? `, ${opts.total} transactions` : ''})`)}`);
   console.log(`\n  Open ${bold(signUrl)} , connect a wallet${opts.expectedSigner ? ` (${opts.expectedSigner})` : ''}, and approve each step.`);
   // Funding, said out loud at the one moment it matters. `warnUnfunded` can't help here: on the
@@ -496,6 +519,8 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   return {
     connect: () => connected,
     async send(tx: PreparedTx): Promise<SignedReceipt> {
+      const signer = await connected;
+      const minimumNonce = await publicClient.getTransactionCount({address: signer, blockTag: 'pending'});
       index += 1;
       // A wallet session spans blocks: the deploy is approved, then setup targets the contract it
       // just created. The browser wallet estimates against ITS OWN RPC, which we don't control and
@@ -515,6 +540,10 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
       pendingReject = null;
       console.log(`  ${dim('tx')} ${explorer}/tx/${txHash}  ${dim('— confirming …')}`);
       const receipt = await waitForTransactionReceiptResilient(publicClient, {hash: txHash});
+      const actual = await publicClient.getTransaction({hash: txHash});
+      assertWalletTransaction(tx, signer, actual, receipt, minimumNonce);
+      if (usedHashes.has(txHash.toLowerCase())) throw new Error('This transaction was already used by the signing session.');
+      usedHashes.add(txHash.toLowerCase());
       console.log(`  ${green('✓')} confirmed`);
       current = null; // back to idle until the next send()
       return {txHash, receipt};
@@ -558,6 +587,19 @@ p{margin:0 0 8px;color:#c9c9d0}
 <p>This signing session is finished — nothing is pending here.</p>
 <p class="dim">This is <b>not</b> a fresh action. Each new action opens its own link: return to the terminal, wait for the next sign URL, and open that one. Don't reuse this tab.</p>
 </div></body></html>`;
+}
+
+/** Reject unrelated, reverted, or earlier transactions before their receipts feed another write. */
+export function assertWalletTransaction(
+  intended: PreparedTx, signer: Address,
+  actual: {hash: Hex; from: Address; to: Address | null; input: Hex; value: bigint; nonce: number},
+  receipt: TransactionReceipt, minimumNonce: number,
+): void {
+  if (actual.hash.toLowerCase() !== receipt.transactionHash.toLowerCase() || receipt.status !== 'success' || actual.from.toLowerCase() !== signer.toLowerCase() || receipt.from.toLowerCase() !== signer.toLowerCase() ||
+      (actual.to?.toLowerCase() ?? null) !== (intended.to?.toLowerCase() ?? null) ||
+      actual.input.toLowerCase() !== intended.data.toLowerCase() || actual.value !== BigInt(intended.value) || actual.nonce < minimumNonce) {
+    throw new Error('Wallet transaction does not match the requested direct transaction. Inspect it before retrying; wrapped smart-account and multisig workflows require --unsigned.');
+  }
 }
 
 function sessionPage(o: {
@@ -619,6 +661,7 @@ a{color:#a98bff}
 </div>
 <script>
 const CFG = ${cfg};
+function sessionFetch(path,init={}){return fetch(path,{...init,headers:{...init.headers,'x-abx-session-token':new URLSearchParams(location.search).get('session')}}).then(async r=>{if(!r.ok)throw new Error(await r.text());return r;});}
 const $ = (id) => document.getElementById(id);
 let account=null, chainId=null, connected=false, curTx=null, curMsg=null, curKind=null, curIndex=0, signing=false, stopped=false;
 const toHexChain = (n) => '0x' + n.toString(16);
@@ -690,7 +733,7 @@ $('switch').onclick = trySwitch;
 async function maybeConnect(){
   if (connected || !account) return;
   if (!signerOk() || !chainOk()){ gateSign(); return; }
-  const r = await fetch('/connect', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({signer: account})});
+  const r = await sessionFetch('/connect', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({signer: account})});
   if (!r.ok){ const e = await r.json().catch(()=>({})); status('Rejected: '+(e.error||'signer mismatch'),'err'); return; }
   connected=true;
   status('Connected '+account+' on '+CFG.chainName+'. Waiting for the first transaction…','ok');
@@ -721,7 +764,7 @@ $('sign').onclick = async () => {
     if (curKind==='msg'){
       // Sign the Arweave data-item's signature-data with the wallet (EIP-191). No gas, no chain.
       const signature = await window.ethereum.request({method:'personal_sign', params:[curMsg.messageHex, account]});
-      await fetch('/signed', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({index: curIndex, signature})});
+      await sessionFetch('/signed', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({index: curIndex, signature})});
       status('Signed ✓ — continuing…','ok');
       $('sign').style.display='none'; curMsg=null; signing=false;
     } else {
@@ -732,7 +775,7 @@ $('sign').onclick = async () => {
       // content write reverts DeploymentFailed(). The user can still edit it in the wallet UI.
       if (curTx.gas) params.gas = curTx.gas;
       const txHash = await window.ethereum.request({method:'eth_sendTransaction', params:[params]});
-      await fetch('/signed', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({index: curIndex, txHash})});
+      await sessionFetch('/signed', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({index: curIndex, txHash})});
       const link = CFG.explorer ? '<a href="'+CFG.explorer+'/tx/'+txHash+'" target="_blank">'+txHash+'</a>' : txHash;
       status('Sent ✓ '+link+'<br>Confirming on-chain…','ok');
       $('sign').style.display='none'; curTx=null; signing=false;
@@ -747,7 +790,7 @@ renderCtx();
 async function poll(){
   if (stopped) return;
   try {
-    const r = await fetch('/next'); const d = await r.json();
+    const r = await sessionFetch('/next'); const d = await r.json();
     if (d.done){ stopped=true; progress(0); $('tlabel').style.display='none'; $('summary').textContent='All done — everything signed.'; $('fields').innerHTML=''; status('Done ✓ — you can close this tab.','ok'); return; }
     if (d.tx && d.index !== curIndex && !signing) renderTx(d.tx, d.index);
     else if (d.msg && d.index !== curIndex && !signing) renderMsg(d.msg, d.index);

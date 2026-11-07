@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {once} from 'node:events';
 import {loadDotEnv} from '@artblocks/abx-sdk/node';
 import {makePublicClient, readEnv} from '@artblocks/abx-sdk';
 import {resolveBackend} from '@artblocks/abx-storage';
@@ -86,7 +87,7 @@ async function main(): Promise<void> {
   // 300s: the sweep is the SAFETY FLOOR (missed ping / cold start / new project), not the trigger —
   // the resolver's chain watcher POSTs /notify the moment settled state changes.
   const intervalMs = Number(readEnv('ABX_EFFECTS_INTERVAL_MS') ?? 300_000);
-  runner.startHttp(port);
+  await once(runner.startHttp(port, readEnv('ABX_EFFECTS_HOST') ?? (readEnv('ABX_EFFECTS_TOKEN') ? '0.0.0.0' : '127.0.0.1')), 'listening');
   runner.startLoop(intervalMs);
   console.log(
     `[effects] runner up — resolver=${resolverUrl} port=${port} sweep=${intervalMs}ms (safety floor) ` +

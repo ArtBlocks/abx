@@ -267,5 +267,6 @@ export interface ProjectState {
   toBlock: string;
   eventCount: number;
   reconstructedAt: string; // ISO timestamp, stamped by the caller
+  /** @deprecated Host transport configuration is omitted by current reconstruction and serving. */
   rpcUrl?: string;
 }
