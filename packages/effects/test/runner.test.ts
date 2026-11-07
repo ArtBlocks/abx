@@ -920,3 +920,22 @@ test('local transport aliases use the configured public origin for content routi
     else process.env.ABX_PUBLIC_BASE_URL = prior;
   }
 });
+
+
+test('remote capture fallback uses the configured path and ignores a diagnostic base echo', async () => {
+  const realFetch = globalThis.fetch;
+  let captured = '';
+  globalThis.fetch = (async (url: unknown) => new Response(JSON.stringify(String(url).includes('/.well-known/')
+    ? {interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [31337], baseUrl: 'https://diagnostic.test/wrong'}
+    : []), {status: 200, headers: {'content-type': 'application/json'}})) as typeof fetch;
+  try {
+    const effect: EffectModule = {...fakeEffect(), async run(ctx) {
+      captured = ctx.liveViewUrl;
+      return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+    }};
+    const runner = new EffectRunner({resolverUrl: 'https://resolver.test/provider', client: null,
+      storage: locatorStorage(), effects: [effect], adminToken: 'fixture-token', fetchState: async () => codeState(1n), log: () => {}});
+    assert.equal((await runner.sweepProject(ADDR)).failed, 0);
+    assert.equal(captured, `https://resolver.test/provider/a/31337/${ADDR}/0`);
+  } finally { globalThis.fetch = realFetch; }
+});

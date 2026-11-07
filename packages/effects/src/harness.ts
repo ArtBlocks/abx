@@ -293,7 +293,8 @@ export class EffectRunner {
       this.preflightOnce = (async () => {
         try {
           const d = await this.service!.descriptor();
-          this.discoveredContent = {baseUrl: d.baseUrl ?? this.opts.publicBaseUrl ?? this.opts.resolverUrl, content: d.content};
+          // The descriptor base is a diagnostic echo, not authority to redirect the configured transport.
+          this.discoveredContent = {baseUrl: this.opts.resolverUrl, content: d.content};
           if (!d.interfaces?.includes(CONTROL_PLANE_INTERFACE)) {
             this.log(
               `warning: ${this.opts.resolverUrl} declares no ${CONTROL_PLANE_INTERFACE} — publishes may be refused ` +
