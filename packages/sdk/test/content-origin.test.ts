@@ -143,7 +143,10 @@ test('the wrapper escapes URL attributes and never includes caller-supplied HTML
 });
 
 test('content frames accept only HTTP(S) URLs without credentials', () => {
-  for (const url of ['javascript:alert(1)', 'data:text/html,hello', 'https://user:pass@content.test/']) {
+  const credentialed = new URL('https://content.test/');
+  credentialed.username = 'fixture';
+  credentialed.password = 'fixture';
+  for (const url of ['javascript:alert(1)', 'data:text/html,hello', credentialed.href]) {
     assert.throws(() => projectContentFrame(url));
   }
 });
