@@ -236,7 +236,7 @@ export interface ServiceDescriptor {
    *  profile rather than forcing every capability into one HTTP process. */
   endpoints?: Record<string, ServiceInterfaceEndpoint>;
   /** Direct collection-scoped content addressing. Metadata and animation URLs remain stable. */
-  content?: {domain: string; liveViewUrlTemplate: string};
+  content?: {domain: string; liveViewUrlTemplate: string; scheme?: string};
 }
 
 export type ServiceInterfaceSupportLevel = 'experimental' | 'beta' | 'supported';

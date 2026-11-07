@@ -1,3 +1,4 @@
+import {discoveredLiveViewUrl, type ServiceDescriptor} from '@artblocks/abx-sdk';
 import {createServer, type Server} from 'node:http';
 import {hexToString} from 'viem';
 import {
@@ -165,6 +166,7 @@ export class EffectRunner {
   /** The resolver control-plane client (the locator-bridge publish lane) — null when co-located. */
   private readonly service: AbxServiceClient | null;
   private contentPolicy: ProjectContentPolicy;
+  private discoveredContent?: {baseUrl: string; content: ServiceDescriptor['content']};
   /** Per-artifact-key failed-run counter (see MAX_ATTEMPTS). */
   private readonly attempts = new Map<string, number>();
   /** The notification queue: per-project pending work, merged on enqueue (tokenIds union;
@@ -291,9 +293,7 @@ export class EffectRunner {
       this.preflightOnce = (async () => {
         try {
           const d = await this.service!.descriptor();
-          if (d.content?.domain) {
-            this.contentPolicy = projectContentPolicy(d.baseUrl ?? this.opts.publicBaseUrl ?? this.opts.resolverUrl, d.content.domain);
-          }
+          this.discoveredContent = {baseUrl: d.baseUrl ?? this.opts.publicBaseUrl ?? this.opts.resolverUrl, content: d.content};
           if (!d.interfaces?.includes(CONTROL_PLANE_INTERFACE)) {
             this.log(
               `warning: ${this.opts.resolverUrl} declares no ${CONTROL_PLANE_INTERFACE} — publishes may be refused ` +
@@ -438,8 +438,10 @@ export class EffectRunner {
       state,
       token,
       tokenData,
-      liveViewUrl: projectContentUrl(this.contentPolicy, `/a/${state.chainId}/${state.address}/${token.tokenId}`) ??
-        `${this.opts.resolverUrl}/a/${state.chainId}/${state.address}/${token.tokenId}`,
+      liveViewUrl: this.discoveredContent
+        ? discoveredLiveViewUrl(this.discoveredContent.baseUrl, this.discoveredContent.content, {chainId: state.chainId, address: state.address, tokenId: token.tokenId})
+        : projectContentUrl(this.contentPolicy, `/a/${state.chainId}/${state.address}/${token.tokenId}`) ??
+          `${this.opts.resolverUrl}/a/${state.chainId}/${state.address}/${token.tokenId}`,
     };
     await this.reportStatus(probeKey, state, token, effect, 'rendering');
     let outputs: Record<string, EffectOutput | null>;

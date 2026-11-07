@@ -251,10 +251,13 @@ provider descriptor (`abx remote <name-or-url>`) for `content.domain` and
 `content.liveViewUrlTemplate`, or use a live-view response's canonical `Link` header. Prefer that
 direct content URL for standalone apps and integrations. Preserve token query parameters. Never
 invent content hostnames or replace a contract's metadata resolver base with the content domain.
-The first-party content domain is `abxcontent.app`; each chain + collection has its own origin.
+The first-party content domain is `abxcontent.app`; each token has a fixed-length hashed subdomain
+and its live application is at `/`. Use `discoveredLiveViewUrl` for advertised templates, including
+older providers, rather than assuming a hostname format.
 
 Existing animation URLs remain marketplace-compatible wrapper/redirect entry points. Within a
-collection, tokens share the creator's trust boundary. Self-contained on-chain metadata/HTML does
+collection, token IDs have separate DOM/storage origins; copies of one ERC-1155 ID share an origin.
+Collection artifacts have a separate origin. Self-contained on-chain metadata/HTML does
 not require this HTTP service.
 
 For self-hosting, configure wildcard DNS and HTTPS for a separate domain, then set
@@ -263,3 +266,10 @@ origins when the provider supplies them during service discovery. Without it, pr
 persistent browser storage and some wallet flows will not work. Keep application sessions and
 sensitive cookies off the content domain. No on-chain transaction is needed for a hosting-origin
 change when the existing resolver routes remain available.
+
+Contract-facing URI bases remain the resolver's `/t` and `/c` endpoints; their contracts append
+chain/address/token coordinates. Do not point these bases at hashed content hosts. Both first-party
+and reference self-hosted resolvers support token-root routing from a chain-derived index that is
+rebuilt with the projection. No contract update or private routing registry is required. On-chain
+data documents and external creator hosts do not inherit the resolver's HTTP headers. Use runtime
+token data for identity, not `location.pathname`; new content URLs have no identifying path.

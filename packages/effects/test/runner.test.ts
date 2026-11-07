@@ -1,3 +1,4 @@
+import {contentOriginLabel, TOKEN_CONTENT_SCHEME} from '@artblocks/abx-sdk';
 // The harness's load-bearing properties, no browser involved: work detection is "the
 // artifact at the CURRENT inputsHash address is missing", runs are idempotent, and a
 // param change re-addresses output (so the same token renders again — self-invalidating).
@@ -869,7 +870,7 @@ for (const discovered of [false, true]) {
       new Response(
         JSON.stringify(
           String(url).includes('/.well-known/')
-            ? {interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [31337], content: {domain: 'content.test'}}
+            ? {interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [31337], content: {domain: 'content.test', scheme: TOKEN_CONTENT_SCHEME, liveViewUrlTemplate: 'https://{tokenOrigin}.content.test/'}}
             : [],
         ),
         {status: 200, headers: {'content-type': 'application/json'}},
@@ -894,7 +895,7 @@ for (const discovered of [false, true]) {
       });
       const stats = await runner.sweepProject(ADDR);
       assert.equal(stats.failed, 0);
-      assert.equal(captured, `https://31337-${ADDR.toLowerCase()}.content.test/a/31337/${ADDR}/0`);
+      assert.equal(captured, `https://${contentOriginLabel({chainId: 31337, address: ADDR, tokenId: '0'})}.content.test/`);
     } finally {
       globalThis.fetch = realFetch;
     }
@@ -913,7 +914,7 @@ test('local transport aliases use the configured public origin for content routi
     const runner = new EffectRunner({resolverUrl: 'http://localhost:8787', contentDomain: 'localhost:8787', client: null,
       storage: memoryStorage(), effects: [effect], fetchState: async () => codeState(1n), log: () => {}});
     assert.equal((await runner.sweepProject(ADDR)).failed, 0);
-    assert.equal(captured, `http://31337-${ADDR.toLowerCase()}.localhost:8787/a/31337/${ADDR}/0`);
+    assert.equal(captured, `http://${contentOriginLabel({chainId: 31337, address: ADDR, tokenId: '0'})}.localhost:8787/`);
   } finally {
     if (prior === undefined) delete process.env.ABX_PUBLIC_BASE_URL;
     else process.env.ABX_PUBLIC_BASE_URL = prior;
