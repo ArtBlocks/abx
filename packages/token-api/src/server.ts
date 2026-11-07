@@ -283,11 +283,13 @@ export function createTokenApiServer(opts: ServerOptions): Server {
       res.setHeader('cross-origin-opener-policy', 'same-origin-allow-popups');
       res.setHeader('origin-agent-cluster', '?1');
       const sendContent: ContentSender = async (body, contentType, cacheControl) => {
-        const response = isolateProjectContent(contentPolicy, requestUrl.href, new Response(typeof body === 'string' ? body : new Uint8Array(body), {
+        // The policy needs headers, not the artwork payload. Keep large byte artifacts out of
+        // Response buffering; only the small generated wrapper has a replacement body.
+        const response = isolateProjectContent(contentPolicy, requestUrl.href, new Response(null, {
           headers: {'content-type': contentType, 'cache-control': cacheControl},
         }));
         res.writeHead(response.status, Object.fromEntries(response.headers));
-        res.end(Buffer.from(await response.arrayBuffer()));
+        res.end(response.body ? Buffer.from(await response.arrayBuffer()) : response.status === 200 ? body : undefined);
       };
       const publicContent = kind === 'public' && !!contentPolicy.contentDomain && isProjectContentPath(requestUrl.pathname);
       if (publicContent && ['GET', 'HEAD'].includes(req.method ?? 'GET') && !requestUrl.pathname.startsWith('/a/')) {

@@ -141,3 +141,9 @@ test('the wrapper escapes URL attributes and never includes caller-supplied HTML
   const response = projectContentFrame(`${direct}?x=%22%3E%3Cscript%3E&y=1`);
   assert.match(await response.text(), /&amp;y=1/);
 });
+
+test('content frames accept only HTTP(S) URLs without credentials', () => {
+  for (const url of ['javascript:alert(1)', 'data:text/html,hello', 'https://user:pass@content.test/']) {
+    assert.throws(() => projectContentFrame(url));
+  }
+});

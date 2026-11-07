@@ -108,6 +108,10 @@ const escapeAttribute = (value: string): string =>
 
 /** A marketplace may copy this HTML; the actual program always executes at its collection origin. */
 export function projectContentFrame(url: string, cacheControl = 'no-store'): Response {
+  const parsed = new URL(url);
+  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+    throw new Error('content frames require an HTTP(S) URL without credentials');
+  }
   const src = escapeAttribute(url);
   return new Response(
     `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ABX project</title><link rel="canonical" href="${src}"><script>${FRAME_SCRIPT}</script><style>${FRAME_STYLE}</style><iframe src="${src}" allow="autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture; accelerometer; gyroscope; xr-spatial-tracking" allowfullscreen></iframe>`,
