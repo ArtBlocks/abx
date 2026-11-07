@@ -1,0 +1,8 @@
+---
+"@artblocks/abx-effects": patch
+"@artblocks/abx-cli": patch
+---
+
+Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.

@@ -10,6 +10,9 @@ import {
   isCodeProject,
   linearBackoffDelay,
   locatorRejectionReason,
+  projectContentPolicy,
+  projectContentUrl,
+  type ProjectContentPolicy,
   renderArtifactKey,
   sleep,
   type Hex,
@@ -101,6 +104,8 @@ export interface EffectArtifactRecord {
 
 export interface RunnerOptions {
   resolverUrl: string;
+  /** Direct collection-content domain; remote discovery takes precedence when advertised. */
+  contentDomain?: string;
   client: PublicClient | null;
   storage: StorageBackend;
   effects: EffectModule[];
@@ -157,6 +162,7 @@ export class EffectRunner {
   private readonly log: (line: string) => void;
   /** The resolver control-plane client (the locator-bridge publish lane) — null when co-located. */
   private readonly service: AbxServiceClient | null;
+  private contentPolicy: ProjectContentPolicy;
   /** Per-artifact-key failed-run counter (see MAX_ATTEMPTS). */
   private readonly attempts = new Map<string, number>();
   /** The notification queue: per-project pending work, merged on enqueue (tokenIds union;
@@ -180,6 +186,7 @@ export class EffectRunner {
 
   constructor(opts: RunnerOptions) {
     this.opts = opts;
+    this.contentPolicy = projectContentPolicy(opts.resolverUrl, opts.contentDomain ?? process.env.ABX_CONTENT_DOMAIN);
     this.log = opts.log ?? ((line) => console.log(`[effects] ${line}`));
     this.service = opts.adminToken ? new AbxServiceClient({baseUrl: opts.resolverUrl, token: opts.adminToken}) : null;
     // Boot guard: in the publish topology (we don't share the resolver's disk), referenced output
@@ -279,6 +286,7 @@ export class EffectRunner {
       this.preflightOnce = (async () => {
         try {
           const d = await this.service!.descriptor();
+          if (d.content?.domain) this.contentPolicy = projectContentPolicy(this.opts.resolverUrl, d.content.domain);
           if (!d.interfaces?.includes(CONTROL_PLANE_INTERFACE)) {
             this.log(
               `warning: ${this.opts.resolverUrl} declares no ${CONTROL_PLANE_INTERFACE} — publishes may be refused ` +
@@ -423,7 +431,8 @@ export class EffectRunner {
       state,
       token,
       tokenData,
-      liveViewUrl: `${this.opts.resolverUrl}/a/${state.chainId}/${state.address}/${token.tokenId}`,
+      liveViewUrl: projectContentUrl(this.contentPolicy, `/a/${state.chainId}/${state.address}/${token.tokenId}`) ??
+        `${this.opts.resolverUrl}/a/${state.chainId}/${state.address}/${token.tokenId}`,
     };
     await this.reportStatus(probeKey, state, token, effect, 'rendering');
     let outputs: Record<string, EffectOutput | null>;

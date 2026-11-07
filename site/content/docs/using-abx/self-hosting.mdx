@@ -69,7 +69,7 @@ CSP sandbox. Scripts and embedding remain enabled, but persistent browser storag
 connections require a dedicated content domain.
 
 For complete websites, configure a separate domain with wildcard DNS and HTTPS pointing at the
-resolver, then set:
+resolver, then set on the resolver and its effects worker:
 
 ```bash
 ABX_CONTENT_DOMAIN=content.example.net

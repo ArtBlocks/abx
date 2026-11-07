@@ -258,7 +258,8 @@ collection, tokens share the creator's trust boundary. Self-contained on-chain m
 not require this HTTP service.
 
 For self-hosting, configure wildcard DNS and HTTPS for a separate domain, then set
-`ABX_CONTENT_DOMAIN` on the resolver. Without it, project documents run in an opaque-origin sandbox;
+`ABX_CONTENT_DOMAIN` on the resolver and effects worker. Remote effects runners use advertised content
+origins when the provider supplies them during service discovery. Without it, project documents run in an opaque-origin sandbox;
 persistent browser storage and some wallet flows will not work. Keep application sessions and
 sensitive cookies off the content domain. No on-chain transaction is needed for a hosting-origin
 change when the existing resolver routes remain available.
