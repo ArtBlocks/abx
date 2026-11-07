@@ -391,7 +391,7 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
     info(`endpoint   ${interfaceId} → ${endpoint.baseUrl}${policy ? dim(` · ${policy}`) : ''}`);
   }
   if (d.content) {
-    info(`content    ${d.content.domain} · one browser origin per collection`);
+    info(`content    ${d.content.domain}${d.content.scheme ? ` · ${d.content.scheme}` : ''}`);
     info(`live URL   ${d.content.liveViewUrlTemplate}`);
   }
   const chainId = resolveChain(CHAIN).id;
