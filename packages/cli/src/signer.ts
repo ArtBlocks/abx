@@ -410,11 +410,13 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   let pendingReject: ((e: Error) => void) | null = null;
   let index = 0;
   let finished = false;
+  let sessionError: string | null = null;
   let connectedAddress: Address | undefined;
   const sessionToken = randomBytes(32).toString('hex');
   const usedHashes = new Set<string>();
 
   const fail = (e: Error) => {
+    sessionError = 'Signing stopped. Check the CLI before retrying.';
     pendingReject?.(e);
     rejectAll?.(e);
   };
@@ -462,7 +464,8 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
       }
       if (url.pathname === '/next') {
         res.writeHead(200, {'content-type': 'application/json'});
-        if (finished) res.end(JSON.stringify({done: true}));
+        if (sessionError) res.end(JSON.stringify({error: sessionError}));
+        else if (finished) res.end(JSON.stringify({done: true}));
         else if (current && !current.consumed) {
           const base = {index: current.index, total: opts.total ?? null};
           res.end(JSON.stringify(current.kind === 'msg' ? {...base, msg: current.msg} : {...base, tx: current.tx}));
@@ -519,34 +522,39 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   return {
     connect: () => connected,
     async send(tx: PreparedTx): Promise<SignedReceipt> {
-      const signer = await connected;
-      const minimumNonce = await publicClient.getTransactionCount({address: signer, blockTag: 'pending'});
-      index += 1;
-      // A wallet session spans blocks: the deploy is approved, then setup targets the contract it
-      // just created. The browser wallet estimates against ITS OWN RPC, which we don't control and
-      // which can lag — so wait for the code to be visible and hand the page an explicit gas limit
-      // instead of letting the wallet guess. Same reasoning as the hot lane (see execute.ts).
-      if (tx.to && tx.gasFloor) await waitForCodeAt(publicClient, tx.to);
-      const gas = opts.expectedSigner
-        ? await pinGas(publicClient, {from: opts.expectedSigner, to: tx.to, data: tx.data, value: tx.value, gasFloor: tx.gasFloor}).catch(() => undefined)
-        : undefined;
-      current = {index, kind: 'tx', tx: gas === undefined ? tx : {...tx, gas: `0x${gas.toString(16)}` as Hex}, consumed: false};
-      console.log(`  ${dim(`tx ${opts.total ? `${index}/${opts.total}` : index}:`)} ${tx.summary} ${dim('— approve in your wallet …')}`);
-      const txHash = await new Promise<Hex>((resolve, reject) => {
-        pendingResolve = resolve;
-        pendingReject = reject;
-      });
-      pendingResolve = null;
-      pendingReject = null;
-      console.log(`  ${dim('tx')} ${explorer}/tx/${txHash}  ${dim('— confirming …')}`);
-      const receipt = await waitForTransactionReceiptResilient(publicClient, {hash: txHash});
-      const actual = await publicClient.getTransaction({hash: txHash});
-      assertWalletTransaction(tx, signer, actual, receipt, minimumNonce);
-      if (usedHashes.has(txHash.toLowerCase())) throw new Error('This transaction was already used by the signing session.');
-      usedHashes.add(txHash.toLowerCase());
-      console.log(`  ${green('✓')} confirmed`);
-      current = null; // back to idle until the next send()
-      return {txHash, receipt};
+      try {
+        const signer = await connected;
+        const minimumNonce = await publicClient.getTransactionCount({address: signer, blockTag: 'pending'});
+        index += 1;
+        // A wallet session spans blocks: the deploy is approved, then setup targets the contract it
+        // just created. The browser wallet estimates against ITS OWN RPC, which we don't control and
+        // which can lag — so wait for the code to be visible and hand the page an explicit gas limit
+        // instead of letting the wallet guess. Same reasoning as the hot lane (see execute.ts).
+        if (tx.to && tx.gasFloor) await waitForCodeAt(publicClient, tx.to);
+        const gas = opts.expectedSigner
+          ? await pinGas(publicClient, {from: opts.expectedSigner, to: tx.to, data: tx.data, value: tx.value, gasFloor: tx.gasFloor}).catch(() => undefined)
+          : undefined;
+        current = {index, kind: 'tx', tx: gas === undefined ? tx : {...tx, gas: `0x${gas.toString(16)}` as Hex}, consumed: false};
+        console.log(`  ${dim(`tx ${opts.total ? `${index}/${opts.total}` : index}:`)} ${tx.summary} ${dim('— approve in your wallet …')}`);
+        const txHash = await new Promise<Hex>((resolve, reject) => {
+          pendingResolve = resolve;
+          pendingReject = reject;
+        });
+        pendingResolve = null;
+        pendingReject = null;
+        console.log(`  ${dim('tx')} ${explorer}/tx/${txHash}  ${dim('— confirming …')}`);
+        const receipt = await waitForTransactionReceiptResilient(publicClient, {hash: txHash});
+        const actual = await publicClient.getTransaction({hash: txHash});
+        assertWalletTransaction(tx, signer, actual, receipt, minimumNonce);
+        if (usedHashes.has(txHash.toLowerCase())) throw new Error('This transaction was already used by the signing session.');
+        usedHashes.add(txHash.toLowerCase());
+        console.log(`  ${green('✓')} confirmed`);
+        current = null; // back to idle until the next send()
+        return {txHash, receipt};
+      } catch (error) {
+        sessionError ??= 'Transaction was not verified. Check the CLI and inspect the transaction before retrying.';
+        throw error;
+      }
     },
     async signMessage(message: Uint8Array, summary?: string): Promise<Hex> {
       index += 1;
@@ -661,14 +669,23 @@ a{color:#a98bff}
 </div>
 <script>
 const CFG = ${cfg};
-function sessionFetch(path,init={}){return fetch(path,{...init,headers:{...init.headers,'x-abx-session-token':new URLSearchParams(location.search).get('session')}}).then(async r=>{if(!r.ok)throw new Error(await r.text());return r;});}
+function sessionFetch(path,init={}){return fetch(path,{...init,headers:{...init.headers,'x-abx-session-token':new URLSearchParams(location.search).get('session')}}).then(async r=>{if(!r.ok){let message=await r.text();try{message=JSON.parse(message).error||message;}catch(e){}throw new Error(message);}return r;});}
+function escapeHtml(value){return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');}
 const $ = (id) => document.getElementById(id);
-let account=null, chainId=null, connected=false, curTx=null, curMsg=null, curKind=null, curIndex=0, signing=false, stopped=false;
+let account=null, connectedSigner=null, chainId=null, connected=false, curTx=null, curMsg=null, curKind=null, curIndex=0, signing=false, stopped=false;
 const toHexChain = (n) => '0x' + n.toString(16);
 const eq = (a,b) => a && b && a.toLowerCase() === b.toLowerCase();
-function status(msg, cls){ const s=$('status'); s.className='status show '+(cls||''); s.innerHTML=msg; }
+function status(msg, cls){ const s=$('status'); s.className='status show '+(cls||''); s.textContent=msg; }
+function statusSent(txHash){
+  status('Sent ✓ ','ok');
+  if (CFG.explorer){
+    const link=document.createElement('a'); link.href=CFG.explorer+'/tx/'+txHash; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent=txHash; $('status').append(link);
+  } else $('status').append(txHash);
+  $('status').append(document.createElement('br'),'Confirming on-chain…');
+}
 function progress(i, label){ $('progress').textContent = i ? ((label||'Step') + ' ' + i + (CFG.total ? ' of ' + CFG.total : '')) : ''; }
-const signerOk = () => !CFG.expectedSigner || eq(account, CFG.expectedSigner);
+const requiredSigner = () => CFG.expectedSigner || connectedSigner;
+const signerOk = () => !requiredSigner() || eq(account, requiredSigner());
 const chainOk  = () => chainId === CFG.chainId;
 // A message signature (personal_sign, for Arweave/Turbo uploads) is chain-agnostic; only a tx needs the network right.
 const needChain = () => curKind !== 'msg';
@@ -683,7 +700,7 @@ function renderCtx(){
   const ad=$('acctDot'), at=$('acctText');
   if (!account){ ad.className='dot'; at.className='v'; at.textContent='Wallet: not connected'; }
   else if (signerOk()){ ad.className='dot good'; at.className='v good'; at.innerHTML='Wallet: '+account+' ✓'+(CFG.expectedSigner?'':' — this wallet will be the owner'); }
-  else { ad.className='dot bad'; at.className='v bad'; at.innerHTML='Wrong wallet: connected <b>'+account+'</b>, but this was prepared for <b>'+CFG.expectedSigner+'</b>. Switch accounts in your wallet.'; }
+  else { ad.className='dot bad'; at.className='v bad'; at.innerHTML='Wrong wallet: connected <b>'+account+'</b>, but this was prepared for <b>'+requiredSigner()+'</b>. Switch accounts in your wallet.'; }
   $('switch').style.display = (account && !chainOk()) ? 'block' : 'none';
   gateSign();
 }
@@ -693,7 +710,7 @@ function gateSign(){
   $('sign').disabled = !ready;
   if (hasItem && !signing && !ready){
     if (needChain() && !chainOk()) status('Can\\'t sign: wrong network. Switch your wallet to '+CFG.chainName+' ('+CFG.chainId+').','err');
-    else if (!signerOk()) status('Can\\'t sign: wrong wallet. Switch to '+CFG.expectedSigner+'.','err');
+    else if (!signerOk()) status('Can\\'t sign: wrong wallet. Switch to '+requiredSigner()+'.','err');
   }
 }
 function renderTx(t,i){
@@ -701,7 +718,7 @@ function renderTx(t,i){
   $('tlabel').style.display='block'; $('tlabel').textContent='This transaction does';
   $('summary').textContent=t.summary;
   $('fields').innerHTML=Object.entries(t.fields).map(([k,v]) =>
-    '<tr><td class="k">'+k+'</td><td class="v">'+v+'</td></tr>').join('');
+    '<tr><td class="k">'+escapeHtml(k)+'</td><td class="v">'+escapeHtml(v)+'</td></tr>').join('');
   $('connect').style.display='none';
   $('sign').textContent='Sign & send';
   $('sign').style.display='block';
@@ -733,15 +750,17 @@ $('switch').onclick = trySwitch;
 async function maybeConnect(){
   if (connected || !account) return;
   if (!signerOk() || !chainOk()){ gateSign(); return; }
-  const r = await sessionFetch('/connect', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({signer: account})});
-  if (!r.ok){ const e = await r.json().catch(()=>({})); status('Rejected: '+(e.error||'signer mismatch'),'err'); return; }
-  connected=true;
-  status('Connected '+account+' on '+CFG.chainName+'. Waiting for the first transaction…','ok');
-  poll();
+  try {
+    await sessionFetch('/connect', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({signer: account})});
+    connected=true; connectedSigner=account;
+    status('Connected '+account+' on '+CFG.chainName+'. Waiting for the first transaction…','ok');
+    poll();
+  } catch(e){ connected=false; status('Rejected: '+(e.message||String(e)),'err'); }
+
 }
 $('connect').onclick = async () => {
   const eth = window.ethereum;
-  if (!eth){ status('No injected wallet found. Install MetaMask (or use the hot lane: <code>--send</code>).','err'); return; }
+  if (!eth){ status('No injected wallet found. Install MetaMask (or use the hot lane: --send).','err'); return; }
   try {
     const accs = await eth.request({method:'eth_requestAccounts'});
     account = accs[0] || null;
@@ -776,8 +795,7 @@ $('sign').onclick = async () => {
       if (curTx.gas) params.gas = curTx.gas;
       const txHash = await window.ethereum.request({method:'eth_sendTransaction', params:[params]});
       await sessionFetch('/signed', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({index: curIndex, txHash})});
-      const link = CFG.explorer ? '<a href="'+CFG.explorer+'/tx/'+txHash+'" target="_blank">'+txHash+'</a>' : txHash;
-      status('Sent ✓ '+link+'<br>Confirming on-chain…','ok');
+      statusSent(txHash);
       $('sign').style.display='none'; curTx=null; signing=false;
     }
   } catch(e){ status((e&&e.message)||String(e),'err'); signing=false; gateSign(); }
@@ -791,6 +809,7 @@ async function poll(){
   if (stopped) return;
   try {
     const r = await sessionFetch('/next'); const d = await r.json();
+    if (d.error){ stopped=true; $('summary').textContent='Signing stopped — check the CLI.'; $('sign').disabled=true; status(d.error,'err'); return; }
     if (d.done){ stopped=true; progress(0); $('tlabel').style.display='none'; $('summary').textContent='All done — everything signed.'; $('fields').innerHTML=''; status('Done ✓ — you can close this tab.','ok'); return; }
     if (d.tx && d.index !== curIndex && !signing) renderTx(d.tx, d.index);
     else if (d.msg && d.index !== curIndex && !signing) renderMsg(d.msg, d.index);
