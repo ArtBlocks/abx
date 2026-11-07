@@ -74,6 +74,7 @@ export function projectContentUrl(policy: ProjectContentPolicy, pathAndQuery: st
   const target = new URL(`${policy.contentScheme}//${key.chainId}-${key.address}.${policy.contentDomain}`);
   target.pathname = source.pathname;
   target.search = source.search;
+  target.hash = source.hash;
   return target.href;
 }
 
@@ -97,10 +98,11 @@ export function projectContentRequestKind(policy: ProjectContentPolicy, requestU
   return metadata || isProjectContentPath(url.pathname) ? 'content' : 'reject';
 }
 
-const FRAME_SCRIPT = "if(window.top===window.self)location.replace(document.querySelector('link[rel=canonical]').href)";
+const FRAME_SCRIPT =
+  "var u=new URL(document.querySelector('link[rel=canonical]').href);if(location.hash)u.hash=location.hash;if(window.top===window.self)location.replace(u.href);else if(location.hash)addEventListener('DOMContentLoaded',function(){document.querySelector('iframe').src=u.href})";
 const FRAME_STYLE = 'html,body{margin:0;height:100%}iframe{display:block;border:0;width:100%;height:100%}';
 const FRAME_CSP =
-  "default-src 'none'; script-src 'sha256-i2w2DbWkmHABUev4BMLgxC3pz3nEbXLXoCNvC0iBTgo='; style-src 'sha256-eTEQdSHa5lZRfHLn1XshWyk4v3jQTf8RRe46YvvjOi8='; base-uri 'none'; form-action 'none'";
+  "default-src 'none'; script-src 'sha256-rAyFgUSzOSuMXzNFRfx/9rm050qrUtEJ8dlg5Z1H6WE='; style-src 'sha256-eTEQdSHa5lZRfHLn1XshWyk4v3jQTf8RRe46YvvjOi8='; base-uri 'none'; form-action 'none'";
 const escapeAttribute = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

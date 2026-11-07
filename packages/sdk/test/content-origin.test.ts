@@ -17,7 +17,7 @@ const policy = projectContentPolicy('https://resolver.test', 'content.test');
 const direct = `https://8453-${ADDRESS}.content.test${path}`;
 
 test('collection content addresses preserve paths and token parameters', () => {
-  assert.equal(projectContentUrl(policy, `${path}?abx=abc&mode=1`), `${direct}?abx=abc&mode=1`);
+  assert.equal(projectContentUrl(policy, `${path}?abx=abc&mode=1#mint`), `${direct}?abx=abc&mode=1#mint`);
   assert.equal(projectContentUrl(policy, `/a/1/${ADDRESS}/7`), `https://1-${ADDRESS}.content.test/a/1/${ADDRESS}/7`);
   assert.deepEqual(contentProjectFromPath(`/t/8453/${ADDRESS.toUpperCase().replace('0X', '0x')}/7`), {chainId: 8453, address: ADDRESS});
 });
