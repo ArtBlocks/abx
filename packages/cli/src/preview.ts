@@ -476,19 +476,10 @@ export interface ShootResult {
   timedOut: boolean;
 }
 
-/**
- * Render `count` seeds from a running preview server to PNGs, collecting each frame's reported
- * traits. This is how an agent (which cannot open localhost) sees the work — and because it drives
- * the same `/view` document the creator sees, there is nothing to keep in sync.
- */
-export async function shootPreview(
-  base: string,
-  outDir: string,
-  count: number,
-  opts: {width?: number; timeoutMs?: number; params?: Record<string, string>} = {},
-): Promise<ShootResult[]> {
+/** Load Playwright and launch Chromium, turning both failure modes into an actionable message. */
+async function launchChromium(flag: '--shoot' | '--check') {
   // Playwright is a BUILD-TIME type dependency only (a `devDependency` of this package), never a
-  // runtime one: `--shoot` is opt-in and the interactive studio needs no browser at all, so shipping
+  // runtime one: `--shoot`/`--check` are opt-in and the interactive studio needs no browser at all, so shipping
   // it as a real dependency would force every `abx` install to pull a browser driver it won't use.
   // Hence: declared for `tsc`, imported dynamically, and absence handled below.
   // Do NOT promote this to `dependencies`, and do NOT drop the devDependency — an undeclared
@@ -499,24 +490,18 @@ export async function shootPreview(
     ({chromium} = await import('playwright'));
   } catch {
     throw new Error(
-      '--shoot needs Playwright + its Chromium build (the interactive preview does not — that runs in YOUR browser).\n' +
+      `${flag} needs Playwright + its Chromium build (the interactive preview does not — that runs in YOUR browser).\n` +
         '  install: npm i -D playwright && npx playwright install chromium\n' +
-        '  or drop --shoot and open the preview URL yourself.',
+        `  or drop ${flag} and open the preview URL yourself.`,
     );
   }
-  // Same logical square the interactive stage uses, so a shot frames the piece identically.
-  const width = opts.width ?? STAGE_PX;
-  const timeoutMs = opts.timeoutMs ?? 10_000;
-  await mkdir(outDir, {recursive: true});
-
   // A missing BROWSER BUILD is a different failure from a missing package, and its stock message
   // ("please run npx playwright install") can send you in a circle: `npx playwright install` resolves
   // whatever playwright npm feels like, which may be a DIFFERENT version than the one that just
   // launched — you download a browser revision this playwright won't use, get the identical error,
   // and run the same command again. Name the install command for the playwright we ACTUALLY loaded.
-  let browser: Awaited<ReturnType<typeof chromium.launch>>;
   try {
-    browser = await chromium.launch();
+    return await chromium.launch();
   } catch (err) {
     const msg = (err as Error).message ?? '';
     if (!/Executable doesn't exist|playwright install/i.test(msg)) throw err;
@@ -531,11 +516,30 @@ export async function shootPreview(
       /* fall back to the generic command */
     }
     throw new Error(
-      `--shoot loaded Playwright${version} but its Chromium build is missing.\n` +
+      `${flag} loaded Playwright${version} but its Chromium build is missing.\n` +
         `  install the build THIS Playwright expects:\n    ${hint}\n` +
         `  (a bare \`npx playwright install\` may fetch a build for a different Playwright version — same error, again.)`,
     );
   }
+}
+
+/**
+ * Render `count` seeds from a running preview server to PNGs, collecting each frame's reported
+ * traits. This is how an agent (which cannot open localhost) sees the work — and because it drives
+ * the same `/view` document the creator sees, there is nothing to keep in sync.
+ */
+export async function shootPreview(
+  base: string,
+  outDir: string,
+  count: number,
+  opts: {width?: number; timeoutMs?: number; params?: Record<string, string>} = {},
+): Promise<ShootResult[]> {
+  // Same logical square the interactive stage uses, so a shot frames the piece identically.
+  const width = opts.width ?? STAGE_PX;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+  await mkdir(outDir, {recursive: true});
+
+  const browser = await launchChromium('--shoot');
   try {
     const page = await browser.newPage({viewport: {width, height: width}});
     const out: ShootResult[] = [];
@@ -577,10 +581,143 @@ export async function shootPreview(
   }
 }
 
+// ── --check: is the render a pure function of the seed? ──────────────────────────
+
+export interface CheckSeedResult {
+  seed: string;
+  /** Pixels AND traits identical across every fresh-context run. */
+  match: boolean;
+  pixelMatch: boolean;
+  traitsMatch: boolean;
+  /** Distinct pixel hashes seen — 1 for a deterministic seed; more says HOW unstable it is. */
+  distinctPixels: number;
+  /** A run stopped waiting before the program reported. That says nothing about determinism. */
+  timedOut: boolean;
+  /** Non-determinism sources the program touched while rendering (Date.now, Math.random…). */
+  hazards: string[];
+}
+
+/**
+ * `pass`  every seed matched across runs.
+ * `drift` some seed rendered differently — the program is not a pure function of its seed.
+ * `harness` no drift seen, but a run timed out, so "no drift" is unproven. Never reported as pass:
+ *   a loaded machine that gave up waiting must not certify a program it never saw finish.
+ */
+export type CheckVerdict = 'pass' | 'drift' | 'harness';
+
+export interface CheckReport {
+  ok: boolean;
+  verdict: CheckVerdict;
+  runs: number;
+  seeds: CheckSeedResult[];
+}
+
+/** One run's observable output, reduced to what must be reproducible. */
+export interface CheckRun {
+  pixelHash: string;
+  traits: Record<string, unknown> | null;
+  hazards: string[];
+  timedOut?: boolean;
+}
+
+/** Exit code per verdict, so CI and agents can branch without parsing JSON. */
+export const CHECK_EXIT: Record<CheckVerdict, number> = {pass: 0, drift: 1, harness: 2};
+
+/** Pure comparison of N runs per seed — kept separate from the browser so it is unit-testable. */
+export function compareCheckRuns(runs: Array<{seed: string; runs: CheckRun[]}>): CheckReport {
+  const seeds = runs.map(({seed, runs: rs}) => {
+    const distinctPixels = new Set(rs.map((r) => r.pixelHash)).size;
+    const pixelMatch = distinctPixels === 1;
+    const traitsMatch = new Set(rs.map((r) => JSON.stringify(r.traits))).size === 1;
+    const hazards = [...new Set(rs.flatMap((r) => r.hazards))].sort();
+    const timedOut = rs.some((r) => r.timedOut);
+    return {seed, match: pixelMatch && traitsMatch, pixelMatch, traitsMatch, distinctPixels, timedOut, hazards};
+  });
+  const verdict: CheckVerdict = seeds.some((s) => !s.match) ? 'drift' : seeds.some((s) => s.timedOut) ? 'harness' : 'pass';
+  return {ok: verdict === 'pass', verdict, runs: runs[0]?.runs.length ?? 0, seeds};
+}
+
+/** Installed before any program code: records calls to the usual sources of non-determinism. */
+const HAZARD_SHIM = `(() => {
+  const hits = new Set();
+  window.__abxHazards = hits;
+  const wrap = (obj, key, name) => {
+    const orig = obj[key];
+    if (typeof orig !== 'function') return;
+    obj[key] = function () { hits.add(name); return orig.apply(this, arguments); };
+  };
+  wrap(Date, 'now', 'Date.now');
+  wrap(performance, 'now', 'performance.now');
+  wrap(Math, 'random', 'Math.random');
+  wrap(window, 'fetch', 'fetch');
+  const OrigDate = Date;
+  window.Date = new Proxy(OrigDate, {
+    construct(t, args) { if (args.length === 0) hits.add('new Date()'); return Reflect.construct(t, args); },
+  });
+  const open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function () { hits.add('XMLHttpRequest'); return open.apply(this, arguments); };
+})();`;
+
+/**
+ * Render each seed `runs` times, each in a FRESH browser context (no shared storage/cache), and
+ * compare screenshot hash + traits. A program whose output is not a pure function of its seed deploys
+ * as a collection whose tokens change on every view — the failure `--shoot` alone cannot show.
+ */
+export async function checkPreview(
+  base: string,
+  count: number,
+  opts: {width?: number; timeoutMs?: number; params?: Record<string, string>; runs?: number} = {},
+): Promise<CheckReport> {
+  const width = opts.width ?? STAGE_PX;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+  const nRuns = Math.max(2, opts.runs ?? 3);
+  const overrides = Object.entries(opts.params ?? {})
+    .map(([k, v]) => `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('');
+  const browser = await launchChromium('--check');
+  try {
+    const once = async (i: number, seed: string): Promise<CheckRun> => {
+      const ctx = await browser.newContext({viewport: {width, height: width}});
+      try {
+        await ctx.addInitScript(HAZARD_SHIM);
+        const page = await ctx.newPage();
+        await page.goto(`${base}/view?tokenId=${i}&seed=${seed}&report=0${overrides}`, {waitUntil: 'load'});
+        let timedOut = false;
+        await page
+          .waitForFunction('window.abx && (window.abx.__done || window.abx.__traits)', {timeout: timeoutMs})
+          .catch(() => { timedOut = true; });
+        const shot = await page.screenshot();
+        const probe = (await page.evaluate(
+          '({traits: (window.abx && window.abx.__traits) || null, done: !!(window.abx && window.abx.__done), hazards: Array.from(window.__abxHazards || [])})',
+        )) as {traits: Record<string, unknown> | null; done: boolean; hazards: string[]};
+        return {
+          pixelHash: createHash('sha256').update(shot).digest('hex'),
+          traits: probe.traits,
+          hazards: probe.hazards,
+          // Same rule as --shoot: a late report after the wait expired is not a timeout.
+          timedOut: timedOut && !probe.traits && !probe.done,
+        };
+      } finally {
+        await ctx.close();
+      }
+    };
+    const out: Array<{seed: string; runs: CheckRun[]}> = [];
+    for (let i = 0; i < count; i++) {
+      const seed = previewSeed(i);
+      const rs: CheckRun[] = [];
+      for (let k = 0; k < nRuns; k++) rs.push(await once(i, seed));
+      out.push({seed, runs: rs});
+    }
+    return compareCheckRuns(out);
+  } finally {
+    await browser.close();
+  }
+}
+
 // ── flag surface ─────────────────────────────────────────────────────────────────
 
 export const PREVIEW_FLAGS: ReadonlySet<string> = new Set([
-  'script', 'code-dir', 'schema', 'dep', 'port', 'shoot', 'count', 'width', 'timeout-ms', 'param',
+  'script', 'code-dir', 'schema', 'dep', 'port', 'shoot', 'check', 'runs', 'count', 'width', 'timeout-ms', 'param',
 ]);
 
 /**

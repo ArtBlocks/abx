@@ -7,6 +7,9 @@ import {
   previewSeed,
   previewSourceFromFlags,
   previewConfigFromFlags,
+  compareCheckRuns,
+  CHECK_EXIT,
+  PREVIEW_FLAGS,
 } from '../src/preview.js';
 import {parseDependencyRef} from '@artblocks/abx-sdk';
 
@@ -129,4 +132,39 @@ test('directory preview contains filesystem reads and requires a local Host', as
     const status = await new Promise<number | undefined>((resolve) => {const req = request(base, {headers: {host: 'untrusted.test'}}, (res) => {res.resume(); resolve(res.statusCode);}); req.end();});
     assert.equal(status, 403);
   } finally {await preview.close(); await rm(root, {recursive: true, force: true});}
+});
+
+test('compareCheckRuns: identical runs pass, drift in pixels or traits fails and hazards are merged', () => {
+  const run = (h: string, t: Record<string, unknown> | null, hz: string[] = [], timedOut = false) => ({pixelHash: h, traits: t, hazards: hz, timedOut});
+  const clean = compareCheckRuns([{seed: 's0', runs: [run('x', {a: 1}), run('x', {a: 1}), run('x', {a: 1})]}]);
+  assert.equal(clean.verdict, 'pass');
+  assert.equal(clean.ok, true);
+  assert.equal(clean.runs, 3);
+  assert.deepEqual(clean.seeds[0].hazards, []);
+
+  // drift only on the THIRD run: two runs would have called this deterministic
+  const late = compareCheckRuns([{seed: 's0', runs: [run('x', null, ['Date.now']), run('x', null), run('y', null, ['Math.random'])]}]);
+  assert.equal(late.verdict, 'drift');
+  assert.equal(late.seeds[0].pixelMatch, false);
+  assert.equal(late.seeds[0].traitsMatch, true);
+  assert.equal(late.seeds[0].distinctPixels, 2);
+  assert.deepEqual(late.seeds[0].hazards, ['Date.now', 'Math.random']);
+
+  const tr = compareCheckRuns([{seed: 's0', runs: [run('x', {a: 1}), run('x', {a: 2}), run('x', {a: 1})]}]);
+  assert.equal(tr.verdict, 'drift');
+  assert.equal(tr.seeds[0].traitsMatch, false);
+});
+
+test('compareCheckRuns: a timeout with matching output is a harness verdict, never a pass', () => {
+  const run = (timedOut: boolean) => ({pixelHash: 'x', traits: null, hazards: [], timedOut});
+  const r = compareCheckRuns([{seed: 's0', runs: [run(false), run(true), run(false)]}]);
+  assert.equal(r.verdict, 'harness');
+  assert.equal(r.ok, false);
+  assert.equal(CHECK_EXIT[r.verdict], 2);
+  assert.deepEqual([CHECK_EXIT.pass, CHECK_EXIT.drift], [0, 1]);
+});
+
+test('--check is an accepted preview flag', () => {
+  assert.ok(PREVIEW_FLAGS.has('check'));
+  assert.ok(PREVIEW_FLAGS.has('runs'));
 });
