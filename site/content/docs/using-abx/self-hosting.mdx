@@ -91,7 +91,9 @@ header with `rel="canonical"` identifies the direct content URL. Service descrip
 On-chain metadata and self-contained on-chain HTML do not change.
 
 For local development, use `ABX_PUBLIC_BASE_URL=http://127.0.0.1:8787` with
-`ABX_CONTENT_DOMAIN=localhost:8787` to enable HTTP collection subdomains on the same port. Use HTTPS for public content domains. Configure DNS and certificates before enabling the
+`ABX_CONTENT_DOMAIN=localhost:8787` to enable HTTP collection subdomains on the same port. The `localhost` root remains available for
+local effects-runner control reads; its collection subdomains serve only collection content.
+Use HTTPS for public content domains. Configure DNS and certificates before enabling the
 setting in production. Changing a content origin starts a new browser-storage namespace and may
 require a fresh wallet connection.
 

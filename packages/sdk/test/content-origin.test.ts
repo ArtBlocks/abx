@@ -166,3 +166,11 @@ test('top-level browser navigation redirects while iframe navigation keeps the m
     else assert.match(await response.text(), /<iframe /);
   }
 });
+
+test('the localhost content root remains a public control-plane alias in local development', () => {
+  const local = projectContentPolicy('http://127.0.0.1:8787', 'localhost:8787');
+  assert.equal(projectContentRequestKind(local, 'http://localhost:8787/.well-known/abx-service'), 'public');
+  assert.equal(projectContentRequestKind(local, 'http://localhost:8787/api/projects'), 'public');
+  assert.equal(projectContentRequestKind(local, `http://8453-${ADDRESS}.localhost:8787/api/projects`), 'reject');
+  assert.equal(projectContentRequestKind(local, `http://8453-${ADDRESS}.localhost:8787${path}`), 'content');
+});
