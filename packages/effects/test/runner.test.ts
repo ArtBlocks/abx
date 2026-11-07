@@ -900,3 +900,22 @@ for (const discovered of [false, true]) {
     }
   });
 }
+
+test('local transport aliases use the configured public origin for content routing', async () => {
+  const prior = process.env.ABX_PUBLIC_BASE_URL;
+  process.env.ABX_PUBLIC_BASE_URL = 'http://127.0.0.1:8787';
+  let captured = '';
+  try {
+    const effect: EffectModule = {...fakeEffect(), async run(ctx) {
+      captured = ctx.liveViewUrl;
+      return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+    }};
+    const runner = new EffectRunner({resolverUrl: 'http://localhost:8787', contentDomain: 'localhost:8787', client: null,
+      storage: memoryStorage(), effects: [effect], fetchState: async () => codeState(1n), log: () => {}});
+    assert.equal((await runner.sweepProject(ADDR)).failed, 0);
+    assert.equal(captured, `http://31337-${ADDR.toLowerCase()}.localhost:8787/a/31337/${ADDR}/0`);
+  } finally {
+    if (prior === undefined) delete process.env.ABX_PUBLIC_BASE_URL;
+    else process.env.ABX_PUBLIC_BASE_URL = prior;
+  }
+});

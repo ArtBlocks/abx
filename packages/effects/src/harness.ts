@@ -106,6 +106,8 @@ export interface RunnerOptions {
   resolverUrl: string;
   /** Direct collection-content domain; remote discovery takes precedence when advertised. */
   contentDomain?: string;
+  /** Canonical public resolver origin when the transport URL is a local alias. */
+  publicBaseUrl?: string;
   client: PublicClient | null;
   storage: StorageBackend;
   effects: EffectModule[];
@@ -186,7 +188,10 @@ export class EffectRunner {
 
   constructor(opts: RunnerOptions) {
     this.opts = opts;
-    this.contentPolicy = projectContentPolicy(opts.resolverUrl, opts.contentDomain ?? process.env.ABX_CONTENT_DOMAIN);
+    this.contentPolicy = projectContentPolicy(
+      opts.publicBaseUrl ?? process.env.ABX_PUBLIC_BASE_URL ?? opts.resolverUrl,
+      opts.contentDomain ?? process.env.ABX_CONTENT_DOMAIN,
+    );
     this.log = opts.log ?? ((line) => console.log(`[effects] ${line}`));
     this.service = opts.adminToken ? new AbxServiceClient({baseUrl: opts.resolverUrl, token: opts.adminToken}) : null;
     // Boot guard: in the publish topology (we don't share the resolver's disk), referenced output
@@ -286,7 +291,9 @@ export class EffectRunner {
       this.preflightOnce = (async () => {
         try {
           const d = await this.service!.descriptor();
-          if (d.content?.domain) this.contentPolicy = projectContentPolicy(this.opts.resolverUrl, d.content.domain);
+          if (d.content?.domain) {
+            this.contentPolicy = projectContentPolicy(d.baseUrl ?? this.opts.publicBaseUrl ?? this.opts.resolverUrl, d.content.domain);
+          }
           if (!d.interfaces?.includes(CONTROL_PLANE_INTERFACE)) {
             this.log(
               `warning: ${this.opts.resolverUrl} declares no ${CONTROL_PLANE_INTERFACE} — publishes may be refused ` +
