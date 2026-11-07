@@ -219,6 +219,7 @@ export async function cmdServe(flags: Flags) {
   const latest = [...indexer.listProjects()].sort((a, b) => b.reconstructedAt.localeCompare(a.reconstructedAt))[0];
   const {url} = await startTokenApiServer({indexer, port, baseUrl, storage: resolveBackend(storageOptions())});
   printServing(url, latest?.address as Address | undefined);
+  if (!process.env.ABX_CONTENT_DOMAIN) info('Project documents use opaque-origin sandboxing. Set ABX_CONTENT_DOMAIN and wildcard DNS/HTTPS for full websites with persistent storage and wallet connections.');
   // The chain watcher — ON by default: the resolver is the protocol's one chain consumer. Every
   // registered project's new events (external mints, foreign-tool param changes) auto-index here
   // and fan out ONE coarse notification per project to the effects layer (ABX_EFFECTS_URL). Tune
@@ -388,6 +389,10 @@ export async function cmdRemote(spec: string | undefined, flags: Flags) {
       .filter(Boolean)
       .join(' · ');
     info(`endpoint   ${interfaceId} → ${endpoint.baseUrl}${policy ? dim(` · ${policy}`) : ''}`);
+  }
+  if (d.content) {
+    info(`content    ${d.content.domain} · one browser origin per collection`);
+    info(`live URL   ${d.content.liveViewUrlTemplate}`);
   }
   const chainId = resolveChain(CHAIN).id;
   const coversChain = (d.chains ?? []).includes(chainId);

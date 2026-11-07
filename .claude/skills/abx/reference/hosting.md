@@ -243,3 +243,22 @@ compare resolver state without cutting over prematurely.
 
 Never describe resolver migration as moving the NFT. Ownership, parameters, commitments, and canonical
 events remain on-chain; only the serving/indexing projection changes.
+
+## Browser content origins
+
+Metadata/control endpoints and executable project pages can have different origins. Read the
+provider descriptor (`abx remote <name-or-url>`) for `content.domain` and
+`content.liveViewUrlTemplate`, or use a live-view response's canonical `Link` header. Prefer that
+direct content URL for standalone apps and integrations. Preserve token query parameters. Never
+invent content hostnames or replace a contract's metadata resolver base with the content domain.
+The first-party content domain is `abxcontent.app`; each chain + collection has its own origin.
+
+Existing animation URLs remain marketplace-compatible wrapper/redirect entry points. Within a
+collection, tokens share the creator's trust boundary. Self-contained on-chain metadata/HTML does
+not require this HTTP service.
+
+For self-hosting, configure wildcard DNS and HTTPS for a separate domain, then set
+`ABX_CONTENT_DOMAIN` on the resolver. Without it, project documents run in an opaque-origin sandbox;
+persistent browser storage and some wallet flows will not work. Keep application sessions and
+sensitive cookies off the content domain. No on-chain transaction is needed for a hosting-origin
+change when the existing resolver routes remain available.

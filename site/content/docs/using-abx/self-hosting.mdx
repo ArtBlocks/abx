@@ -61,6 +61,39 @@ abx status 0xYourContract
 The reference resolver assumes one trusted operator. Do not share it with unrelated customers without
 adding tenant isolation, quotas, and rate limits.
 
+## Content origins
+
+Project HTML and other active documents must execute separately from the resolver dashboard and
+control plane. By default, the reference resolver serves publisher documents with an opaque-origin
+CSP sandbox. Scripts and embedding remain enabled, but persistent browser storage and some wallet
+connections require a dedicated content domain.
+
+For complete websites, configure a separate domain with wildcard DNS and HTTPS pointing at the
+resolver, then set:
+
+```bash
+ABX_CONTENT_DOMAIN=content.example.net
+```
+
+Each collection is served at `https://{chainId}-{address}.content.example.net`, retaining the existing
+`/a/`, `/t/`, and `/c/` paths and query parameters. A content host serves only its own collection's
+read routes and the ABX runtime; account, dashboard, control, and other collections' routes are refused.
+The dedicated domain should hold no application sessions or sensitive cookies. Sibling subdomains
+have separate DOM and browser storage, but parent-domain cookies can still be shared. The collection
+is the trust boundary: all tokens in it share that collection's origin.
+
+Existing live-view URLs return a restricted marketplace wrapper. Opened directly, the wrapper
+navigates to the collection origin; embedded or copied by a marketplace, it frames that origin.
+Image and artifact byte routes redirect without changing committed bytes. The response's `Link`
+header with `rel="canonical"` identifies the direct content URL. Service descriptors advertise
+`content.domain` and `content.liveViewUrlTemplate`; `abx remote` displays these when available.
+On-chain metadata and self-contained on-chain HTML do not change.
+
+For local development, use `ABX_PUBLIC_BASE_URL=http://127.0.0.1:8787` with
+`ABX_CONTENT_DOMAIN=localhost:8787` to enable HTTP collection subdomains on the same port. Use HTTPS for public content domains. Configure DNS and certificates before enabling the
+setting in production. Changing a content origin starts a new browser-storage namespace and may
+require a fresh wallet connection.
+
 ## SQLite maintenance
 
 The projection lives at `.abx-self-host/index.db`. Check and reclaim unused pages with:

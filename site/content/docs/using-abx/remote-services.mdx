@@ -157,3 +157,16 @@ abx migrate 0xYourContract --from <source> --to <destination>
 
 The command copies offchain values, checks hashes, and compares both resolvers. It does not update DNS
 or the onchain base URI.
+
+## Project content
+
+The first-party provider serves metadata at `resolver.abx.io` and project documents from collection
+subdomains of `abxcontent.app`. Accounts and creator controls remain at `services.abx.io`. Existing
+metadata and animation URLs continue to work; live views use an embeddable wrapper that loads the
+project's own origin. Artifact and image URLs redirect to their collection's content host.
+
+For direct viewing or application integrations, read the service descriptor's `content` advertisement
+with `abx remote abx`, or use the live-view response's canonical `Link` header. Keep the chain,
+collection address, token id, and query parameters. Do not guess a provider's content domain or replace
+a contract's metadata base with a content URL. On-chain URI rendering remains independent of this
+hosted service.

@@ -37,6 +37,7 @@ export * from './deps.js';
 export * from './gateways.js';
 export * from './generator.js';
 export * from './generator-document.js';
+export * from './content-origin.js';
 export * from './image-type.js';
 export * from './inspect.js';
 export * from './script-chunks.js';
