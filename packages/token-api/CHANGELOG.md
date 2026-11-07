@@ -1,5 +1,22 @@
 # @artblocks/abx-token-api
 
+## 0.3.0
+
+### Minor Changes
+
+- 8091fe3: Serve each token's live application at the root of a fixed-length hashed content subdomain. Keep
+  legacy resolver and collection links as compatible entrypoints, persist rebuildable token-root
+  lookups in the reference self-hosted resolver, and honor advertised provider URL templates in remote
+  captures. Document contract URI compatibility and the security limits of sandbox-only hosting.
+
+### Patch Changes
+
+- Updated dependencies [4eb24b6]
+- Updated dependencies [8091fe3]
+  - @artblocks/abx-sdk@0.10.0
+  - @artblocks/abx-indexer@0.2.0
+  - @artblocks/abx-storage@0.1.12
+
 ## 0.2.10
 
 ### Patch Changes
