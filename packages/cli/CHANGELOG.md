@@ -1,5 +1,34 @@
 # @artblocks/abx-cli
 
+## 0.8.2
+
+### Patch Changes
+
+- 935fb00: Serve resolver project documents on collection-scoped content origins configured by
+  ABX_CONTENT_DOMAIN. Preserve existing metadata and animation URLs, provide marketplace-compatible
+  live-view wrappers and canonical direct links, and keep artifact bytes unchanged across redirects.
+  Self-hosted documents use opaque-origin sandboxing when no content domain is configured. Advertise
+  content addressing in service discovery and document the browser storage and wallet implications.
+- b48af22: Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+  discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+  wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.
+
+  Top-level browser live-view requests use HTTP redirects so existing capture clients see the final
+  artwork status. Marketplace frames and server-side downloads retain the embeddable wrapper.
+
+- ef2f9ca: `abx doctor` no longer reports a project-local install as "running via npx" when it is invoked as `npx abx`.
+- 9e1129e: Drop-in for existing SDK consumers: `analyzeScript` adds an optional `inlineHtml` finding and the SDK exports `inlineScriptUnterminatedAt`. Detect raw script content that the current generated HTML cannot terminate. The CLI warns during inspect, ERC-721/ERC-1155 script deployment, and script replacement without executing or rewriting the source. Document context-specific author fixes and previewing before locking. No contract or generator behavior changes.
+- bb7cdfb: Stop printing Node 22's `SQLite is an experimental feature` warning on every command. Other Node warnings are unchanged.
+- 3fbe0fb: The "reproduce this exact preview" line from `deploy-series` and `deploy-code` dry runs now keeps `--creator`, `--display-notes`, `--creator-links` and `--license`.
+- Updated dependencies [935fb00]
+- Updated dependencies [b48af22]
+- Updated dependencies [9e1129e]
+- Updated dependencies [8be5eab]
+  - @artblocks/abx-sdk@0.9.0
+  - @artblocks/abx-token-api@0.2.10
+  - @artblocks/abx-indexer@0.1.11
+  - @artblocks/abx-storage@0.1.11
+
 ## 0.8.1
 
 ### Patch Changes

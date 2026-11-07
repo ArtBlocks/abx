@@ -1,5 +1,29 @@
 # @artblocks/abx-sdk
 
+## 0.9.0
+
+### Minor Changes
+
+- 935fb00: Serve resolver project documents on collection-scoped content origins configured by
+  ABX_CONTENT_DOMAIN. Preserve existing metadata and animation URLs, provide marketplace-compatible
+  live-view wrappers and canonical direct links, and keep artifact bytes unchanged across redirects.
+  Self-hosted documents use opaque-origin sandboxing when no content domain is configured. Advertise
+  content addressing in service discovery and document the browser storage and wallet implications.
+- 9e1129e: Drop-in for existing SDK consumers: `analyzeScript` adds an optional `inlineHtml` finding and the SDK exports `inlineScriptUnterminatedAt`. Detect raw script content that the current generated HTML cannot terminate. The CLI warns during inspect, ERC-721/ERC-1155 script deployment, and script replacement without executing or rewriting the source. Document context-specific author fixes and previewing before locking. No contract or generator behavior changes.
+
+### Patch Changes
+
+- b48af22: Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+  discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+  wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.
+
+  Top-level browser live-view requests use HTTP redirects so existing capture clients see the final
+  artwork status. Marketplace frames and server-side downloads retain the embeddable wrapper.
+
+- 8be5eab: Keep the localhost root available as a local resolver control-plane alias when collection content
+  uses localhost subdomains. Default effects-runner transport can still discover projects and state;
+  collection subdomains continue to reject control routes, and production content roots stay restricted.
+
 ## 0.8.0
 
 ### Minor Changes
