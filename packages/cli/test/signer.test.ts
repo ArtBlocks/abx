@@ -152,7 +152,9 @@ test('rendered signing page reports rejected connections and escapes transaction
     const source = html.match(/<script>([\s\S]*?)<\/script>/i)![1]!;
     const elements = new Map<string, {className: string; textContent: string; innerHTML: string; style: Record<string, string>; disabled: boolean}>();
     const element = (id: string) => {if (!elements.has(id)) elements.set(id, {className: '', textContent: '', innerHTML: '', style: {}, disabled: false}); return elements.get(id)!;};
-    const context = createContext({document: {getElementById: element}, window: {}, location: {search: url.search}, URLSearchParams,
+    const statusChildren: Array<string | Record<string, string>> = [];
+    Object.assign(element('status'), {append: (...items: typeof statusChildren) => statusChildren.push(...items)});
+    const context = createContext({document: {getElementById: element, createElement: (tagName: string) => ({tagName})}, window: {}, location: {search: url.search}, URLSearchParams,
       fetch: async () => ({ok: false, text: async () => JSON.stringify({error: 'signer rejected'})}), setTimeout: () => {}});
     runInContext(source, context);
     await runInContext('account="0x1111111111111111111111111111111111111111"; chainId=CFG.chainId; maybeConnect()', context);
@@ -160,6 +162,11 @@ test('rendered signing page reports rejected connections and escapes transaction
     runInContext('renderTx({summary:"test",fields:{name:"<img src=x onerror=alert(1)>"}},1)', context);
     assert.match(element('fields').innerHTML, /&lt;img/);
     assert.doesNotMatch(element('fields').innerHTML, /<img/);
+    runInContext('statusSent("0x1234")', context);
+    const link = statusChildren[0] as Record<string, string>;
+    assert.match(link.href!, /\/tx\/0x1234$/);
+    assert.equal(link.textContent, '0x1234');
+    assert.equal(link.rel, 'noopener noreferrer');
     context.fetch = async () => ({ok: true, json: async () => ({error: 'confirmation stopped'})});
     await runInContext('maybeConnect()', context);
     await new Promise((resolve) => setImmediate(resolve));

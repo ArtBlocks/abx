@@ -552,7 +552,7 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         current = null; // back to idle until the next send()
         return {txHash, receipt};
       } catch (error) {
-        sessionError = 'Transaction was not verified. Check the CLI and inspect the transaction before retrying.';
+        sessionError ??= 'Transaction was not verified. Check the CLI and inspect the transaction before retrying.';
         throw error;
       }
     },
@@ -676,6 +676,13 @@ let account=null, connectedSigner=null, chainId=null, connected=false, curTx=nul
 const toHexChain = (n) => '0x' + n.toString(16);
 const eq = (a,b) => a && b && a.toLowerCase() === b.toLowerCase();
 function status(msg, cls){ const s=$('status'); s.className='status show '+(cls||''); s.textContent=msg; }
+function statusSent(txHash){
+  status('Sent ✓ ','ok');
+  if (CFG.explorer){
+    const link=document.createElement('a'); link.href=CFG.explorer+'/tx/'+txHash; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent=txHash; $('status').append(link);
+  } else $('status').append(txHash);
+  $('status').append(document.createElement('br'),'Confirming on-chain…');
+}
 function progress(i, label){ $('progress').textContent = i ? ((label||'Step') + ' ' + i + (CFG.total ? ' of ' + CFG.total : '')) : ''; }
 const requiredSigner = () => CFG.expectedSigner || connectedSigner;
 const signerOk = () => !requiredSigner() || eq(account, requiredSigner());
@@ -788,8 +795,7 @@ $('sign').onclick = async () => {
       if (curTx.gas) params.gas = curTx.gas;
       const txHash = await window.ethereum.request({method:'eth_sendTransaction', params:[params]});
       await sessionFetch('/signed', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({index: curIndex, txHash})});
-      const link = CFG.explorer ? '<a href="'+CFG.explorer+'/tx/'+txHash+'" target="_blank">'+txHash+'</a>' : txHash;
-      status('Sent ✓ '+link+'<br>Confirming on-chain…','ok');
+      statusSent(txHash);
       $('sign').style.display='none'; curTx=null; signing=false;
     }
   } catch(e){ status((e&&e.message)||String(e),'err'); signing=false; gateSign(); }
