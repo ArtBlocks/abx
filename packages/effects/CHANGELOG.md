@@ -1,5 +1,14 @@
 # @artblocks/abx-effects
 
+## 0.1.13
+
+### Patch Changes
+
+- d74b1eb: Keep transport configuration out of public project state; bound project-content fetching to public network destinations and limited decoded bodies. Authenticate local signing sessions, verify completed transaction intent, contain preview file reads, preserve queued indexer deltas, and require authentication for public effects listeners. Scope deterministic image writes to their collection and document reference hosting limits and migrations.
+- Updated dependencies [d74b1eb]
+  - @artblocks/abx-sdk@0.10.1
+  - @artblocks/abx-storage@0.1.13
+
 ## 0.1.12
 
 ### Patch Changes
