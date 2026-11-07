@@ -717,7 +717,7 @@ export async function checkPreview(
 // ── flag surface ─────────────────────────────────────────────────────────────────
 
 export const PREVIEW_FLAGS: ReadonlySet<string> = new Set([
-  'script', 'code-dir', 'schema', 'dep', 'port', 'shoot', 'check', 'runs', 'count', 'width', 'timeout-ms', 'param',
+  'script', 'code-dir', 'schema', 'dep', 'port', 'shoot', 'check', 'runs', 'json', 'count', 'width', 'timeout-ms', 'param',
 ]);
 
 /**
