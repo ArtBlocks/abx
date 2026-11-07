@@ -62,6 +62,12 @@ import {type ServedTokenUri, decodeOnChainJson, fetchServedTokenUri, prettyBody,
  * can't open a browser.
  */
 export async function cmdPreview(flags: Flags) {
+  // Only --check yields a machine verdict; the studio and --shoot paths stay plain human output.
+  if (flags.check === 'true') return withJson(flags, async (emit) => cmdPreviewBody(flags, emit));
+  return cmdPreviewBody(flags);
+}
+
+async function cmdPreviewBody(flags: Flags, emit?: (payload: Record<string, unknown>) => void) {
   warnStrayFlags(flags, PREVIEW_FLAGS as Set<string>, 'preview');
   const cfg = previewConfigFromFlags(flags);
   const shootDir = flags.shoot && flags.shoot !== 'true' ? String(flags.shoot) : flags.shoot === 'true' ? 'abx-preview' : undefined;
@@ -99,7 +105,8 @@ export async function cmdPreview(flags: Flags) {
         timeoutMs: Number(flags['timeout-ms'] ?? 10_000) || 10_000,
         params: parsePreviewParams(flags.param as string | undefined),
       });
-      console.log(JSON.stringify(report, null, 2));
+      if (emit && flags.json !== undefined) emit({...report});
+      else console.log(JSON.stringify(report, null, 2));
       process.exitCode = CHECK_EXIT[report.verdict];
     } catch (err) {
       // No browser / no Playwright is a harness failure, never "your program drifted".
