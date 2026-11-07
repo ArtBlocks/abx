@@ -246,3 +246,9 @@ test('token hostname matches the language-independent SHA-256/base32 vector', ()
   assert.equal(contentRouteDigest({chainId: 8453, address: ADDRESS, tokenId: '7'}), '0x9ca54d7a31812fb2bf5c1f7ac277c5c54003f64ba79c137f2b3f3eaeb956b934');
   assert.equal(label, 't-tssu26rrqex3fp24d55me56fyvaah5slu6obg7zlh47k5okwxe2a');
 });
+
+
+test('malformed provider templates fall back without unbounded placeholder matching', () => {
+  const key = {chainId: 8453, address: ADDRESS, tokenId: '7'};
+  assert.equal(discoveredLiveViewUrl('https://resolver.test', {liveViewUrlTemplate: '{{|'.repeat(50000)}, key), `https://resolver.test${path}`);
+});

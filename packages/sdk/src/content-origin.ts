@@ -214,7 +214,7 @@ export function discoveredLiveViewUrl(
     tokenId: key.tokenId,
     tokenOrigin: contentOriginLabel(key),
   };
-  const result = content.liveViewUrlTemplate.replace(/\{([^}]+)\}/g, (match, name: string) => values[name] ?? match);
+  const result = content.liveViewUrlTemplate.replace(/\{(chainId|address|tokenId|tokenOrigin)\}/g, (match, name: string) => values[name] ?? match);
   if (/[{}]/.test(result)) return fallback;
   try {
     const url = new URL(result);
