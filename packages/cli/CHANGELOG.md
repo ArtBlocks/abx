@@ -1,5 +1,16 @@
 # @artblocks/abx-cli
 
+## 0.8.6
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+  - @artblocks/abx-indexer@0.2.2
+  - @artblocks/abx-token-api@0.3.2
+  - @artblocks/abx-storage@0.1.14
+
 ## 0.8.5
 
 ### Patch Changes

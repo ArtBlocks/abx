@@ -1,5 +1,11 @@
 # @artblocks/abx-sdk
 
+## 0.10.2
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+
 ## 0.10.1
 
 ### Patch Changes

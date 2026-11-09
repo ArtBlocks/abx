@@ -10,7 +10,7 @@ description: >-
   ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
-  version: "0.8.5"
+  version: "0.8.6"
 ---
 
 # ABX

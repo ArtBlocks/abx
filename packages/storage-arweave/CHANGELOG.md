@@ -1,5 +1,11 @@
 # @artblocks/abx-storage-arweave
 
+## 0.1.1
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+
 ## 0.1.0
 
 ### Patch Changes
