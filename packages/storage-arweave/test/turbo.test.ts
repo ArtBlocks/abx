@@ -1,4 +1,7 @@
 import {test} from 'node:test';
+import {generateKeyPairSync, verify, constants} from 'node:crypto';
+import {Readable} from 'node:stream';
+import type {TurboAuthenticatedClient} from '@ardrive/turbo-sdk';
 import assert from 'node:assert/strict';
 import {hexToBytes, recoverMessageAddress, toHex, type Hex} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
@@ -89,4 +92,42 @@ test('Turbo SDK accepts the viem-backed structural signer without replacing it',
   ).buildClient();
 
   assert.equal(typeof client.uploadFile, 'function');
+});
+
+
+for (const remote of [false, true]) {
+  test(`Turbo 2 retains the ${remote ? 'remote' : 'local'} viem signer for data items and signed requests`, async (t) => {
+    const {EthereumSigner} = await import('@ardrive/turbo-sdk');
+    t.mock.method(EthereumSigner.prototype, 'sign', () => { throw new Error('must not use ethers-v5 signing'); });
+    const account = privateKeyToAccount(ETH_KEY);
+    const uploader = new TurboUploader(remote ? {
+      kind: 'ethereum-remote', address: account.address,
+      signMessage: (message) => account.signMessage({message: {raw: message}}),
+    } : {kind: 'ethereum', privateKey: ETH_KEY});
+    const client = await (uploader as unknown as {buildClient(): Promise<TurboAuthenticatedClient>}).buildClient();
+    const message = new TextEncoder().encode('Turbo 2 compatibility');
+    const signature = await client.signer.signData(message);
+    assert.equal(await recoverMessageAddress({message: {raw: message}, signature: toHex(signature)}), account.address);
+    assert.equal(await client.signer.getNativeAddress(), account.address);
+    const signed = await client.signer.signDataItem({
+      fileStreamFactory: () => Readable.from(Buffer.from(message)), fileSizeFactory: () => message.byteLength,
+    });
+    const chunks: Buffer[] = [];
+    for await (const chunk of signed.dataItemStreamFactory() as Readable) chunks.push(Buffer.from(chunk));
+    const bytes = Buffer.concat(chunks);
+    assert.equal(bytes.length, signed.dataItemSizeFactory());
+    assert.equal(bytes.readUInt16LE(0), 3);
+    assert.equal(bytes.subarray(67, 132).toString('hex'), account.publicKey.slice(2));
+  });
+}
+
+test('Turbo 2 retains RSA signing for Arweave without an x402 peer', async () => {
+  const {privateKey, publicKey} = generateKeyPairSync('rsa', {modulusLength: 4096});
+  const jwk = privateKey.export({format: 'jwk'});
+  const uploader = new TurboUploader({kind: 'arweave', jwk: jwk as {kty: string; n: string; e: string}});
+  const client = await (uploader as unknown as {buildClient(): Promise<TurboAuthenticatedClient>}).buildClient();
+  const message = Buffer.from('Turbo Arweave compatibility');
+  const signature = await client.signer.signData(message);
+  assert.equal(verify('sha256', message, {key: publicKey, padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: constants.RSA_PSS_SALTLEN_AUTO}, signature), true);
+  assert.equal(await client.signer.getNativeAddress(), await uploader.funding.address());
 });
