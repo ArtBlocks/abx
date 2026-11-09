@@ -31,7 +31,12 @@ to hide a breaking change in a minor release.
 | --- | --- | --- |
 | **Patch** | Backward-compatible fixes and maintenance that do not add a public capability | Bug fixes, security or dependency updates, performance fixes |
 | **Minor** | Backward-compatible public capabilities | A supported network, command, option, export, or project mechanic |
-| **Major** | A change that can break a supported consumer or existing workflow | Removing or renaming an API, rejecting previously valid input, or changing established command behavior |
+| **Major** | A change that can break a supported consumer or existing workflow | Removing or renaming an API, rejecting supported input, or changing documented command behavior incompatibly |
+
+Correctness and security fixes that reject malformed or unsafe input outside the supported contract
+can remain patches. Assess compatibility against documented, supported use rather than every input
+an earlier implementation happened to accept. If a security fix does break supported use, classify
+and communicate that break explicitly.
 
 Documentation-only and repository-internal changes do not need a Changeset unless they alter a
 published package. When uncertain, describe the affected consumer and compatibility impact in the
