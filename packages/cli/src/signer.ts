@@ -2,7 +2,8 @@ import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {isAddress, verifyMessage} from 'viem';
 import {createServer, type IncomingMessage, type ServerResponse, type Server} from 'node:http';
 import type {AddressInfo} from 'node:net';
-import {writeFileSync} from 'node:fs';
+import {writeFileSync, renameSync, rmSync} from 'node:fs';
+import {dirname, join} from 'node:path';
 import {
   chainSupportByKey,
   makeHotSender,
@@ -64,10 +65,14 @@ function announceSignUrl(signUrl: string, file?: string): void {
   // backgrounded process's output: `ABX_SIGN_URL=http://localhost:8799`.
   console.log(`  ${dim('ABX_SIGN_URL=')}${bold(signUrl)}`);
   if (file) {
+    const temporary = join(dirname(file), `.abx-sign-${randomBytes(16).toString('hex')}`);
     try {
-      writeFileSync(file, signUrl + '\n');
+      writeFileSync(temporary, signUrl + '\n', {mode: 0o600, flag: 'wx'});
+      renameSync(temporary, file);
     } catch {
       /* best-effort — the printed line is the fallback */
+    } finally {
+      try {rmSync(temporary, {force: true});} catch { /* best-effort cleanup */ }
     }
   }
 }

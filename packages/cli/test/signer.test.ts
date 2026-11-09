@@ -1,12 +1,24 @@
 import {privateKeyToAccount} from 'viem/accounts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync, mkdtempSync} from 'node:fs';
+import {readFileSync, mkdtempSync, writeFileSync, symlinkSync, statSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {envKeyRequiresYes, openWalletSession, walletFundingGuidance, assertWalletTransaction} from '../src/signer.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+test('session URL replacement is private and does not follow an existing symlink', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'abx-sign-private-'));
+  const target = join(dir, 'other'); const file = join(dir, 'url');
+  writeFileSync(target, 'unchanged'); symlinkSync(target, file);
+  const session = await openWalletSession({chainKey: 'sepolia', port: 0, signUrlFile: file});
+  try {
+    assert.equal(readFileSync(target, 'utf8'), 'unchanged');
+    assert.equal(statSync(file).mode & 0o777, 0o600);
+    assert.match(boundUrl(file), /session=/);
+  } finally {session.close(); rmSync(dir, {recursive: true, force: true});}
+});
 
 test('env-key consent follows the shared chain environment registry', () => {
   assert.equal(envKeyRequiresYes('base-sepolia'), false);

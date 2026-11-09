@@ -9,6 +9,25 @@ import {
   previewConfigFromFlags,
 } from '../src/preview.js';
 import {parseDependencyRef} from '@artblocks/abx-sdk';
+import {connect} from 'node:net';
+import {startPreviewServer} from '../src/preview.js';
+
+test('malformed Host and request targets return errors while the preview remains available', async () => {
+  const server = await startPreviewServer({source: {kind: 'script', path: '/unused.js'}, deps: [], schemas: []}, 0);
+  try {
+    for (const [target, host] of [['/', ''], ['/', 'bad host'], ['//', 'localhost']]) {
+      const reply = await new Promise<string>((resolve, reject) => {
+        const socket = connect(server.port, '127.0.0.1', () =>
+          socket.write(`GET ${target} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`),
+        );
+        let data = ''; socket.on('data', (chunk) => {data += chunk;});
+        socket.on('end', () => resolve(data)); socket.on('error', reject);
+      });
+      assert.match(reply, /^HTTP\/1.1 400/);
+    }
+    assert.equal((await fetch(`${server.url}/api/seed`)).status, 200);
+  } finally {await server.close();}
+});
 
 test('previewSeed is a real bytes32 — full width, so the sketch PRNG sees production entropy', () => {
   const s = previewSeed(0);
