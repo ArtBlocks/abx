@@ -697,7 +697,7 @@ export class EffectRunner {
         if (!this.opts.authToken) {
           const authority = new URL(`http://${req.headers.host ?? ''}`);
           if (!['127.0.0.1', 'localhost', '[::1]'].includes(authority.hostname) ||
-              authority.port !== String((server.address() as import('node:net').AddressInfo).port) ||
+              Number(authority.port || 80) !== (server.address() as import('node:net').AddressInfo).port ||
               (req.headers.origin !== undefined && req.headers.origin !== authority.origin)) {
             res.writeHead(403); return res.end('local effects origin refused');
           }
@@ -730,6 +730,7 @@ export class EffectRunner {
         res.end(JSON.stringify({error: 'unknown route'}));
       } catch (err) {
         if (res.destroyed || res.writableEnded) return;
+        if (err instanceof TriggerBodyError && !res.headersSent) res.setHeader('connection', 'close');
         if (!res.headersSent) res.writeHead(err instanceof TriggerBodyError ? err.status : err instanceof SyntaxError || err instanceof TypeError ? 400 : 500, {'content-type': 'application/json'});
         res.end(JSON.stringify({error: err instanceof TriggerBodyError ? err.message : 'effects request failed'}));
       }
