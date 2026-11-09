@@ -20,7 +20,23 @@ async function chromiumAvailable(): Promise<boolean> {
   }
 }
 
+async function webglAvailable(): Promise<boolean> {
+  try {
+    const {chromium} = await import('playwright');
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      return await page.evaluate(() => !!document.createElement('canvas').getContext('webgl'));
+    } finally {
+      await browser.close();
+    }
+  } catch {
+    return false;
+  }
+}
+
 const available = await chromiumAvailable();
+const webgl = available && (await webglAvailable());
 
 function check(script: string) {
   const r = spawnSync(
@@ -46,6 +62,18 @@ test('--check: Math.random drifts (exit 1) and is named as a hazard', {skip: !av
 
 test('--check: Date.now drifts (exit 1)', {skip: !available}, () => {
   const {status, report} = check('clock.js');
+  assert.equal(status, 1);
+  assert.equal(report.verdict, 'drift');
+});
+
+test('--check: a seeded WebGL program passes (exit 0)', {skip: !webgl && 'headless Chromium has no WebGL'}, () => {
+  const {status, report} = check('webgl.js');
+  assert.equal(status, 0);
+  assert.equal(report.verdict, 'pass');
+});
+
+test('--check: a WebGL program coloured by Math.random drifts (exit 1)', {skip: !webgl && 'headless Chromium has no WebGL'}, () => {
+  const {status, report} = check('webgl-drift.js');
   assert.equal(status, 1);
   assert.equal(report.verdict, 'drift');
 });
