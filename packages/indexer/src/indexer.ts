@@ -137,6 +137,12 @@ export class SelfHostIndexer {
     let state: ProjectState;
     let mode: 'full' | 'incremental';
     try {
+      const useDelta = incremental && opts.logs !== undefined && !recovering;
+      // Refuse a lagging fallback before spending work on a replay. Healthy fetched deltas
+      // already prove their boundary and add no head request.
+      if (!useDelta && opts.toBlock !== undefined &&
+          await this.client(reg.chainKey, opts.rpcUrl).getBlockNumber() < opts.toBlock)
+        throw new Error('Network RPC head is behind the required catch-up boundary; retry.');
       if (incremental && opts.logs !== undefined && !recovering) {
         if (opts.toBlock === undefined) {
           throw new Error('reindex({logs}) requires toBlock — the inclusive scan head those logs cover');
