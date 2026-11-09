@@ -14,7 +14,7 @@ export interface CreatorAuthorizationStore {
 }
 
 interface KeyringEntry {
-  getPassword(signal?: AbortSignal): Promise<string | undefined>;
+  getPassword(signal?: AbortSignal): Promise<string | null | undefined>;
   setPassword(value: string, signal?: AbortSignal): Promise<void>;
   deleteCredential(signal?: AbortSignal): Promise<boolean>;
 }
@@ -73,13 +73,13 @@ export class CreatorKeyringStore implements CreatorAuthorizationStore {
   }
 
   async load(): Promise<StoredCreatorAuthorization | null> {
-    let raw: string | undefined;
+    let raw: string | null | undefined;
     try {
       raw = await this.#credential().getPassword(timeout());
     } catch {
       throw new CreatorCredentialStoreAccessError();
     }
-    if (raw === undefined) return null;
+    if (raw === undefined || raw === null) return null;
     try {
       return decode(raw);
     } catch {
