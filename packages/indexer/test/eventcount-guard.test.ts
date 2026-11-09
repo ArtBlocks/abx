@@ -119,6 +119,10 @@ test('failed shared catch-up retains its boundary and recovers the missing inter
     await Promise.all([first, queued]);
     assert.equal(store.getProject(ADDR)?.toBlock, '100');
     assert.equal(store.getIndexStatus(ADDR)?.status, 'failed');
+    store.putMeta('watch:sepolia', '120');
+    await assert.rejects(indexer.reindexShared(ADDR), /required catch-up boundary/, 'a default retry retains the recorded watcher boundary');
+    assert.equal(store.getIndexStatus(ADDR)?.status, 'failed');
+    assert.equal(getLogsCalls.length, 0, 'lagging default retries do not scan history');
     healthy = true;
     const recovered = await indexer.reindexShared(ADDR, {logs: [], toBlock: 120n});
     assert.equal(recovered.state.events.some((e) => e.blockNumber === '110'), true);
