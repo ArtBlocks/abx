@@ -223,6 +223,19 @@ test('native credential records round-trip without exposing a plaintext fallback
   assert.equal(await store.load(), null);
 });
 
+for (const missing of [null, undefined]) {
+  test(`an absent native credential (${String(missing)}) does not delete or rewrite the store`, async () => {
+    const events: string[] = [];
+    const store = new CreatorKeyringStore('app_test', creatorWallet.address, {
+      async getPassword() { events.push('read'); return missing; },
+      async setPassword() { events.push('write'); },
+      async deleteCredential() { events.push('delete'); return false; },
+    });
+    assert.equal(await store.load(), null);
+    assert.deepEqual(events, ['read']);
+  });
+}
+
 test('denied credential reads stop before another device grant, retry, write, or deletion', async () => {
   const events: string[] = [];
   const store = new CreatorKeyringStore('app_test', creatorWallet.address, {
