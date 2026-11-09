@@ -82,6 +82,22 @@ jobs:
       # The documentation site is the canonical public documentation surface.
       - run: pnpm --dir site build
 
+  preview-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @artblocks/abx-cli exec playwright install --with-deps chromium
+      - run: node --import tsx --test packages/cli/test/preview-check-e2e.test.ts
+        env:
+          ABX_PREVIEW_BROWSER_TESTS: '1'
+
   # Also split out: `tier2` packs every workspace package and installs it into a clean consumer, which
   # is slow and completely independent of the unit suite. It is the ONLY gate that can catch a
   # packaging bug (a Tier 1 run resolves workspace source, so it cannot), which is why it stays a

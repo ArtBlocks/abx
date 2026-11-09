@@ -561,7 +561,7 @@ export async function shootPreview(
       // can tell "the program reported nothing" from "we stopped waiting".
       let timedOut = false;
       await page
-        .waitForFunction('window.abx && (window.abx.__done || window.abx.__traits)', {timeout: timeoutMs})
+        .waitForFunction('window.abx && (window.abx.__done || window.abx.__traits)', undefined, {timeout: timeoutMs})
         .catch(() => { timedOut = true; });
       const file = join(outDir, `seed-${i}.png`);
       await page.screenshot({path: file});
@@ -583,7 +583,7 @@ export async function shootPreview(
   }
 }
 
-// ── --check: is the render a pure function of the seed? ──────────────────────────
+// ── --check: bounded evidence of repeatable output ──────────────────────────
 
 export interface CheckSeedResult {
   seed: string;
@@ -595,18 +595,21 @@ export interface CheckSeedResult {
   distinctPixels: number;
   /** Frames compared per run (1 = the settled frame only). */
   frames: number;
-  /** 1-based frames at which the runs disagree — [] when pixels match everywhere. */
+  /** 1-based frames at which pixels or normalized traits disagree. */
   driftFrames: number[];
   /** A run stopped waiting before the program reported. That says nothing about determinism. */
   timedOut: boolean;
   /** Non-determinism sources the program touched while rendering (Date.now, Math.random…). */
   hazards: string[];
+  done: boolean;
+  errors: string[];
+  frameTimesMs: number[][];
 }
 
 /**
  * `pass`  every seed matched across runs.
- * `drift` some seed rendered differently — the program is not a pure function of its seed.
- * `harness` no drift seen, but a run timed out, so "no drift" is unproven. Never reported as pass:
+ * `drift` some completed seed rendered differently in the tested runtime and capture window.
+ * `harness` a run failed or did not complete, so output comparisons are inconclusive:
  *   a loaded machine that gave up waiting must not certify a program it never saw finish.
  */
 export type CheckVerdict = 'pass' | 'drift' | 'harness';
@@ -617,6 +620,7 @@ export interface CheckReport {
   runs: number;
   frames: number;
   seeds: CheckSeedResult[];
+  error?: string;
 }
 
 /** One run's observable output, reduced to what must be reproducible. */
@@ -627,27 +631,53 @@ export interface CheckRun {
   traits: Record<string, unknown> | null;
   hazards: string[];
   timedOut?: boolean;
+  done?: boolean;
+  errors?: string[];
+  laterTraits?: unknown[];
+  frameTimesMs?: number[];
 }
 
 /** Exit code per verdict, so CI and agents can branch without parsing JSON. */
 export const CHECK_EXIT: Record<CheckVerdict, number> = {pass: 0, drift: 1, harness: 2};
 
 /** Pure comparison of N runs per seed — kept separate from the browser so it is unit-testable. */
+function normalizedTraits(value: unknown): string {
+  return JSON.stringify(value, (_key, entry: unknown) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+    return Object.fromEntries(Object.keys(entry).sort().map((key) => [key, (entry as Record<string, unknown>)[key]]));
+  });
+}
+
 export function compareCheckRuns(runs: Array<{seed: string; runs: CheckRun[]}>): CheckReport {
   const seeds = runs.map(({seed, runs: rs}) => {
     const nFrames = 1 + Math.max(0, ...rs.map((r) => r.laterHashes?.length ?? 0));
     const frameHash = (r: CheckRun, f: number) => (f === 0 ? r.pixelHash : r.laterHashes?.[f - 1]);
+    const frameTraits = (r: CheckRun, f: number) => normalizedTraits(f === 0 ? r.traits : r.laterTraits?.[f - 1]);
     const driftFrames: number[] = [];
-    for (let f = 0; f < nFrames; f++) if (new Set(rs.map((r) => frameHash(r, f))).size > 1) driftFrames.push(f + 1);
+    for (let f = 0; f < nFrames; f++) {
+      if (new Set(rs.map((r) => frameHash(r, f))).size > 1 || new Set(rs.map((r) => frameTraits(r, f))).size > 1) driftFrames.push(f + 1);
+    }
     const distinctPixels = new Set(rs.map((r) => JSON.stringify([r.pixelHash, r.laterHashes ?? []]))).size;
-    const pixelMatch = driftFrames.length === 0;
-    const traitsMatch = new Set(rs.map((r) => JSON.stringify(r.traits))).size === 1;
+    const pixelMatch = Array.from({length: nFrames}, (_, f) => new Set(rs.map((r) => frameHash(r, f))).size === 1).every(Boolean);
+    const traitsMatch = Array.from({length: nFrames}, (_, f) => new Set(rs.map((r) => frameTraits(r, f))).size === 1).every(Boolean);
     const hazards = [...new Set(rs.flatMap((r) => r.hazards))].sort();
     const timedOut = rs.some((r) => r.timedOut);
-    return {seed, match: pixelMatch && traitsMatch, pixelMatch, traitsMatch, distinctPixels, frames: nFrames, driftFrames, timedOut, hazards};
+    const done = rs.length >= 2 && rs.every((r) => r.done === true);
+    const errors = [...new Set(rs.flatMap((r) => r.errors ?? []))].sort();
+    const frameTimesMs = rs.map((r) => r.frameTimesMs ?? []);
+    return {seed, match: pixelMatch && traitsMatch, pixelMatch, traitsMatch, distinctPixels, frames: nFrames, driftFrames, timedOut, hazards, done, errors, frameTimesMs};
   });
-  const verdict: CheckVerdict = seeds.some((s) => !s.match) ? 'drift' : seeds.some((s) => s.timedOut) ? 'harness' : 'pass';
+  // An incomplete/failed render cannot establish drift or a pass, even when its partial pixels differ.
+  const incomplete = seeds.length === 0 || seeds.some((s) => s.timedOut || !s.done || s.errors.length > 0);
+  const verdict: CheckVerdict = incomplete ? 'harness' : seeds.some((s) => !s.match) ? 'drift' : 'pass';
   return {ok: verdict === 'pass', verdict, runs: runs[0]?.runs.length ?? 0, frames: seeds[0]?.frames ?? 1, seeds};
+}
+
+/** Validate before launching Chromium: Playwright treats a zero timeout as unbounded. */
+export function previewCheckInteger(name: string, value: unknown, fallback: number, min: number, max: number): number {
+  const n = value === undefined ? fallback : Number(value);
+  if (!Number.isSafeInteger(n) || n < min || n > max) throw new Error(`--${name} must be an integer from ${min} to ${max}.`);
+  return n;
 }
 
 /** Gap between `--check --frames` captures, after the first (taken once the program has reported). */
@@ -669,6 +699,7 @@ const HAZARD_SHIM = `(() => {
   const OrigDate = Date;
   window.Date = new Proxy(OrigDate, {
     construct(t, args) { if (args.length === 0) hits.add('new Date()'); return Reflect.construct(t, args); },
+    apply(t, receiver, args) { hits.add('Date()'); return Reflect.apply(t, receiver, args); },
   });
   const open = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function () { hits.add('XMLHttpRequest'); return open.apply(this, arguments); };
@@ -676,18 +707,19 @@ const HAZARD_SHIM = `(() => {
 
 /**
  * Render each seed `runs` times, each in a FRESH browser context (no shared storage/cache), and
- * compare screenshot hash + traits. A program whose output is not a pure function of its seed deploys
- * as a collection whose tokens change on every view — the failure `--shoot` alone cannot show.
+ * compare screenshot hash + traits. This is bounded evidence for the sampled inputs and capture
+ * times in this Chromium build, not a proof of purity or cross-browser reproducibility.
  */
 export async function checkPreview(
   base: string,
   count: number,
   opts: {width?: number; timeoutMs?: number; params?: Record<string, string>; runs?: number; frames?: number} = {},
 ): Promise<CheckReport> {
-  const width = opts.width ?? STAGE_PX;
-  const timeoutMs = opts.timeoutMs ?? 10_000;
-  const nRuns = Math.max(2, opts.runs ?? 3);
-  const nFrames = Math.max(1, opts.frames ?? 1);
+  const width = previewCheckInteger('width', opts.width, STAGE_PX, 1, 4000);
+  const timeoutMs = previewCheckInteger('timeout-ms', opts.timeoutMs, 10_000, 1, 120_000);
+  const nRuns = previewCheckInteger('runs', opts.runs, 3, 2, 10);
+  const nFrames = previewCheckInteger('frames', opts.frames, 1, 1, 20);
+  previewCheckInteger('count', count, 9, 1, 64);
   const overrides = Object.entries(opts.params ?? {})
     .map(([k, v]) => `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('');
@@ -698,29 +730,58 @@ export async function checkPreview(
       try {
         await ctx.addInitScript(HAZARD_SHIM);
         const page = await ctx.newPage();
-        await page.goto(`${base}/view?tokenId=${i}&seed=${seed}&report=0${overrides}`, {waitUntil: 'load'});
+        const errors = new Set<string>();
+        const hazards = new Set<string>();
+        page.on('pageerror', () => errors.add('page_error'));
+        page.on('crash', () => errors.add('page_crashed'));
+        page.on('requestfailed', () => errors.add('request_failed'));
+        page.on('request', (request) => {
+          if (['fetch', 'xhr', 'websocket', 'eventsource'].includes(request.resourceType())) hazards.add('network');
+        });
+        page.on('response', (response) => {
+          if (response.status() >= 400 && ['document', 'script', 'stylesheet', 'image', 'font'].includes(response.request().resourceType())) errors.add('resource_http_error');
+        });
+        const hashes: string[] = [];
+        const traits: Array<Record<string, unknown> | null> = [];
+        const frameTimesMs: number[] = [];
+        let done = false;
         let timedOut = false;
-        await page
-          .waitForFunction('window.abx && (window.abx.__done || window.abx.__traits)', {timeout: timeoutMs})
-          .catch(() => { timedOut = true; });
-        const shot = await page.screenshot();
-        const probe = (await page.evaluate(
-          '({traits: (window.abx && window.abx.__traits) || null, done: !!(window.abx && window.abx.__done), hazards: Array.from(window.__abxHazards || [])})',
-        )) as {traits: Record<string, unknown> | null; done: boolean; hazards: string[]};
-        const hash = (b: Buffer) => createHash('sha256').update(b).digest('hex');
-        // Animation: more frames at fixed intervals after the first, so drift that starts later is seen.
-        const laterHashes: string[] = [];
-        for (let f = 1; f < nFrames; f++) {
-          await page.waitForTimeout(CHECK_FRAME_INTERVAL_MS);
-          laterHashes.push(hash(await page.screenshot()));
+        try {
+          const response = await page.goto(`${base}/view?tokenId=${i}&seed=${seed}&report=0${overrides}`, {waitUntil: 'load', timeout: timeoutMs});
+          if (response && response.status() >= 400) errors.add('document_http_error');
+          await page.waitForFunction('window.abx && window.abx.__done === true', undefined, {timeout: timeoutMs})
+            .catch((error: Error) => {
+              if (error.name === 'TimeoutError') timedOut = true;
+              else throw error;
+            });
+          const started = Date.now();
+          for (let f = 0; f < nFrames; f++) {
+            // Targets are relative to the first capture, rather than accumulating screenshot cost.
+            const remaining = f * CHECK_FRAME_INTERVAL_MS - (Date.now() - started);
+            if (remaining > 0) await page.waitForTimeout(remaining);
+            const shot = await page.screenshot({timeout: timeoutMs});
+            const probe = (await page.evaluate(
+              '({traits: (window.abx && window.abx.__traits) || null, done: !!(window.abx && window.abx.__done), hazards: Array.from(window.__abxHazards || [])})',
+            )) as {traits: Record<string, unknown> | null; done: boolean; hazards: string[]};
+            hashes.push(createHash('sha256').update(shot).digest('hex'));
+            traits.push(probe.traits);
+            done = f === 0 ? probe.done : done && probe.done;
+            for (const hazard of probe.hazards) hazards.add(hazard);
+            frameTimesMs.push(Date.now() - started);
+          }
+        } catch (error) {
+          errors.add(error instanceof Error && error.name === 'TimeoutError' ? 'capture_timeout' : 'capture_failed');
         }
         return {
-          pixelHash: hash(shot),
-          ...(laterHashes.length ? {laterHashes} : {}),
-          traits: probe.traits,
-          hazards: probe.hazards,
-          // Same rule as --shoot: a late report after the wait expired is not a timeout.
-          timedOut: timedOut && !probe.traits && !probe.done,
+          pixelHash: hashes[0] ?? '',
+          laterHashes: hashes.slice(1),
+          traits: traits[0] ?? null,
+          laterTraits: traits.slice(1),
+          hazards: [...hazards],
+          done,
+          timedOut,
+          errors: [...errors],
+          frameTimesMs,
         };
       } finally {
         await ctx.close();

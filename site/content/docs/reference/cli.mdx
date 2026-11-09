@@ -106,6 +106,35 @@ Consumers should check the schema version before interpreting the plan.
 | `migrate` | Check parity while moving between resolvers |
 | `forget` | Remove a local or remote projection without touching the chain |
 
+## Runtime repeatability check
+
+```sh
+abx preview --script art.js --check --count 9 --runs 3 --json
+abx preview --code-dir ./dist --check --frames 3 --param palette=Dusk --json
+```
+
+Each seed runs in fresh Chromium contexts with the same token data and parameter overrides. A pass
+means no pixel or normalized trait drift was observed for these inputs, capture times, and browser
+build. It does not prove purity, cross-browser consistency, or correctness after deployment. Continue
+using `abx inspect` and a testnet deployment to verify the other boundaries.
+
+The check waits for `abx.done()`; traits alone do not certify completion. Exit `0` means matching
+completed runs, `1` means observed drift, and `2` means incomplete execution or a harness failure
+(including script errors, missing Playwright/Chromium, and timeouts). `--json` always emits one report;
+progress and installation guidance go to stderr. Per-seed fields identify pixel/trait matches,
+`driftFrames`, completion, diagnostic codes, observed hazards, and actual frame timing per run.
+
+`--frames` samples the initial completed output and later targets one second apart. Each sample
+compares both pixels and traits; diagnostics continue through the final sample. Capture scheduling
+can vary, especially for continuously animated work: drift is evidence to investigate, not proof
+that the program uses unseeded randomness. Hazards such as clock, network, and `Math.random` calls
+are observations, not failures when sampled outputs still match.
+
+Playwright and its Chromium build remain optional; install them using the command printed by the CLI
+when absent. Bounds are 1–64 seeds, 2–10 runs, 1–20 frames, a 1–4000 pixel square viewport, and a
+1–120000 millisecond timeout per navigation/readiness/capture operation. `--check` and `--shoot`
+are separate modes. Each invocation exercises the same local preview server as the studio.
+
 ## Signing lanes
 
 Every write uses one lane:

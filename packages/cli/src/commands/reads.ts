@@ -44,6 +44,7 @@ import {
   previewDepTags,
   shootPreview,
   checkPreview,
+  previewCheckInteger,
   CHECK_EXIT,
   startPreviewServer,
 } from '../preview.js';
@@ -63,15 +64,25 @@ import {type ServedTokenUri, decodeOnChainJson, fetchServedTokenUri, prettyBody,
  */
 export async function cmdPreview(flags: Flags) {
   // Only --check yields a machine verdict; the studio and --shoot paths stay plain human output.
-  if (flags.check === 'true') return withJson(flags, async (emit) => cmdPreviewBody(flags, emit));
+  if (flags.check === 'true') return withJson(flags, async (emit) => {
+    try { await cmdPreviewBody(flags, emit); }
+    catch (error) {
+      const report = {ok: false, verdict: 'harness', runs: 0, frames: 0, seeds: [], error: (error as Error).message};
+      console.error(report.error);
+      if (flags.json !== undefined) emit(report);
+      else console.log(JSON.stringify(report, null, 2));
+      process.exitCode = CHECK_EXIT.harness;
+    }
+  });
   return cmdPreviewBody(flags);
 }
 
 async function cmdPreviewBody(flags: Flags, emit?: (payload: Record<string, unknown>) => void) {
   warnStrayFlags(flags, PREVIEW_FLAGS as Set<string>, 'preview');
+  if (flags.check === 'true' && flags.shoot !== undefined) throw new Error('Use --check or --shoot, not both.');
   const cfg = previewConfigFromFlags(flags);
   const shootDir = flags.shoot && flags.shoot !== 'true' ? String(flags.shoot) : flags.shoot === 'true' ? 'abx-preview' : undefined;
-  const count = Math.min(Math.max(Number(flags.count ?? 9) || 9, 1), 64);
+  const count = flags.check === 'true' ? previewCheckInteger('count', flags.count, 9, 1, 64) : Math.min(Math.max(Number(flags.count ?? 9) || 9, 1), 64);
 
   console.log(bold(`\n  ABX Self-Host Toolkit — preview\n  ${dim('the program, running locally — no chain, no deploy')}`));
 
@@ -93,27 +104,27 @@ async function cmdPreviewBody(flags: Flags, emit?: (payload: Record<string, unkn
   const checkMode = flags.check === 'true';
   const previewPort = shootDir || checkMode ? 0 : Number(flags.port ?? DEFAULT_PREVIEW_PORT);
   if (previewPort !== 0) await assertPortFree(previewPort, 'preview');
+  if (checkMode) {
+    previewCheckInteger('runs', flags.runs, 3, 2, 10);
+    previewCheckInteger('frames', flags.frames, 1, 1, 20);
+  }
   const server = await startPreviewServer(cfg, previewPort);
 
   if (checkMode) {
-    const runs = Math.max(2, Number(flags.runs ?? 3) || 3);
-    const frames = Math.min(Math.max(Math.floor(Number(flags.frames ?? 1)) || 1, 1), 20);
+    const runs = previewCheckInteger('runs', flags.runs, 3, 2, 10);
+    const frames = previewCheckInteger('frames', flags.frames, 1, 1, 20);
     step(`Determinism check — ${count} seeds, ${runs} fresh-context runs each${frames > 1 ? `, ${frames} frames` : ''}`);
     try {
       const report = await checkPreview(server.url, count, {
         runs,
         frames,
-        width: Number(flags.width ?? 1000) || 1000,
-        timeoutMs: Number(flags['timeout-ms'] ?? 10_000) || 10_000,
+        width: previewCheckInteger('width', flags.width, 1000, 1, 4000),
+        timeoutMs: previewCheckInteger('timeout-ms', flags['timeout-ms'], 10_000, 1, 120_000),
         params: parsePreviewParams(flags.param as string | undefined),
       });
       if (emit && flags.json !== undefined) emit({...report});
       else console.log(JSON.stringify(report, null, 2));
       process.exitCode = CHECK_EXIT[report.verdict];
-    } catch (err) {
-      // No browser / no Playwright is a harness failure, never "your program drifted".
-      console.error((err as Error).message);
-      process.exitCode = CHECK_EXIT.harness;
     } finally {
       await server.close();
     }
