@@ -127,6 +127,11 @@ export class SelfHostIndexer {
     const indexStatus = this.store.getIndexStatus(address);
     const attempts = (indexStatus?.attempts ?? 0) + 1;
     const recovering = indexStatus?.status === 'failed';
+    // Default/manual retries share the watcher's coverage obligation too. Explicit block-tag
+    // snapshots retain their requested boundary. Healthy deltas do no additional store reads.
+    const watchedThrough = opts.toBlock === undefined && opts.blockTag === undefined && (recovering || !incremental)
+      ? this.store.getMeta(`watch:${reg.chainKey}`) : null;
+    const requiredThrough = opts.toBlock ?? (watchedThrough === null ? undefined : BigInt(watchedThrough));
     // `backfilling` is for an initial sync or a forced replay — the long ones a client polls. A
     // routine incremental catch-up keeps its current status until it lands, so a live project's
     // status doesn't flicker on every watcher tick.
@@ -140,8 +145,8 @@ export class SelfHostIndexer {
       const useDelta = incremental && opts.logs !== undefined && !recovering;
       // Refuse a lagging fallback before spending work on a replay. Healthy fetched deltas
       // already prove their boundary and add no head request.
-      if (!useDelta && opts.toBlock !== undefined &&
-          await this.client(reg.chainKey, opts.rpcUrl).getBlockNumber() < opts.toBlock)
+      if (!useDelta && requiredThrough !== undefined &&
+          await this.client(reg.chainKey, opts.rpcUrl).getBlockNumber() < requiredThrough)
         throw new Error('Network RPC head is behind the required catch-up boundary; retry.');
       if (incremental && opts.logs !== undefined && !recovering) {
         if (opts.toBlock === undefined) {
@@ -194,7 +199,7 @@ export class SelfHostIndexer {
         });
         mode = 'full';
       }
-      if (opts.toBlock !== undefined && BigInt(state.toBlock) < opts.toBlock)
+      if (requiredThrough !== undefined && BigInt(state.toBlock) < requiredThrough)
         throw new Error('Network RPC head is behind the required catch-up boundary; retry.');
       // Full replays replace the append-only log; incremental writes retain existing events.
       this.store.putProject(state, {fullReplay: mode === 'full'});
