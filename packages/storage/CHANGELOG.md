@@ -1,5 +1,27 @@
 # @artblocks/abx-storage
 
+## 0.1.15
+
+### Patch Changes
+
+- Updated dependencies [f298236]
+  - @artblocks/abx-sdk@0.10.3
+
+## 0.1.14
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+
+## 0.1.13
+
+### Patch Changes
+
+- Updated dependencies [d74b1eb]
+  - @artblocks/abx-sdk@0.10.1
+
 ## 0.1.12
 
 ### Patch Changes

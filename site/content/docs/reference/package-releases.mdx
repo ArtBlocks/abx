@@ -1,0 +1,29 @@
+---
+title: "Package releases"
+description: "How ABX packages are built, authorized, and published."
+---
+
+ABX packages publish from the protected `main` branch of `ArtBlocks/abx` through
+`.github/workflows/release.yml`. Changesets creates a version PR; merging that PR publishes the
+unpublished versions through npm trusted publishing with short-lived GitHub OIDC credentials.
+The CLI package includes its co-versioned agent skill.
+
+The release job uses the GitHub environment `npm-publish`. Its deployment branch policy must allow
+only the `main` branch. Each ABX package's npm trusted publisher must identify `ArtBlocks`, repository
+`abx`, workflow `release.yml`, and environment `npm-publish`. A branch filter in a workflow file alone
+is insufficient because the file itself can differ on another branch.
+
+These settings apply to `@artblocks/abx-cli`, `@artblocks/abx-sdk`, `@artblocks/abx-indexer`,
+`@artblocks/abx-token-api`, `@artblocks/abx-effects`, `@artblocks/abx-storage`, and
+`@artblocks/abx-storage-arweave`. Do not leave an additional publisher connection that authorizes the
+same workflow without the environment restriction. Package publishing access should require 2FA and
+disallow token publishing; automated releases use OIDC instead of a stored npm token.
+
+When replacing a publisher connection, configure the matching GitHub environment and workflow first,
+then coordinate the npm connections and a normal Changesets release. A new connection must complete
+its first successful publish before npm's validation deadline. Keep the old connection only during
+the coordinated transition, and verify the final publisher list for every package.
+
+Required CI and the merge queue remain enabled. The environment does not add a manual approval step
+to normal releases. Changes to these settings affect package publishing, not deployed collections,
+contract addresses, or resolver URLs.

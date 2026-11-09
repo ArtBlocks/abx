@@ -692,6 +692,20 @@ export class EffectRunner {
           res.writeHead(401, {'content-type': 'application/json'});
           return res.end(JSON.stringify({error: 'unauthorized — send Authorization: Bearer <ABX_EFFECTS_TOKEN>'}));
         }
+        // Loopback is still reachable from other browser origins. Keep tokenless mode local
+        // without requiring another credential for normal CLI-to-runner requests.
+        if (!this.opts.authToken) {
+          const authority = new URL(`http://${req.headers.host ?? ''}`);
+          if (!['127.0.0.1', 'localhost', '[::1]'].includes(authority.hostname) ||
+              Number(authority.port || 80) !== (server.address() as import('node:net').AddressInfo).port ||
+              (req.headers.origin !== undefined && req.headers.origin !== authority.origin)) {
+            res.writeHead(403); return res.end('local effects origin refused');
+          }
+        }
+        if (req.method === 'POST' && ['/run', '/notify'].includes(url.pathname) &&
+            req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+          res.writeHead(415); return res.end('application/json required');
+        }
         if (req.method === 'POST' && url.pathname === '/notify') {
           const body = JSON.parse(await readBody(req)) as {address?: string; tokenIds?: string[]; force?: boolean};
           if (!body.address) {
@@ -715,8 +729,10 @@ export class EffectRunner {
         res.writeHead(404, {'content-type': 'application/json'});
         res.end(JSON.stringify({error: 'unknown route'}));
       } catch (err) {
-        res.writeHead(500, {'content-type': 'application/json'});
-        res.end(JSON.stringify({error: (err as Error).message}));
+        if (res.destroyed || res.writableEnded) return;
+        if (err instanceof TriggerBodyError && !res.headersSent) res.setHeader('connection', 'close');
+        if (!res.headersSent) res.writeHead(err instanceof TriggerBodyError ? err.status : err instanceof SyntaxError || err instanceof TypeError ? 400 : 500, {'content-type': 'application/json'});
+        res.end(JSON.stringify({error: err instanceof TriggerBodyError ? err.message : 'effects request failed'}));
       }
     });
     server.listen(port, host);
@@ -818,11 +834,20 @@ export class EffectRunner {
   }
 }
 
-function readBody(req: import('node:http').IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => resolve(data));
-    req.on('error', reject);
-  });
+class TriggerBodyError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+
+async function readBody(req: import('node:http').IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let bytes = 0;
+  for await (const chunk of req.iterator({destroyOnReturn: false})) {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > 1024 * 1024) {
+      req.resume();
+      throw new TriggerBodyError(413, 'effects request exceeds 1 MiB');
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }

@@ -96,6 +96,44 @@ function mockClient(logsByCall: Log[][]): {client: PublicClient; getLogsCalls: A
   return {client, getLogsCalls};
 }
 
+test('failed shared catch-up retains its boundary and recovers the missing interval before later deltas', async () => {
+  const {store, indexer, cleanup} = fresh();
+  try {
+    indexer.register({address: ADDR, chainKey: 'sepolia', fromBlock: '100', factory: null});
+    store.putProject(baseState({events: [
+      {name: 'AbxDeployed', register: 0, what: 'deploy', blockNumber: '100', logIndex: 0, txHash: '0x01', args: {abxVersion: '1'}},
+      {name: 'Transfer', register: 1, what: 'mint', blockNumber: '100', logIndex: 1, txHash: '0x01', args: {from: ZERO, to: ADDR, id: '0'}},
+    ], eventCount: 2, toBlock: '100'}));
+    const delta = transferLog(110n, 0, ADDR, 1n);
+    const {client, getLogsCalls} = mockClient([[delta]]);
+    let reads = 0; let healthy = false; let fail!: (err: Error) => void;
+    client.getBlockNumber = (async () => {
+      reads++;
+      if (reads === 1) return new Promise<bigint>((_resolve, reject) => {fail = reject;});
+      return healthy ? 120n : 100n;
+    }) as typeof client.getBlockNumber;
+    (indexer as unknown as {client: unknown}).client = () => client;
+    const first = assert.rejects(indexer.reindexShared(ADDR), /dummy RPC failure/);
+    const queued = assert.rejects(indexer.reindexShared(ADDR, {logs: [delta], toBlock: 120n}), /required catch-up boundary/);
+    fail(new Error('dummy RPC failure'));
+    await Promise.all([first, queued]);
+    assert.equal(store.getProject(ADDR)?.toBlock, '100');
+    assert.equal(store.getIndexStatus(ADDR)?.status, 'failed');
+    store.putMeta('watch:sepolia', '120');
+    await assert.rejects(indexer.reindexShared(ADDR), /required catch-up boundary/, 'a default retry retains the recorded watcher boundary');
+    assert.equal(store.getIndexStatus(ADDR)?.status, 'failed');
+    assert.equal(getLogsCalls.length, 0, 'lagging default retries do not scan history');
+    healthy = true;
+    const recovered = await indexer.reindexShared(ADDR, {logs: [], toBlock: 120n});
+    assert.equal(recovered.state.events.some((e) => e.blockNumber === '110'), true);
+    assert.deepEqual(getLogsCalls, [{fromBlock: 101n, toBlock: 120n}]);
+    const priorReads = reads;
+    await indexer.reindexShared(ADDR, {logs: [], toBlock: 121n});
+    assert.equal(reads, priorReads, 'healthy delta folds add no head requests');
+    assert.equal(getLogsCalls.length, 1, 'healthy delta folds add no per-project log scans');
+  } finally {cleanup();}
+});
+
 test('an incremental fold that would REDUCE eventCount is discarded, and exactly one full reconstruct repairs it', async () => {
   const {store, indexer, cleanup} = fresh();
   try {

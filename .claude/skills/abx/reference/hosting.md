@@ -174,6 +174,10 @@ For an active JavaScript sale, run continuous effects. For a fixed supply or rep
 may be sufficient. With an on-chain Solidity image renderer, no effects service is needed for the
 image; do not deploy infrastructure merely because the collection is a code contract.
 
+Effects triggers require JSON and accept up to 1 MiB per request. Tokenless loopback mode refuses
+requests from other browser origins; ordinary CLI calls work directly. Failed index recovery retries
+only the affected project with backoff, preserving the missing range without periodic project sweeps.
+
 Protect public effects endpoints with the generated token. An unauthenticated force-render endpoint
 can burn compute and storage. Keep resolver admin/effects credentials separate from wallet signing.
 

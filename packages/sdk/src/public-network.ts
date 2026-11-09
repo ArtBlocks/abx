@@ -23,10 +23,19 @@ export class ContentNetworkError extends Error {
 export function isPublicAddress(address: string): boolean {
   try {
     const parsed = ipaddr.process(address);
+    // URL normalisation turns dotted IPv4-compatible literals into hex (::7f00:1).
+    // These deprecated transition addresses are not public destinations.
+    if (parsed.kind() === 'ipv6' && parsed.match(ipaddr.parse('::'), 96)) return false;
     return parsed.range() === 'unicast';
   } catch {
     return false;
   }
+}
+
+function finalResponseStatus(status: number | undefined): number {
+  if (status === undefined || !Number.isInteger(status) || status < 200 || status > 599)
+    throw new ContentNetworkError('Content response has an invalid HTTP status.');
+  return status;
 }
 
 /** Validate all answers, then pin the selected address for the actual connection. */
@@ -127,55 +136,60 @@ async function fetchContentInternal(
           lookup: (_host, _opts, cb) => cb(null, target.address, target.family),
         },
         (res) => {
-          const responseHeaders = new Headers();
-          for (const [key, value] of Object.entries(res.headers)) {
-            if (value !== undefined) responseHeaders.set(key, Array.isArray(value) ? value.join(', ') : value);
-          }
-          const status = res.statusCode ?? 502;
-          if ([301, 302, 303, 307, 308].includes(status) || method === 'HEAD') {
-            res.destroy();
-            const result = new Response(null, { status, headers: responseHeaders });
-            Object.defineProperty(result, 'url', { value: url.href });
-            resolve(result);
-            return;
-          }
-          let body: Readable = res;
-          const encoding = responseHeaders.get('content-encoding');
-          const decoder =
-            encoding === 'gzip'
-              ? createGunzip()
-              : encoding === 'br'
-                ? createBrotliDecompress()
-                : encoding === 'deflate'
-                  ? createInflate()
-                  : null;
-          if (decoder) {
-            res.on('error', (err) => decoder.destroy(err));
-            body = res.pipe(decoder);
-            responseHeaders.delete('content-encoding');
-            responseHeaders.delete('content-length');
-          }
-          void (async () => {
-            const chunks: Buffer[] = [];
-            let size = 0;
-            try {
-              for await (const chunk of body) {
-                size += Buffer.byteLength(chunk);
-                if (size > maxBytes) throw new ContentNetworkError('Content response exceeds the byte limit.');
-                chunks.push(Buffer.from(chunk));
-              }
-              const result = new Response(
-                [204, 205, 304].includes(status) ? null : new Uint8Array(Buffer.concat(chunks)),
-                { status, headers: responseHeaders },
-              );
+          try {
+            const responseHeaders = new Headers();
+            for (const [key, value] of Object.entries(res.headers)) {
+              if (value !== undefined) responseHeaders.set(key, Array.isArray(value) ? value.join(', ') : value);
+            }
+            const status = finalResponseStatus(res.statusCode);
+            if ([301, 302, 303, 307, 308].includes(status) || method === 'HEAD') {
+              res.destroy();
+              const result = new Response(null, { status, headers: responseHeaders });
               Object.defineProperty(result, 'url', { value: url.href });
               resolve(result);
-            } catch (error) {
-              body.destroy();
-              res.destroy();
-              reject(error);
+              return;
             }
-          })();
+            let body: Readable = res;
+            const encoding = responseHeaders.get('content-encoding');
+            const decoder =
+              encoding === 'gzip'
+                ? createGunzip()
+                : encoding === 'br'
+                  ? createBrotliDecompress()
+                  : encoding === 'deflate'
+                    ? createInflate()
+                    : null;
+            if (decoder) {
+              res.on('error', (err) => decoder.destroy(err));
+              body = res.pipe(decoder);
+              responseHeaders.delete('content-encoding');
+              responseHeaders.delete('content-length');
+            }
+            void (async () => {
+              const chunks: Buffer[] = [];
+              let size = 0;
+              try {
+                for await (const chunk of body) {
+                  size += Buffer.byteLength(chunk);
+                  if (size > maxBytes) throw new ContentNetworkError('Content response exceeds the byte limit.');
+                  chunks.push(Buffer.from(chunk));
+                }
+                const result = new Response(
+                  [204, 205, 304].includes(status) ? null : new Uint8Array(Buffer.concat(chunks)),
+                  { status, headers: responseHeaders },
+                );
+                Object.defineProperty(result, 'url', { value: url.href });
+                resolve(result);
+              } catch (error) {
+                body.destroy();
+                res.destroy();
+                reject(error);
+              }
+            })();
+          } catch (error) {
+            res.destroy();
+            reject(error);
+          }
         },
       );
       req.on('error', reject);
@@ -249,8 +263,15 @@ export async function startContentProxy(
           family: target.family,
         },
         (response) => {
-          res.writeHead(response.statusCode ?? 502, response.headers);
-          response.pipe(res);
+          try {
+            res.writeHead(finalResponseStatus(response.statusCode), response.headers);
+            response.on('error', () => res.destroy());
+            response.pipe(res);
+          } catch {
+            response.destroy();
+            if (!res.headersSent) res.writeHead(502);
+            res.end();
+          }
         },
       );
       upstream.on('socket', track);
@@ -261,8 +282,10 @@ export async function startContentProxy(
       res.on('close', () => upstream.destroy());
       req.pipe(upstream);
     })().catch(() => {
-      res.writeHead(403);
-      res.end('Content network destination refused.');
+      if (!res.destroyed && !res.writableEnded) {
+        if (!res.headersSent) res.writeHead(403);
+        res.end('Content network destination refused.');
+      }
     });
   });
   server.on('connection', (socket) => {

@@ -1,5 +1,45 @@
 # @artblocks/abx-cli
 
+## 0.8.7
+
+### Patch Changes
+
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+- Updated dependencies [0da12d2]
+- Updated dependencies [f298236]
+  - @artblocks/abx-indexer@0.2.3
+  - @artblocks/abx-sdk@0.10.3
+  - @artblocks/abx-token-api@0.3.3
+  - @artblocks/abx-storage@0.1.15
+
+## 0.8.6
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+  - @artblocks/abx-indexer@0.2.2
+  - @artblocks/abx-token-api@0.3.2
+  - @artblocks/abx-storage@0.1.14
+
+## 0.8.5
+
+### Patch Changes
+
+- 4be15b5: Show rejected wallet connections and failed transaction verification in the signing page, preserve the connected signer across account changes, and render transaction details as text.
+
+## 0.8.4
+
+### Patch Changes
+
+- d74b1eb: Keep transport configuration out of public project state; bound project-content fetching to public network destinations and limited decoded bodies. Authenticate local signing sessions, verify completed transaction intent, contain preview file reads, preserve queued indexer deltas, and require authentication for public effects listeners. Scope deterministic image writes to their collection and document reference hosting limits and migrations.
+- Updated dependencies [d74b1eb]
+  - @artblocks/abx-sdk@0.10.1
+  - @artblocks/abx-indexer@0.2.1
+  - @artblocks/abx-token-api@0.3.1
+  - @artblocks/abx-storage@0.1.13
+
 ## 0.8.3
 
 ### Patch Changes
