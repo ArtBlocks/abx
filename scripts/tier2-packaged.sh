@@ -54,7 +54,7 @@ mkdir -p "$WORK/consumer"
   npm install "$WORK"/tgz/*.tgz >/dev/null 2>&1
 )
 # Turbo 2's x402 peer is unused by ABX and must stay absent even when the adapter is installed.
-ARWEAVE_WALLETS=$(find "$WORK/consumer/node_modules" -type d \(   -name x402-fetch -o -name x402 -o -name wagmi -o -name '@walletconnect' -o -name '@reown' \) 2>/dev/null || true)
+ARWEAVE_WALLETS=$(find "$WORK/consumer/node_modules" -type d \( -name x402-fetch -o -name x402 -o -name wagmi -o -name '@walletconnect' -o -name '@reown' \) 2>/dev/null || true)
 if [ -z "$ARWEAVE_WALLETS" ]; then
   ok "Arweave adapter install excludes the unused x402/browser wallet tree"
 else

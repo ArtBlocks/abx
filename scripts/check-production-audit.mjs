@@ -26,7 +26,6 @@ const accepted = new Map([
         'no upstream fix; faulty ECDSA nonce generation belongs to ethers-v5 signing, while ABX supplies viem-backed or remote Ethereum signatures and uses RSA for Arweave; Turbo signer integration tests cover both paths',
     },
   ],
-
 ]);
 
 /**
