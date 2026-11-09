@@ -57,7 +57,9 @@ contract guide for the deployed-source and CREATE2 consequences.
 ## Documentation and releases
 
 - Update `site/content/docs/` in the same change as user-visible behavior.
-- Add a Changeset for changes to a published package. Do not hand-edit released changelog entries.
+- Add a Changeset for changes to a published package. Choose its bump using
+  [the version-selection policy](.changeset/README.md#choosing-a-version); do not hand-edit released
+  changelog entries.
 - Keep the end-user skill aligned with the CLI. Its version is stamped during the release workflow.
 - Never commit `.env`, private keys, provider credentials, local runtime state, build output, packed
   tarballs, or agent-session transcripts.

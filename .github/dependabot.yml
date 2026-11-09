@@ -18,6 +18,10 @@ updates:
           - patch
     # These updates need deliberate compatibility work, not recurring automated PRs.
     ignore:
+      - dependency-name: "mermaid"
+        # Keep docs rendering/browser requirements stable until an explicit major migration.
+        update-types:
+          - version-update:semver-major
       - dependency-name: "@changesets/cli"
         update-types:
           - version-update:semver-major
