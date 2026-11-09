@@ -94,7 +94,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm --filter @artblocks/abx-cli exec playwright install --with-deps chromium
-      - run: node --import tsx --test packages/cli/test/preview-check-e2e.test.ts
+      - run: node --import tsx --test packages/cli/test/preview-check-e2e.test.ts packages/effects/test/*.test.ts
         env:
           ABX_PREVIEW_BROWSER_TESTS: '1'
 
