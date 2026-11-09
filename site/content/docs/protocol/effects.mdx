@@ -76,6 +76,11 @@ Without `ABX_EFFECTS_TOKEN`, the HTTP trigger server listens on `127.0.0.1` only
 public mode and refuse to start without the token. `/health` remains public; `/run` and `/notify`
 require `Authorization: Bearer <token>` in public mode. `--once` needs no HTTP listener.
 
+Trigger requests use `Content-Type: application/json` and accept bodies up to 1 MiB. Tokenless local
+mode also checks the request Host and refuses other browser origins. Existing CLI commands supply
+JSON automatically; a custom browser control panel must use the runner's own origin or an
+authenticated integration.
+
 For deterministic cloud thumbnails, the on-chain `image` URL template must select an object under
 `<publicBase>/<chainId>/<lowercase-contract-address>/`, for example
 `https://cdn.example/8453/0x0000000000000000000000000000000000000001/{id}.png`.

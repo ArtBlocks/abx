@@ -605,6 +605,36 @@ test('HTTP: /notify enqueues (202) and /run + /notify are token-gated when authT
   }
 });
 
+test('tokenless HTTP rejects browser cross-origin and rebinding requests but accepts local JSON commands', async () => {
+  const runner = new EffectRunner({resolverUrl: 'http://resolver.test', client: null, storage: memoryStorage(), effects: []});
+  let runs = 0;
+  runner.sweepProject = async () => {runs++; return {ran: 0, skipped: 0, failed: 0, errors: []};};
+  const server = runner.startHttp(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${(server.address() as {port: number}).port}`;
+  const body = JSON.stringify({address: ADDR, force: true});
+  try {
+    for (const headers of [
+      {'content-type': 'application/json', origin: 'https://other.test'},
+      {'content-type': 'application/json', host: 'other.test'},
+      {'content-type': 'application/json', host: ''},
+      {'content-type': 'text/plain'},
+    ]) {
+      const {request} = await import('node:http');
+      const status = await new Promise<number | undefined>((resolve, reject) => {
+        const req = request(`${base}/run`, {method: 'POST', headers}, (res) => {res.resume(); res.on('end', () => resolve(res.statusCode));});
+        if (headers.host !== undefined) req.setHeader('host', headers.host);
+        req.on('error', reject); req.end(body);
+      });
+      assert.ok([400, 403, 415].includes(status!), `${JSON.stringify(headers)} returned ${status}`);
+    }
+    assert.equal(runs, 0);
+    assert.equal((await fetch(`${base}/run`, {method: 'POST', headers: {'content-type': 'application/json'}, body})).status, 200);
+    assert.equal(runs, 1);
+    assert.equal((await fetch(`${base}/run`, {method: 'POST', headers: {'content-type': 'application/json'}, body: ' '.repeat(1024 * 1024 + 1)})).status, 413);
+  } finally {server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve()));}
+});
+
 test('status reporting: rendering → done on success, failed(error, attempts) on crash — via the control plane', async () => {
   const reports: Array<Record<string, unknown>> = [];
   const realFetch = globalThis.fetch;
