@@ -7,6 +7,10 @@ import {
   previewSeed,
   previewSourceFromFlags,
   previewConfigFromFlags,
+  compareCheckRuns,
+  CHECK_EXIT,
+  PREVIEW_FLAGS,
+  previewCheckInteger,
 } from '../src/preview.js';
 import {parseDependencyRef} from '@artblocks/abx-sdk';
 import {connect} from 'node:net';
@@ -148,4 +152,85 @@ test('directory preview contains filesystem reads and requires a local Host', as
     const status = await new Promise<number | undefined>((resolve) => {const req = request(base, {headers: {host: 'untrusted.test'}}, (res) => {res.resume(); resolve(res.statusCode);}); req.end();});
     assert.equal(status, 403);
   } finally {await preview.close(); await rm(root, {recursive: true, force: true});}
+});
+
+test('compareCheckRuns: identical runs pass, drift in pixels or traits fails and hazards are merged', () => {
+  const run = (h: string, t: Record<string, unknown> | null, hz: string[] = [], timedOut = false) => ({pixelHash: h, traits: t, hazards: hz, timedOut, done: true});
+  const clean = compareCheckRuns([{seed: 's0', runs: [run('x', {a: 1}), run('x', {a: 1}), run('x', {a: 1})]}]);
+  assert.equal(clean.verdict, 'pass');
+  assert.equal(clean.ok, true);
+  assert.equal(clean.runs, 3);
+  assert.deepEqual(clean.seeds[0].hazards, []);
+
+  // drift only on the THIRD run: two runs would have called this deterministic
+  const late = compareCheckRuns([{seed: 's0', runs: [run('x', null, ['Date.now']), run('x', null), run('y', null, ['Math.random'])]}]);
+  assert.equal(late.verdict, 'drift');
+  assert.equal(late.seeds[0].pixelMatch, false);
+  assert.equal(late.seeds[0].traitsMatch, true);
+  assert.equal(late.seeds[0].distinctPixels, 2);
+  assert.deepEqual(late.seeds[0].hazards, ['Date.now', 'Math.random']);
+
+  const tr = compareCheckRuns([{seed: 's0', runs: [run('x', {a: 1}), run('x', {a: 2}), run('x', {a: 1})]}]);
+  assert.equal(tr.verdict, 'drift');
+  assert.equal(tr.seeds[0].traitsMatch, false);
+});
+
+test('compareCheckRuns: a timeout with matching output is a harness verdict, never a pass', () => {
+  const run = (timedOut: boolean) => ({pixelHash: 'x', traits: null, hazards: [], timedOut, done: true});
+  const r = compareCheckRuns([{seed: 's0', runs: [run(false), run(true), run(false)]}]);
+  assert.equal(r.verdict, 'harness');
+  assert.equal(r.ok, false);
+  assert.equal(CHECK_EXIT[r.verdict], 2);
+  assert.deepEqual([CHECK_EXIT.pass, CHECK_EXIT.drift], [0, 1]);
+});
+
+test('compareCheckRuns: drift that starts after frame 1 is caught only when later frames are compared', () => {
+  const run = (later?: string[]) => ({pixelHash: 'a', ...(later ? {laterHashes: later} : {}), traits: null, hazards: [], done: true});
+  const single = compareCheckRuns([{seed: 's0', runs: [run(), run(), run()]}]);
+  assert.equal(single.verdict, 'pass');
+  assert.equal(single.frames, 1);
+  assert.deepEqual(single.seeds[0].driftFrames, []);
+
+  const steady = compareCheckRuns([{seed: 's0', runs: [run(['b']), run(['b'])]}]);
+  assert.equal(steady.verdict, 'pass');
+  assert.equal(steady.frames, 2);
+
+  const late = compareCheckRuns([{seed: 's0', runs: [run(['b', 'c']), run(['b', 'x']), run(['b', 'c'])]}]);
+  assert.equal(late.verdict, 'drift');
+  assert.equal(late.frames, 3);
+  assert.deepEqual(late.seeds[0].driftFrames, [3]);
+  assert.equal(late.seeds[0].pixelMatch, false);
+  assert.equal(late.seeds[0].distinctPixels, 2);
+});
+
+test('--check is an accepted preview flag', () => {
+  assert.ok(PREVIEW_FLAGS.has('check'));
+  assert.ok(PREVIEW_FLAGS.has('runs'));
+  assert.ok(PREVIEW_FLAGS.has('frames'));
+});
+
+
+test('check comparison normalizes object traits and compares later traits and completion', () => {
+  const run = (traits: Record<string, unknown>) => ({pixelHash: 'x', traits, hazards: [], done: true});
+  assert.equal(compareCheckRuns([{seed: 's', runs: [run({a: 1, b: {c: 2, d: 3}}), run({b: {d: 3, c: 2}, a: 1})]}]).verdict, 'pass');
+  const late = compareCheckRuns([{seed: 's', runs: [
+    {...run({a: 1}), laterHashes: ['same'], laterTraits: [{a: 2}]},
+    {...run({a: 1}), laterHashes: ['same'], laterTraits: [{a: 3}]},
+  ]}]);
+  assert.equal(late.verdict, 'drift');
+  assert.equal(late.seeds[0].pixelMatch, true);
+  assert.equal(late.seeds[0].traitsMatch, false);
+  assert.deepEqual(late.seeds[0].driftFrames, [2]);
+  assert.equal(compareCheckRuns([{seed: 's', runs: [run({a: 1}), {...run({a: 1}), done: false}]}]).verdict, 'harness');
+  assert.equal(compareCheckRuns([{seed: 's', runs: [run({a: 1}), {...run({a: 2}), errors: ['page_error']}]}]).verdict, 'harness');
+  assert.equal(compareCheckRuns([]).verdict, 'harness');
+  assert.equal(compareCheckRuns([{seed: 's', runs: [run({a: 1})]}]).verdict, 'harness');
+});
+
+test('check options reject unbounded, fractional and invalid counts instead of silently coercing', () => {
+  for (const value of ['Infinity', 'NaN', '-1', '0', '1.5', '11', 'true']) {
+    assert.throws(() => previewCheckInteger('runs', value, 3, 2, 10), /--runs must be an integer/);
+  }
+  assert.equal(previewCheckInteger('runs', undefined, 3, 2, 10), 3);
+  assert.equal(previewCheckInteger('runs', '2', 3, 2, 10), 2);
 });
