@@ -1,5 +1,14 @@
 # @artblocks/abx-effects
 
+## 0.1.15
+
+### Patch Changes
+
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+- Updated dependencies [f298236]
+  - @artblocks/abx-sdk@0.10.3
+  - @artblocks/abx-storage@0.1.15
+
 ## 0.1.14
 
 ### Patch Changes

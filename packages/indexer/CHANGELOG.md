@@ -1,5 +1,14 @@
 # @artblocks/abx-indexer
 
+## 0.2.3
+
+### Patch Changes
+
+- 0da12d2: Default recovery and backfill requests on a watched node retain its recorded scan boundary, including manual retries. Reject lagging endpoints before historical scans without adding work to healthy delta folds.
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+- Updated dependencies [f298236]
+  - @artblocks/abx-sdk@0.10.3
+
 ## 0.2.2
 
 ### Patch Changes
