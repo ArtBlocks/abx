@@ -1,5 +1,78 @@
 # @artblocks/abx-sdk
 
+## 0.10.3
+
+### Patch Changes
+
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+
+## 0.10.2
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+
+## 0.10.1
+
+### Patch Changes
+
+- d74b1eb: Keep transport configuration out of public project state; bound project-content fetching to public network destinations and limited decoded bodies. Authenticate local signing sessions, verify completed transaction intent, contain preview file reads, preserve queued indexer deltas, and require authentication for public effects listeners. Scope deterministic image writes to their collection and document reference hosting limits and migrations.
+
+## 0.10.0
+
+### Minor Changes
+
+- 8091fe3: Serve each token's live application at the root of a fixed-length hashed content subdomain. Keep
+  legacy resolver and collection links as compatible entrypoints, persist rebuildable token-root
+  lookups in the reference self-hosted resolver, and honor advertised provider URL templates in remote
+  captures. Document contract URI compatibility and the security limits of sandbox-only hosting.
+
+### Patch Changes
+
+- 4eb24b6: Preserve configured resolver path prefixes in live-view fallbacks and keep descriptor diagnostic
+  base URLs from overriding remote capture transport when a direct content scheme is unavailable.
+
+## 0.9.0
+
+### Minor Changes
+
+- 935fb00: Serve resolver project documents on collection-scoped content origins configured by
+  ABX_CONTENT_DOMAIN. Preserve existing metadata and animation URLs, provide marketplace-compatible
+  live-view wrappers and canonical direct links, and keep artifact bytes unchanged across redirects.
+  Self-hosted documents use opaque-origin sandboxing when no content domain is configured. Advertise
+  content addressing in service discovery and document the browser storage and wallet implications.
+- 9e1129e: Drop-in for existing SDK consumers: `analyzeScript` adds an optional `inlineHtml` finding and the SDK exports `inlineScriptUnterminatedAt`. Detect raw script content that the current generated HTML cannot terminate. The CLI warns during inspect, ERC-721/ERC-1155 script deployment, and script replacement without executing or rewriting the source. Document context-specific author fixes and previewing before locking. No contract or generator behavior changes.
+
+### Patch Changes
+
+- b48af22: Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+  discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+  wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.
+
+  Top-level browser live-view requests use HTTP redirects so existing capture clients see the final
+  artwork status. Marketplace frames and server-side downloads retain the embeddable wrapper.
+
+- 8be5eab: Keep the localhost root available as a local resolver control-plane alias when collection content
+  uses localhost subdomains. Default effects-runner transport can still discover projects and state;
+  collection subdomains continue to reject control routes, and production content roots stay restricted.
+
+## 0.8.0
+
+### Minor Changes
+
+- f1654fd: Add automatic creator-wallet payment: sufficiently funded wallets pay native value and network
+  fees; eligible zero-value calls otherwise use sponsorship. Introduce `--embedded` with `--sponsor`
+  as its backwards-compatible alias, reuse one agent grant, and verify returned signing payloads
+  against the local transaction intent before signing. Self-payment requires live provider support.
+  Structured deploy plans use schema version 3 with the automatic payment policy.
+
+## 0.7.1
+
+### Patch Changes
+
+- e497ffe: Mark Arbitrum Sepolia, Arbitrum, Base, and Ethereum mainnet as supported. Align the network registry,
+  CLI capabilities, qualification notices, and public network table with their supported status.
+
 ## 0.7.0
 
 ### Minor Changes

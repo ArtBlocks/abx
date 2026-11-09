@@ -1,6 +1,13 @@
+import {fetchPublicContent, ContentNetworkError} from '@artblocks/abx-sdk/node';
+import {contentRequestLabel, contentDigestFromLabel, contentRootPath} from '@artblocks/abx-sdk';
 import {createServer, type IncomingMessage, type Server, type ServerResponse} from 'node:http';
 import {
   ABX_JS,
+  publicProjectState,
+  projectContentPolicy,
+  projectContentRequestKind,
+  isolateProjectContent,
+  isProjectContentPath,
   fieldOf,
   makePublicClient,
   normalizeAttributes,
@@ -73,16 +80,20 @@ function serverChainKey(): string {
 }
 
 /** The context the /v1 control plane + descriptor run against (control-plane.ts owns the routes). */
-function controlPlaneCtx(indexer: SelfHostIndexer, storage: StorageBackend, baseUrl: string): ControlPlaneContext {
-  return {indexer, storage, chainId: serverChainId(), chainKey: serverChainKey(), baseUrl};
+function controlPlaneCtx(indexer: SelfHostIndexer, storage: StorageBackend, baseUrl: string, contentDomain?: string): ControlPlaneContext {
+  return {indexer, storage, chainId: serverChainId(), chainKey: serverChainKey(), baseUrl, contentDomain};
 }
 
 export interface ServerOptions {
+  /** Alternate operator-owned transport, primarily for isolated fixtures. Defaults to checked public fetching. */
+  fetchContent?: typeof fetch;
   indexer: SelfHostIndexer;
   port?: number;
   baseUrl?: string;
   /** Byte-custody backend the image/verify routes resolve content from. Defaults to `resolveBackend()`. */
   storage?: StorageBackend;
+  /** Dedicated wildcard host for collection content. Unset documents use opaque-origin sandboxing. */
+  contentDomain?: string;
 }
 
 /**
@@ -118,7 +129,10 @@ export async function resolveContent(
   // off-chain custody, located by the on-chain hash of the image
   if (image && (image.representation === R.keccak256 || image.representation === R.sha256)) {
     const stored = await storage.get(image.value);
-    if (stored) return {contentType: stored.contentType, body: stored.bytes};
+    if (stored) {
+      if (!verifyAgainstHash(stored.bytes, image)) throw new Error('Stored image failed its on-chain integrity check.');
+      return {contentType: stored.contentType, body: stored.bytes};
+    }
   }
   // graceful placeholder — the deterministic fallback the on-chain renderer also uses,
   // so a token with no resolvable image looks the same whether served here or self-resolved.
@@ -257,11 +271,52 @@ export function createTokenApiServer(opts: ServerOptions): Server {
   const baseUrl = opts.baseUrl ?? resolveBaseUrl(port);
   assertServableBaseUrl(baseUrl);
   const storage = opts.storage ?? resolveBackend();
+  const contentPolicy = projectContentPolicy(baseUrl, opts.contentDomain ?? process.env.ABX_CONTENT_DOMAIN);
 
   return createServer(async (req, res) => {
     try {
-      await route(req, res, indexer, baseUrl, storage);
+      const requestUrl = new URL(baseUrl);
+      requestUrl.host = req.headers.host ?? requestUrl.host;
+      const pathUrl = new URL(req.url ?? '/', baseUrl);
+      requestUrl.pathname = pathUrl.pathname;
+      requestUrl.search = pathUrl.search;
+      const kind = projectContentRequestKind(contentPolicy, requestUrl.href);
+      if (kind === 'reject' || (['content', 'legacy'].includes(kind) && !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET'))) {
+        return sendJson(res, 404, {error: 'not found'});
+      }
+      if (kind === 'health') return sendJson(res, 200, {ok: true});
+      res.setHeader('access-control-allow-origin', '*');
+      res.setHeader('access-control-expose-headers', 'link');
+      res.setHeader('x-content-type-options', 'nosniff');
+      res.setHeader('cross-origin-opener-policy', 'same-origin-allow-popups');
+      res.setHeader('origin-agent-cluster', '?1');
+      const sendContent: ContentSender = async (body, contentType, cacheControl) => {
+        // The policy needs headers, not the artwork payload. Keep large byte artifacts out of
+        // Response buffering; only the small generated wrapper has a replacement body.
+        const response = isolateProjectContent(
+          contentPolicy,
+          requestUrl.href,
+          new Response(null, {headers: {'content-type': contentType, 'cache-control': cacheControl}}),
+          typeof req.headers['sec-fetch-dest'] === 'string' ? req.headers['sec-fetch-dest'] : undefined,
+        );
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        res.end(response.body ? Buffer.from(await response.arrayBuffer()) : response.status === 200 ? body : undefined);
+      };
+      const publicContent = ['public', 'legacy'].includes(kind) && !!contentPolicy.contentDomain && isProjectContentPath(requestUrl.pathname);
+      if (publicContent && ['GET', 'HEAD'].includes(req.method ?? 'GET') && !requestUrl.pathname.startsWith('/a/')) {
+        return sendContent('', 'application/octet-stream', 'no-store');
+      }
+      let routingUrl = req.url;
+      if (kind === 'content' && requestUrl.pathname === '/') {
+        const label = contentRequestLabel(contentPolicy, requestUrl.href)!;
+        const key = indexer.store.getContentRoute(contentDigestFromLabel(label)!);
+        const path = key && contentRootPath(label, key);
+        if (!path) return sendJson(res, 404, {error: 'not found'});
+        routingUrl = path + requestUrl.search;
+      }
+      await route(req, res, indexer, baseUrl, storage, sendContent, contentPolicy.contentDomain, publicContent, routingUrl, opts.fetchContent);
     } catch (err) {
+      if (err instanceof ContentNetworkError) return sendJson(res, 502, {code: 'internal_error', error: 'content fetch refused by this host’s public-network or response limits'});
       // NEVER hand a raw internal error to the client. An unexpected failure here is usually an
       // upstream RPC error, and viem's message embeds the full endpoint URL — which for a keyed
       // endpoint IS a credential. On a multi-tenant provider that would leak the operator's RPC key
@@ -296,15 +351,23 @@ export function startTokenApiServer(opts: ServerOptions): Promise<{server: Serve
   });
 }
 
+type ContentSender = (body: Uint8Array | string, contentType: string, cacheControl: string) => Promise<void>;
+
 async function route(
   req: IncomingMessage,
   res: ServerResponse,
   indexer: SelfHostIndexer,
   baseUrl: string,
   storage: StorageBackend,
+  sendContent: ContentSender,
+  contentDomain?: string,
+  publicContent = false,
+  routingUrl = req.url,
+  fetchContent: typeof fetch = fetchPublicContent,
 ): Promise<void> {
   res.setHeader('access-control-allow-origin', '*');
-  const url = new URL(req.url ?? '/', 'http://localhost');
+  res.setHeader('access-control-expose-headers', 'link');
+  const url = new URL(routingUrl ?? '/', 'http://localhost');
   const parts = url.pathname.split('/').filter(Boolean);
   const method = req.method ?? 'GET';
 
@@ -345,7 +408,7 @@ async function route(
   // agent-readably, so a client can match a project's needs to this service BEFORE trusting it
   // with a registration. See site/content/docs/using-abx/remote-services.mdx.
   if (parts[0] === '.well-known' && parts[1] === 'abx-service') {
-    return sendJson(res, 200, await serviceDescriptor(controlPlaneCtx(indexer, storage, baseUrl)));
+    return sendJson(res, 200, await serviceDescriptor(controlPlaneCtx(indexer, storage, baseUrl, contentDomain)));
   }
 
   // GET /abx.js — the runtime companion (directory builds include it; the generator inlines it).
@@ -393,7 +456,8 @@ async function route(
       return;
     }
     if (availability === 'not-a-code-project') return sendJson(res, 404, {error: 'no live view — not a code project'});
-    const view = await resolveLiveView(chainClientLazy(), state, token);
+    if (publicContent) return sendContent('', 'text/html; charset=utf-8', 'no-store');
+    const view = await resolveLiveView(chainClientLazy(), state, token, fetchContent);
     if (!view) {
       return sendJson(res, 404, {
         error: 'no live view — this project has a `code` field whose locator is not serveable (the `code` field is locators-only: ipfs/arweave/url)',
@@ -404,9 +468,7 @@ async function route(
       res.end();
       return;
     }
-    res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
-    res.end(view.html);
-    return;
+    return sendContent(view.html, 'text/html; charset=utf-8', 'no-store');
   }
 
   // /v1/* — the control plane (register/list/deregister/reindex/status + the effect-publish
@@ -416,7 +478,7 @@ async function route(
   // bearer token authorizes indexing control only. Disabled unless ABX_RESOLVER_ADMIN_TOKEN is
   // set on the resolver. Routes + auth live in control-plane.ts.
   if (parts[0] === 'v1') {
-    return routeControlPlane(req, res, controlPlaneCtx(indexer, storage, baseUrl), parts.slice(1));
+    return routeControlPlane(req, res, controlPlaneCtx(indexer, storage, baseUrl, contentDomain), parts.slice(1));
   }
 
   // /api/*
@@ -496,7 +558,7 @@ async function route(
       // GET /api/project/:addr
       const state = indexer.getProject(address);
       if (!state) return unknownProject(res);
-      return sendJson(res, 200, state);
+      return sendJson(res, 200, publicProjectState(state));
     }
     return sendError(res, 404, 'unknown_route', 'unknown api route', {
       routes: ['/api/projects', '/api/watch', '/api/project/:address', '/api/project/:address/artifacts', '/api/project/:address/effects', '/api/project/:address/verify', '/api/deps/:chainId/:address'],
@@ -548,12 +610,7 @@ async function route(
           if (found) {
             const artifact = await storage.get(key);
             if (artifact) {
-              res.writeHead(200, {
-                'content-type': artifact.contentType || 'image/png',
-                'cache-control': 'public, max-age=300',
-              });
-              res.end(artifact.bytes);
-              return;
+              return sendContent(artifact.bytes, artifact.contentType || 'image/png', 'public, max-age=300');
             }
           }
         } catch {
@@ -568,9 +625,7 @@ async function route(
         res.end();
         return;
       }
-      res.writeHead(200, {'content-type': content.contentType, 'cache-control': 'public, max-age=300'});
-      res.end(content.body);
-      return;
+      return sendContent(content.body, content.contentType, 'public, max-age=300');
     }
     // GET /t/:chainId/:addr/:id/data/{field} and /t/:chainId/:addr/:id/data/{effectKey}/{outputKey}
     // — the plane's byte-serving route (data-plane.md → Serving): declared Content-Type, 302 to a
@@ -578,9 +633,9 @@ async function route(
     // segment count disambiguates a field artifact (1) from an effect artifact (2).
     if (parts[4] === 'data' && parts[5]) {
       if (parts[6] !== undefined) {
-        return serveEffectArtifact(res, state, token, parts[5], parts[6], storage, indexer);
+        return serveEffectArtifact(res, state, token, parts[5], parts[6], storage, indexer, sendContent);
       }
-      return serveFieldArtifact(res, state, token, parts[5], storage, displayMeta(indexer, address));
+      return serveFieldArtifact(res, state, token, parts[5], storage, displayMeta(indexer, address), sendContent);
     }
     return sendJson(
       res,
@@ -596,7 +651,7 @@ async function route(
     const state = indexer.getProject(address);
     if (!state) return unknownProject(res);
     if (parts[3] === 'data' && parts[4]) {
-      return serveFieldArtifact(res, state, null, parts[4], storage, displayMeta(indexer, address));
+      return serveFieldArtifact(res, state, null, parts[4], storage, displayMeta(indexer, address), sendContent);
     }
     return sendJson(res, 200, await buildContractMetadata(chainClientLazy(), state, baseUrl, serverChainId(), displayMeta(indexer, address), storage));
   }
@@ -671,6 +726,7 @@ async function serveEffectArtifact(
   outputKey: string,
   storage: StorageBackend,
   indexer: SelfHostIndexer,
+  sendContent: ContentSender,
 ): Promise<void> {
   if (!isCodeProject(state)) return sendJson(res, 404, {error: 'no effect artifacts — not a code project'});
   try {
@@ -683,21 +739,11 @@ async function serveEffectArtifact(
       return;
     }
     if (row?.bytes) {
-      res.writeHead(200, {
-        'content-type': row.contentType || 'application/octet-stream',
-        'cache-control': 'public, max-age=300',
-      });
-      res.end(row.bytes);
-      return;
+      return sendContent(row.bytes, row.contentType || 'application/octet-stream', 'public, max-age=300');
     }
     const stored = await storage.get(key);
     if (stored) {
-      res.writeHead(200, {
-        'content-type': row?.contentType || stored.contentType || 'application/octet-stream',
-        'cache-control': 'public, max-age=300',
-      });
-      res.end(stored.bytes);
-      return;
+      return sendContent(stored.bytes, row?.contentType || stored.contentType || 'application/octet-stream', 'public, max-age=300');
     }
   } catch {
     // fall through to the 404 — the route is best-effort, like the image seam
@@ -718,6 +764,7 @@ async function serveFieldArtifact(
   field: string,
   storage: StorageBackend,
   display: DisplayMeta,
+  sendContent: ContentSender,
 ): Promise<void> {
   if (field === 'code') return sendJson(res, 404, {error: '`code` is never served verbatim — the live view serves the program'});
   const entry = (token ? fieldOf(token.fields, field) : null) ?? fieldOf(state.collectionFields, field);
@@ -726,12 +773,7 @@ async function serveFieldArtifact(
   try {
     const onChain = await resolveFieldBytes(chainClientLazy(), entry);
     if (onChain) {
-      res.writeHead(200, {
-        'content-type': await fieldMimeType(chainClientLazy(), state, entry, field, tokenId, display, storage, token?.fields),
-        'cache-control': 'public, max-age=300',
-      });
-      res.end(onChain);
-      return;
+      return sendContent(onChain, await fieldMimeType(chainClientLazy(), state, entry, field, tokenId, display, storage, token?.fields), 'public, max-age=300');
     }
     // computed on-chain at read — the collection surface passes the sentinel id (no token).
     const rendered = await resolveFieldRendered(
@@ -748,19 +790,13 @@ async function serveFieldArtifact(
         res.end();
         return;
       }
-      res.writeHead(200, {'content-type': rendered.contentType, 'cache-control': 'public, max-age=300'});
-      res.end(rendered.bytes);
-      return;
+      return sendContent(rendered.bytes, rendered.contentType, 'public, max-age=300');
     }
     if (entry.representation === R.keccak256 || entry.representation === R.sha256) {
       const stored = await storage.get(entry.value);
       if (stored) {
-        res.writeHead(200, {
-          'content-type': stored.contentType || 'application/octet-stream',
-          'cache-control': 'public, max-age=300',
-        });
-        res.end(stored.bytes);
-        return;
+        if (!verifyAgainstHash(stored.bytes, entry)) throw new Error('Stored field failed its on-chain integrity check.');
+        return sendContent(stored.bytes, stored.contentType || 'application/octet-stream', 'public, max-age=300');
       }
       const bridged = display.contentLocators?.[entry.value.toLowerCase()];
       if (bridged) {
@@ -777,7 +813,9 @@ async function serveFieldArtifact(
       return;
     }
   } catch (err) {
-    return sendJson(res, 502, {error: `field '${field}' failed to resolve: ${(err as Error).message}`});
+    const detail = (err as Error).message ?? 'unknown error';
+    console.error(`[server] field '${field}' failed to resolve: ${detail}`);
+    return sendJson(res, 502, {error: `field '${field}' failed to resolve${upstreamHint(detail)}`});
   }
   return sendJson(res, 404, {error: `'${field}' (${entry.representation}) is not byte-servable from this node`});
 }

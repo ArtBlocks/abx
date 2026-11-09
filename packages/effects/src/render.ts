@@ -1,3 +1,4 @@
+import {contentBrowserEnvironment, CONTENT_BROWSER_ARGS, startContentProxy} from '@artblocks/abx-sdk/node';
 import {contractParamString} from '@artblocks/abx-sdk';
 import type {EffectContext, EffectModule, EffectOutput} from './harness.js';
 
@@ -43,8 +44,10 @@ export function renderEffect(defaults: {width?: number; timeoutMs?: number} = {}
       const printWidth = Number(contractParamString(ctx.state, 'render.printWidth') ?? 0);
 
       const pw = await loadPlaywright();
-      const browser = await pw.chromium.launch();
+      const proxy = await startContentProxy({allowOrigins: [new URL(ctx.liveViewUrl).origin]});
+      let browser: Browser | undefined;
       try {
+        browser = await pw.chromium.launch({proxy: {server: proxy.url}, args: CONTENT_BROWSER_ARGS, env: contentBrowserEnvironment()});
         const still = await capture(browser, ctx.liveViewUrl, width, Math.round(width / aspect), timeoutMs, true);
         // The print export re-runs the same deterministic document at print resolution — a
         // fresh page, so viewport-sized sketches lay out natively rather than being rescaled.
@@ -60,7 +63,7 @@ export function renderEffect(defaults: {width?: number; timeoutMs?: number} = {}
           print: print ? {bytes: print.png, contentType: 'image/png'} : null,
         };
       } finally {
-        await browser.close();
+        try {await browser?.close();} finally {await proxy.close();}
       }
     },
   };
@@ -105,11 +108,11 @@ async function capture(
 }
 
 /** Runtime-optional resolution so the workspace never hard-depends on a browser. */
-async function loadPlaywright(): Promise<{chromium: {launch(): Promise<Browser>}}> {
+async function loadPlaywright(): Promise<{chromium: {launch(opts: {proxy: {server: string}; args: readonly string[]; env: Record<string, string>}): Promise<Browser>}}> {
   try {
     const {createRequire} = await import('node:module');
     const requireHere = createRequire(import.meta.url);
-    return requireHere('playwright') as {chromium: {launch(): Promise<Browser>}};
+    return requireHere('playwright') as {chromium: {launch(opts: {proxy: {server: string}; args: readonly string[]; env: Record<string, string>}): Promise<Browser>}};
   } catch {
     throw new Error(
       'playwright could not load — captures need its browsers installed where they run: ' +

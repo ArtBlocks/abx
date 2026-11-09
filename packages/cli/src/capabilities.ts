@@ -11,7 +11,7 @@ import type {Flags} from './flags.js';
  * matrices in prose.
  */
 export const ABX_CAPABILITIES = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   defaultChain: DEFAULT_CHAIN_KEY,
   chains: CHAIN_SUPPORT,
   /** Compatibility field for consumers that only need selectable chain keys. */
@@ -20,11 +20,14 @@ export const ABX_CAPABILITIES = {
     send: {flag: '--send', summary: 'local environment key pays gas', supportLevel: 'supported'},
     sign: {flag: '--sign', summary: 'connected browser wallet pays gas', supportLevel: 'supported'},
     sponsor: {
-      flag: '--sponsor',
-      summary: 'account-bound ABX creator wallet; ABX Services pays eligible gas',
+      flag: '--embedded',
+      aliases: ['--sponsor'],
+      summary: 'account-bound creator wallet; self-pays when funded, otherwise eligible gas is sponsored',
       supportLevel: 'supported',
-      chainIds: [8_453, 84_532],
-      limits: ['zero value', 'network and provider gas policy'],
+      chainIds: CHAIN_SUPPORT.filter((chain) => chain.supportLevel !== 'disabled').map((chain) => chain.chainId),
+      sponsoredChainIds: [8_453, 84_532, 42_161, 421_614],
+      paymentPolicy: 'prefer-self-payment',
+      limits: ['wallet covers value plus fees when self-paid', 'zero native value when sponsored', 'network and provider gas policy'],
     },
     unsigned: {flag: '--unsigned', summary: 'print for an external signer', supportLevel: 'supported'},
   },
@@ -80,7 +83,7 @@ export const ABX_CAPABILITIES = {
     command: 'abx deploy-contract',
     input: 'exact EVM creation bytecode or a Foundry artifact plus already ABI-encoded constructor arguments',
     signingLanes: ['--send', '--sign', '--sponsor', '--unsigned'],
-    boundaries: ['ABX does not compile, link, audit, or infer constructor types', 'zero value under --sponsor'],
+    boundaries: ['ABX does not compile, link, audit, or infer constructor types', 'embedded deployments use the keyless CREATE2 proxy'],
   },
   extensionRoutes: [
     {

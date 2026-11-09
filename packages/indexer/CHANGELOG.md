@@ -1,5 +1,69 @@
 # @artblocks/abx-indexer
 
+## 0.2.3
+
+### Patch Changes
+
+- 0da12d2: Default recovery and backfill requests on a watched node retain its recorded scan boundary, including manual retries. Reject lagging endpoints before historical scans without adding work to healthy delta folds.
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+- Updated dependencies [f298236]
+  - @artblocks/abx-sdk@0.10.3
+
+## 0.2.2
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+
+## 0.2.1
+
+### Patch Changes
+
+- d74b1eb: Keep transport configuration out of public project state; bound project-content fetching to public network destinations and limited decoded bodies. Authenticate local signing sessions, verify completed transaction intent, contain preview file reads, preserve queued indexer deltas, and require authentication for public effects listeners. Scope deterministic image writes to their collection and document reference hosting limits and migrations.
+- Updated dependencies [d74b1eb]
+  - @artblocks/abx-sdk@0.10.1
+
+## 0.2.0
+
+### Minor Changes
+
+- 8091fe3: Serve each token's live application at the root of a fixed-length hashed content subdomain. Keep
+  legacy resolver and collection links as compatible entrypoints, persist rebuildable token-root
+  lookups in the reference self-hosted resolver, and honor advertised provider URL templates in remote
+  captures. Document contract URI compatibility and the security limits of sandbox-only hosting.
+
+### Patch Changes
+
+- Updated dependencies [4eb24b6]
+- Updated dependencies [8091fe3]
+  - @artblocks/abx-sdk@0.10.0
+
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [935fb00]
+- Updated dependencies [b48af22]
+- Updated dependencies [9e1129e]
+- Updated dependencies [8be5eab]
+  - @artblocks/abx-sdk@0.9.0
+
+## 0.1.10
+
+### Patch Changes
+
+- Updated dependencies [f1654fd]
+  - @artblocks/abx-sdk@0.8.0
+
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies [e497ffe]
+  - @artblocks/abx-sdk@0.7.1
+
 ## 0.1.8
 
 ### Patch Changes

@@ -58,6 +58,14 @@ Solidity changes require extra care because the SDK embeds both ABIs and creatio
 Do not raise code-size test limits to make a change pass. Treat a deployment-address change as a
 public compatibility event.
 
+## Maintainer merge workflow
+
+Reviewed pull requests enter the GitHub merge queue and are squash-merged after the required
+TypeScript, site, packaging, and Solidity checks pass against current `main` and earlier queued
+changes. CI runs for both pull requests and merge groups; maintainers do not need to merge `main`
+into each queued branch. Workflow runs from external fork contributors still require approval,
+including after new pushes; approving a run does not approve a merge.
+
 ## Verification
 
 At minimum, run the checks relevant to your change:

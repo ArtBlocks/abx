@@ -1,3 +1,4 @@
+import {contentOriginLabel, TOKEN_CONTENT_SCHEME} from '@artblocks/abx-sdk';
 // The harness's load-bearing properties, no browser involved: work detection is "the
 // artifact at the CURRENT inputsHash address is missing", runs are idempotent, and a
 // param change re-addresses output (so the same token renders again — self-invalidating).
@@ -604,6 +605,36 @@ test('HTTP: /notify enqueues (202) and /run + /notify are token-gated when authT
   }
 });
 
+test('tokenless HTTP rejects browser cross-origin and rebinding requests but accepts local JSON commands', async () => {
+  const runner = new EffectRunner({resolverUrl: 'http://resolver.test', client: null, storage: memoryStorage(), effects: []});
+  let runs = 0;
+  runner.sweepProject = async () => {runs++; return {ran: 0, skipped: 0, failed: 0, errors: []};};
+  const server = runner.startHttp(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${(server.address() as {port: number}).port}`;
+  const body = JSON.stringify({address: ADDR, force: true});
+  try {
+    for (const headers of [
+      {'content-type': 'application/json', origin: 'https://other.test'},
+      {'content-type': 'application/json', host: 'other.test'},
+      {'content-type': 'application/json', host: ''},
+      {'content-type': 'text/plain'},
+    ]) {
+      const {request} = await import('node:http');
+      const status = await new Promise<number | undefined>((resolve, reject) => {
+        const req = request(`${base}/run`, {method: 'POST', headers}, (res) => {res.resume(); res.on('end', () => resolve(res.statusCode));});
+        if (headers.host !== undefined) req.setHeader('host', headers.host);
+        req.on('error', reject); req.end(body);
+      });
+      assert.ok([400, 403, 415].includes(status!), `${JSON.stringify(headers)} returned ${status}`);
+    }
+    assert.equal(runs, 0);
+    assert.equal((await fetch(`${base}/run`, {method: 'POST', headers: {'content-type': 'application/json'}, body})).status, 200);
+    assert.equal(runs, 1);
+    assert.equal((await fetch(`${base}/run`, {method: 'POST', headers: {'content-type': 'application/json'}, body: ' '.repeat(1024 * 1024 + 1)})).status, 413);
+  } finally {server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve()));}
+});
+
 test('status reporting: rendering → done on success, failed(error, attempts) on crash — via the control plane', async () => {
   const reports: Array<Record<string, unknown>> = [];
   const realFetch = globalThis.fetch;
@@ -690,15 +721,15 @@ test('deterministic lane: still lands at the on-chain-named S3 key; idempotent v
     client: null,
     storage,
     effects: [effect],
-    fetchState: async () => withImageTemplate(codeState(0x0e1a40n), 'https://cdn.test/orbit/{id}.png'),
+    fetchState: async () => withImageTemplate(codeState(0x0e1a40n), 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/{id}.png'),
     log: () => {},
   });
 
   const first = await runner.sweepProject(ADDR);
   assert.deepEqual(first, {ran: 1, skipped: 0, failed: 0, errors: []});
   // token 0 → the exact object the on-chain url-template names (publicBase stripped), plus its marker.
-  assert.ok(storage.objects.has('orbit/0.png'), 'still written to the deterministic key');
-  assert.ok(storage.objects.has('orbit/0.png.abxhash'), 'inputsHash marker written');
+  assert.ok(storage.objects.has('31337/0xabcd000000000000000000000000000000000001/0.png'), 'still written to the deterministic key');
+  assert.ok(storage.objects.has('31337/0xabcd000000000000000000000000000000000001/0.png.abxhash'), 'inputsHash marker written');
 
   const second = await runner.sweepProject(ADDR);
   assert.deepEqual(second, {ran: 0, skipped: 1, failed: 0, errors: []});
@@ -822,18 +853,18 @@ test('deterministic lane: the registry row carries the stable public URL as its 
     client: null,
     storage,
     effects: [fakeEffect()],
-    fetchState: async () => withImageTemplate(codeState(1n), 'https://cdn.test/orbit/{id}.png'),
+    fetchState: async () => withImageTemplate(codeState(1n), 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/{id}.png'),
     log: () => {},
     recordArtifact: (row) => void rows.push(row),
   });
   await runner.sweepProject(ADDR);
   const img = rows.find((r) => r.outputKey === 'image')!;
-  assert.equal(img.locator, 'https://cdn.test/orbit/0.png'); // the on-chain-named object, not a hash key
+  assert.equal(img.locator, 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/0.png'); // the on-chain-named object, not a hash key
 
   // and the skip path records it too (sidecar marker matched, storage.has(key) never would)
   rows.length = 0;
   await runner.sweepProject(ADDR);
-  assert.equal(rows.find((r) => r.outputKey === 'image')?.locator, 'https://cdn.test/orbit/0.png');
+  assert.equal(rows.find((r) => r.outputKey === 'image')?.locator, 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/0.png');
 });
 
 test('deterministic lane: a param change overwrites the SAME key (stable URL, no proliferation)', async () => {
@@ -845,18 +876,113 @@ test('deterministic lane: a param change overwrites the SAME key (stable URL, no
     client: null,
     storage,
     effects: [effect],
-    fetchState: async () => withImageTemplate(codeState(palette), 'https://cdn.test/orbit/{id}.png'),
+    fetchState: async () => withImageTemplate(codeState(palette), 'https://cdn.test/31337/0xabcd000000000000000000000000000000000001/{id}.png'),
     log: () => {},
   });
 
   await runner.sweepProject(ADDR);
-  const before = new TextDecoder().decode((await storage.getObject!('orbit/0.png.abxhash'))!.bytes);
+  const before = new TextDecoder().decode((await storage.getObject!('31337/0xabcd000000000000000000000000000000000001/0.png.abxhash'))!.bytes);
 
   palette = 0xff0000n; // a collector changes the palette param → new inputsHash
   const res = await runner.sweepProject(ADDR);
   assert.deepEqual(res, {ran: 1, skipped: 0, failed: 0, errors: []}); // re-rendered
-  const after = new TextDecoder().decode((await storage.getObject!('orbit/0.png.abxhash'))!.bytes);
+  const after = new TextDecoder().decode((await storage.getObject!('31337/0xabcd000000000000000000000000000000000001/0.png.abxhash'))!.bytes);
   assert.notEqual(before, after); // marker advanced
   // ONE image object + ONE marker — overwritten in place, so the on-chain URL never changes.
   assert.equal(storage.objects.size, 2);
+});
+
+for (const discovered of [false, true]) {
+  test(`captures use the ${discovered ? 'advertised' : 'configured'} direct content origin`, async () => {
+    const realFetch = globalThis.fetch;
+    let captured = '';
+    globalThis.fetch = (async (url: unknown) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes('/.well-known/')
+            ? {interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [31337], content: {domain: 'content.test', scheme: TOKEN_CONTENT_SCHEME, liveViewUrlTemplate: 'https://{tokenOrigin}.content.test/'}}
+            : [],
+        ),
+        {status: 200, headers: {'content-type': 'application/json'}},
+      )) as typeof fetch;
+    try {
+      const effect: EffectModule = {
+        ...fakeEffect(),
+        async run(ctx) {
+          captured = ctx.liveViewUrl;
+          return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+        },
+      };
+      const runner = new EffectRunner({
+        resolverUrl: 'https://resolver.test',
+        contentDomain: discovered ? undefined : 'content.test',
+        client: null,
+        storage: discovered ? locatorStorage() : memoryStorage(),
+        effects: [effect],
+        adminToken: discovered ? 'fixture-token' : undefined,
+        fetchState: async () => codeState(1n),
+        log: () => {},
+      });
+      const stats = await runner.sweepProject(ADDR);
+      assert.equal(stats.failed, 0);
+      assert.equal(captured, `https://${contentOriginLabel({chainId: 31337, address: ADDR, tokenId: '0'})}.content.test/`);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+}
+
+test('local transport aliases use the configured public origin for content routing', async () => {
+  const prior = process.env.ABX_PUBLIC_BASE_URL;
+  process.env.ABX_PUBLIC_BASE_URL = 'http://127.0.0.1:8787';
+  let captured = '';
+  try {
+    const effect: EffectModule = {...fakeEffect(), async run(ctx) {
+      captured = ctx.liveViewUrl;
+      return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+    }};
+    const runner = new EffectRunner({resolverUrl: 'http://localhost:8787', contentDomain: 'localhost:8787', client: null,
+      storage: memoryStorage(), effects: [effect], fetchState: async () => codeState(1n), log: () => {}});
+    assert.equal((await runner.sweepProject(ADDR)).failed, 0);
+    assert.equal(captured, `http://${contentOriginLabel({chainId: 31337, address: ADDR, tokenId: '0'})}.localhost:8787/`);
+  } finally {
+    if (prior === undefined) delete process.env.ABX_PUBLIC_BASE_URL;
+    else process.env.ABX_PUBLIC_BASE_URL = prior;
+  }
+});
+
+
+test('remote capture fallback uses the configured path and ignores a diagnostic base echo', async () => {
+  const realFetch = globalThis.fetch;
+  let captured = '';
+  globalThis.fetch = (async (url: unknown) => new Response(JSON.stringify(String(url).includes('/.well-known/')
+    ? {interfaces: ['abx-token-api/v1', 'abx-control-plane/v1'], chains: [31337], baseUrl: 'https://diagnostic.test/wrong'}
+    : []), {status: 200, headers: {'content-type': 'application/json'}})) as typeof fetch;
+  try {
+    const effect: EffectModule = {...fakeEffect(), async run(ctx) {
+      captured = ctx.liveViewUrl;
+      return {image: {bytes: new Uint8Array([1]), contentType: 'image/png'}, traits: null};
+    }};
+    const runner = new EffectRunner({resolverUrl: 'https://resolver.test/provider', client: null,
+      storage: locatorStorage(), effects: [effect], adminToken: 'fixture-token', fetchState: async () => codeState(1n), log: () => {}});
+    assert.equal((await runner.sweepProject(ADDR)).failed, 0);
+    assert.equal(captured, `https://resolver.test/provider/a/31337/${ADDR}/0`);
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('a collection cannot choose another collection storage namespace', async () => {
+  const storage = memoryCloud('https://cdn.test');
+  await storage.putObject!('someone-else/0.png', {bytes: new TextEncoder().encode('victim'), contentType: 'image/png'});
+  const runner = new EffectRunner({resolverUrl: 'http://resolver.test', client: null, storage, effects: [fakeEffect()], fetchState: async () => withImageTemplate(codeState(1n), 'https://cdn.test/someone-else/{id}.png'), log: () => {}});
+  const stats = await runner.sweepProject(ADDR);
+  assert.equal(stats.failed, 1);
+  assert.match(stats.errors[0], /storage namespace/);
+  assert.equal(new TextDecoder().decode((await storage.getObject!('someone-else/0.png'))!.bytes), 'victim');
+});
+
+test('public effects listeners require a nonempty token', () => {
+  for (const authToken of [undefined, '', '   ']) {
+    const runner = new EffectRunner({resolverUrl: 'http://resolver.test', client: null, storage: memoryStorage(), effects: [], authToken});
+    assert.throws(() => runner.startHttp(0, '0.0.0.0'), /ABX_EFFECTS_TOKEN/);
+  }
 });

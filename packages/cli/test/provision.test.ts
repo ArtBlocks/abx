@@ -55,3 +55,24 @@ test('effects runner: Playwright base image (chromium baked), abx-effects entryp
   assert.match(toml, /memory = "1gb"/); // chromium needs headroom
   assert.match(toml, /dockerfile = "Dockerfile\.effects"/);
 });
+
+test('effects dotenv instructions work at arbitrary output depths and quote filesystem paths', async () => {
+  const {mkdtempSync, mkdirSync, writeFileSync, rmSync} = await import('node:fs');
+  const {join, relative} = await import('node:path');
+  const {tmpdir} = await import('node:os');
+  const {execFileSync} = await import('node:child_process');
+  const root = mkdtempSync(join(tmpdir(), 'abx-provision-env-'));
+  const project = join(root, "creator's project"); mkdirSync(project);
+  const envFile = join(project, '.env'); writeFileSync(envFile, 'ABX_EFFECTS_TOKEN=DUMMY_ONLY\n');
+  try {
+    for (const depth of ['effects', 'one/effects', 'one/two/effects']) {
+      const out = join(root, 'output', depth); mkdirSync(out, {recursive: true});
+      const art = effectsArtifact({app: 'dummy', resolverUrl: 'https://resolver.test', sourcePackages: [], envFile: relative(out, envFile)});
+      const load = art.steps.find((step) => step.startsWith('set -a;'))!;
+      const token = execFileSync('/bin/bash', ['-c', `${load}\nprintf '%s' "$ABX_EFFECTS_TOKEN"`], {cwd: out, env: {PATH: '/usr/bin:/bin'}}).toString();
+      assert.equal(token, 'DUMMY_ONLY');
+      assert.match(art.steps.find((step) => step.startsWith('fly secrets set ABX_EFFECTS_TOKEN='))!, /ABX_EFFECTS_TOKEN:\?/);
+      assert.match(fileIn(art, 'Dockerfile.effects'), /ABX_EFFECTS_HOST=0.0.0.0/);
+    }
+  } finally {rmSync(root, {recursive: true, force: true});}
+});

@@ -1,5 +1,147 @@
 # @artblocks/abx-cli
 
+## 0.8.7
+
+### Patch Changes
+
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+- Updated dependencies [0da12d2]
+- Updated dependencies [f298236]
+  - @artblocks/abx-indexer@0.2.3
+  - @artblocks/abx-sdk@0.10.3
+  - @artblocks/abx-token-api@0.3.3
+  - @artblocks/abx-storage@0.1.15
+
+## 0.8.6
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+  - @artblocks/abx-indexer@0.2.2
+  - @artblocks/abx-token-api@0.3.2
+  - @artblocks/abx-storage@0.1.14
+
+## 0.8.5
+
+### Patch Changes
+
+- 4be15b5: Show rejected wallet connections and failed transaction verification in the signing page, preserve the connected signer across account changes, and render transaction details as text.
+
+## 0.8.4
+
+### Patch Changes
+
+- d74b1eb: Keep transport configuration out of public project state; bound project-content fetching to public network destinations and limited decoded bodies. Authenticate local signing sessions, verify completed transaction intent, contain preview file reads, preserve queued indexer deltas, and require authentication for public effects listeners. Scope deterministic image writes to their collection and document reference hosting limits and migrations.
+- Updated dependencies [d74b1eb]
+  - @artblocks/abx-sdk@0.10.1
+  - @artblocks/abx-indexer@0.2.1
+  - @artblocks/abx-token-api@0.3.1
+  - @artblocks/abx-storage@0.1.13
+
+## 0.8.3
+
+### Patch Changes
+
+- 4eb24b6: Preserve configured resolver path prefixes in live-view fallbacks and keep descriptor diagnostic
+  base URLs from overriding remote capture transport when a direct content scheme is unavailable.
+- 8091fe3: Serve each token's live application at the root of a fixed-length hashed content subdomain. Keep
+  legacy resolver and collection links as compatible entrypoints, persist rebuildable token-root
+  lookups in the reference self-hosted resolver, and honor advertised provider URL templates in remote
+  captures. Document contract URI compatibility and the security limits of sandbox-only hosting.
+- Updated dependencies [4eb24b6]
+- Updated dependencies [8091fe3]
+  - @artblocks/abx-sdk@0.10.0
+  - @artblocks/abx-indexer@0.2.0
+  - @artblocks/abx-token-api@0.3.0
+  - @artblocks/abx-storage@0.1.12
+
+## 0.8.2
+
+### Patch Changes
+
+- 935fb00: Serve resolver project documents on collection-scoped content origins configured by
+  ABX_CONTENT_DOMAIN. Preserve existing metadata and animation URLs, provide marketplace-compatible
+  live-view wrappers and canonical direct links, and keep artifact bytes unchanged across redirects.
+  Self-hosted documents use opaque-origin sandboxing when no content domain is configured. Advertise
+  content addressing in service discovery and document the browser storage and wallet implications.
+- b48af22: Effects runners capture direct collection content URLs from ABX_CONTENT_DOMAIN or remote service
+  discovery. This keeps browser navigation status checks on the actual document and avoids marketplace
+  wrappers in automated capture. Document the shared resolver/effects configuration in the bundled skill.
+
+  Top-level browser live-view requests use HTTP redirects so existing capture clients see the final
+  artwork status. Marketplace frames and server-side downloads retain the embeddable wrapper.
+
+- ef2f9ca: `abx doctor` no longer reports a project-local install as "running via npx" when it is invoked as `npx abx`.
+- 9e1129e: Drop-in for existing SDK consumers: `analyzeScript` adds an optional `inlineHtml` finding and the SDK exports `inlineScriptUnterminatedAt`. Detect raw script content that the current generated HTML cannot terminate. The CLI warns during inspect, ERC-721/ERC-1155 script deployment, and script replacement without executing or rewriting the source. Document context-specific author fixes and previewing before locking. No contract or generator behavior changes.
+- bb7cdfb: Stop printing Node 22's `SQLite is an experimental feature` warning on every command. Other Node warnings are unchanged.
+- 3fbe0fb: The "reproduce this exact preview" line from `deploy-series` and `deploy-code` dry runs now keeps `--creator`, `--display-notes`, `--creator-links` and `--license`.
+- Updated dependencies [935fb00]
+- Updated dependencies [b48af22]
+- Updated dependencies [9e1129e]
+- Updated dependencies [8be5eab]
+  - @artblocks/abx-sdk@0.9.0
+  - @artblocks/abx-token-api@0.2.10
+  - @artblocks/abx-indexer@0.1.11
+  - @artblocks/abx-storage@0.1.11
+
+## 0.8.1
+
+### Patch Changes
+
+- 80d67eb: Include the automatic creator-wallet payment policy in Series previews, code previews and resume
+  plans. Require the field in every structured deploy plan so future lanes cannot silently omit it.
+- 1154ed1: Explain OS credential-store access before restoring a creator-wallet grant. Stop after denied or
+  failed credential reads instead of automatically starting another browser authorization flow.
+  Keep reusable grants in the OS credential store and document macOS Keychain prompts.
+
+## 0.8.0
+
+### Minor Changes
+
+- f1654fd: Add automatic creator-wallet payment: sufficiently funded wallets pay native value and network
+  fees; eligible zero-value calls otherwise use sponsorship. Introduce `--embedded` with `--sponsor`
+  as its backwards-compatible alias, reuse one agent grant, and verify returned signing payloads
+  against the local transaction intent before signing. Self-payment requires live provider support.
+  Structured deploy plans use schema version 3 with the automatic payment policy.
+
+### Patch Changes
+
+- Updated dependencies [f1654fd]
+  - @artblocks/abx-sdk@0.8.0
+  - @artblocks/abx-indexer@0.1.10
+  - @artblocks/abx-storage@0.1.10
+  - @artblocks/abx-token-api@0.2.9
+
+## 0.7.4
+
+### Patch Changes
+
+- e497ffe: Mark Arbitrum Sepolia, Arbitrum, Base, and Ethereum mainnet as supported. Align the network registry,
+  CLI capabilities, qualification notices, and public network table with their supported status.
+- Updated dependencies [e497ffe]
+  - @artblocks/abx-sdk@0.7.1
+  - @artblocks/abx-indexer@0.1.9
+  - @artblocks/abx-storage@0.1.9
+  - @artblocks/abx-token-api@0.2.8
+
+## 0.7.3
+
+### Patch Changes
+
+- c77b9d9: Allow the sponsored signing lane on Arbitrum and Arbitrum Sepolia when the live provider and account advertise eligibility. Update command help and bundled agent guidance for controlled network rollouts; recognizing these chains does not grant sponsorship.
+
+## 0.7.2
+
+### Patch Changes
+
+- d86143f: Add selectively loaded ecosystem discovery references for every selectable ABX network, with shared
+  official tooling, ERC-20 and external token-launch ideas, and input provenance. Favor resilient
+  same-chain EVM reads and self-contained output; disclose lifetime service dependencies, owner-controlled
+  replacement, fallback behavior, and account/credential requirements for service-dependent designs.
+- 6fe1f7c: Broaden skill ideation to programmable digital objects, clarify state-changing hook capabilities, and keep concept exploration separate from implementation.
+
 ## 0.7.1
 
 ### Patch Changes

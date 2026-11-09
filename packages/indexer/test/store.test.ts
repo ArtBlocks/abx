@@ -1,10 +1,23 @@
 import {test} from 'node:test';
+import {DatabaseSync} from 'node:sqlite';
 import assert from 'node:assert/strict';
 import {existsSync, mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import type {ProjectState} from '@artblocks/abx-sdk';
 import {SqliteStore} from '../src/index.js';
+
+test('opening a legacy database clears stored RPC endpoints without replaying projects', () => {
+  const {store, cleanup} = freshStore();
+  const raw = new DatabaseSync(store.path);
+  try {
+    store.putProject(sampleState(ADDR));
+    raw.prepare('UPDATE projects SET rpc_url=?').run('https://rpc.test/DUMMY_LEGACY_KEY');
+    const reopened = new SqliteStore(dirname(store.path));
+    assert.equal(raw.prepare('SELECT rpc_url FROM projects').get()?.rpc_url, null);
+    assert.equal(reopened.getProject(ADDR)?.eventCount, store.getProject(ADDR)?.eventCount);
+  } finally {raw.close(); cleanup();}
+});
 
 // Built on node:test + node:assert (both in the runtime) — zero added deps, no
 // chain, no Docker. Exercises the Store contract that the indexer and token API
@@ -181,7 +194,8 @@ function editionState(address = EDITION_ADDR, over: Partial<ProjectState> = {}):
 // must still refuse to cache it), so round-trip assertions compare against this nulled projection
 // of the input rather than the input itself.
 function nulledUris(state: ProjectState): ProjectState {
-  return {...state, contractURI: null, tokens: state.tokens.map((t) => ({...t, tokenURI: null}))};
+  const {rpcUrl: _rpcUrl, ...publicState} = state;
+  return {...publicState, contractURI: null, tokens: state.tokens.map((t) => ({...t, tokenURI: null}))};
 }
 
 test('round-trips a project byte-for-byte (nested tokens/commitments/events)', () => {

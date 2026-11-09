@@ -28,6 +28,8 @@ import {
   probeHistoryAt,
   redactRpcUrl,
   resolveChain,
+  projectContentPolicy,
+  projectContentUrl,
   resolveRpcUrls,
   rpcEnvVar,
   detectCanonicalFactory as sdkDetectCanonicalFactory,
@@ -633,6 +635,8 @@ export function printServing(url: string, address?: Address) {
     console.log(`    ${dim('tokenURI   ')}${url}/t/${cid}/${address}/0`);
     console.log(`    ${dim('image      ')}${url}/t/${cid}/${address}/0/image`);
     console.log(`    ${dim('state API  ')}${url}/api/project/${address}`);
+    const direct = projectContentUrl(projectContentPolicy(url, process.env.ABX_CONTENT_DOMAIN), `/a/${cid}/${address}/0`);
+    if (direct) console.log(`    ${dim('content    ')}${direct}`);
   }
   // The dashboard is READ-ONLY: re-index/verify are admin actions that 404 unless the node has an
   // ABX_RESOLVER_ADMIN_TOKEN, so there is no button to press. This line used to say "hit Re-index

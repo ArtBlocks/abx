@@ -149,3 +149,13 @@ test('parseBlockTagFlag: only the two reorg-safe tags, and a number is REFUSED n
   // the error names what to do instead, per the house rule on actionable errors
   assert.throws(() => parseBlockTagFlag('99'), /omit the flag for the default/);
 });
+
+
+test('embedded is the same signing lane as the original sponsor spelling', () => {
+  assert.deepEqual(parseFlags(['--embedded']), parseFlags(['--sponsor']));
+  assert.deepEqual(parseFlags(['--embedded=']), parseFlags(['--sponsor=']));
+});
+
+test('creator attribution remains metadata rather than selecting a wallet', () => {
+  assert.deepEqual(parseFlags(['--creator', 'Art Blocks']), {creator: 'Art Blocks'});
+});
