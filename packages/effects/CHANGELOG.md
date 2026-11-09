@@ -1,5 +1,14 @@
 # @artblocks/abx-effects
 
+## 0.1.14
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+  - @artblocks/abx-storage@0.1.14
+
 ## 0.1.13
 
 ### Patch Changes
