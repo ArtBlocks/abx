@@ -396,17 +396,17 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void (async () => {
-      const u = new URL(req.url ?? '/', 'http://localhost');
-      const host = new URL(`http://${req.headers.host ?? 'invalid'}`).hostname;
-      if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
-        res.writeHead(403); res.end('invalid host'); return;
-      }
-      const send = (code: number, type: string, body: string | Buffer) => {
-        // Never cache: the whole point is that a refresh picks up the edit you just made.
-        res.writeHead(code, {'content-type': type, 'cache-control': 'no-store'});
-        res.end(body);
-      };
       try {
+        const u = new URL(req.url ?? '/', 'http://localhost');
+        const host = new URL(`http://${req.headers.host ?? 'invalid'}`).hostname;
+        if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
+          res.writeHead(403); res.end('invalid host'); return;
+        }
+        const send = (code: number, type: string, body: string | Buffer) => {
+          // Never cache: the whole point is that a refresh picks up the edit you just made.
+          res.writeHead(code, {'content-type': type, 'cache-control': 'no-store'});
+          res.end(body);
+        };
         if (u.pathname === '/') return send(200, MIME['.html'], studioPage(cfg, notes));
 
         if (u.pathname === '/api/seed') {
@@ -442,10 +442,12 @@ export async function startPreviewServer(cfg: PreviewConfig, port: number): Prom
 
         send(404, 'text/plain', 'not found');
       } catch (err) {
-        if (err instanceof PreviewPathError) return send(err.status, 'text/plain', err.message);
-        send(500, 'text/plain', `preview error: ${(err as Error).message}`);
+        if (res.destroyed || res.writableEnded) return;
+        const status = err instanceof PreviewPathError ? err.status : err instanceof TypeError ? 400 : 500;
+        if (!res.headersSent) res.writeHead(status, {'content-type': 'text/plain', 'cache-control': 'no-store'});
+        res.end(err instanceof PreviewPathError ? err.message : status === 400 ? 'invalid preview request' : `preview error: ${(err as Error).message}`);
       }
-    })();
+    })().catch(() => res.destroy());
   });
 
   const actual = await new Promise<number>((res2, rej) => {

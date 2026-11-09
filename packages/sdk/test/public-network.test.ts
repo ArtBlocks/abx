@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, request } from 'node:http';
-import { connect } from 'node:net';
+import { connect, createServer as createRawServer } from 'node:net';
 import { gzipSync } from 'node:zlib';
 import {
   fetchPublicContent,
@@ -35,10 +35,12 @@ test('content destinations reject non-public IPv4, IPv6, mapped and translated a
     'fe80::1',
     '::ffff:127.0.0.1',
     '64:ff9b::7f00:1',
+    '::7f00:1',
+    '::a00:1',
   ])
     assert.equal(isPublicAddress(ip), false, ip);
   for (const ip of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111']) assert.equal(isPublicAddress(ip), true, ip);
-  for (const url of ['http://2130706433/', 'http://[::ffff:127.0.0.1]/', 'http://foo.localhost/', 'file:///tmp/test'])
+  for (const url of ['http://2130706433/', 'http://[::ffff:127.0.0.1]/', 'http://[::127.0.0.1]/', 'http://[::10.0.0.1]/', 'http://foo.localhost/', 'file:///tmp/test'])
     await assert.rejects(contentDestination(new URL(url)));
   const credentialed = new URL('https://example.com/');
   credentialed.username = 'dummy';
@@ -52,6 +54,33 @@ test('content destinations reject non-public IPv4, IPv6, mapped and translated a
       ],
     }),
   );
+});
+
+test('invalid upstream statuses fail the request without crashing fetch or its browser proxy', async () => {
+  let status = '099';
+  const fixture = createRawServer((socket) => socket.once('data', () =>
+    socket.end(`HTTP/1.1 ${status} Fixture\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`),
+  ));
+  await new Promise<void>((resolve) => fixture.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${(fixture.address() as import('node:net').AddressInfo).port}`;
+  const options = {allowOrigins: [origin]};
+  const proxy = await startContentProxy(options);
+  try {
+    for (status of ['099', '600']) {
+      for (const method of ['HEAD', 'GET'])
+        await assert.rejects(fetchPublicContent(origin, {method}, options), /invalid HTTP status/);
+      const proxied = await new Promise<number | undefined>((resolve, reject) => {
+        const req = request(proxy.url, {path: origin}, (res) => {res.resume(); res.on('end', () => resolve(res.statusCode));});
+        req.on('error', reject); req.end();
+      });
+      assert.equal(proxied, 502);
+    }
+    status = '200';
+    assert.equal((await fetchPublicContent(origin, {}, options)).status, 200);
+  } finally {
+    await proxy.close();
+    await new Promise<void>((resolve) => fixture.close(() => resolve()));
+  }
 });
 
 test('transport checks redirect hops and caps decompressed bytes', async () => {

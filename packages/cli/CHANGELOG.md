@@ -1,5 +1,28 @@
 # @artblocks/abx-cli
 
+## 0.8.7
+
+### Patch Changes
+
+- f298236: Contain malformed upstream responses, reject deprecated IPv6 transition destinations, and preserve indexing recovery boundaries without adding scans for healthy projects. Harden local preview and effects requests and keep wallet session URL files private.
+- Updated dependencies [0da12d2]
+- Updated dependencies [f298236]
+  - @artblocks/abx-indexer@0.2.3
+  - @artblocks/abx-sdk@0.10.3
+  - @artblocks/abx-token-api@0.3.3
+  - @artblocks/abx-storage@0.1.15
+
+## 0.8.6
+
+### Patch Changes
+
+- 0be353f: Publish through the main-only GitHub publishing environment and validate each package's restricted npm trusted publisher. Package runtime behavior is unchanged.
+- Updated dependencies [0be353f]
+  - @artblocks/abx-sdk@0.10.2
+  - @artblocks/abx-indexer@0.2.2
+  - @artblocks/abx-token-api@0.3.2
+  - @artblocks/abx-storage@0.1.14
+
 ## 0.8.5
 
 ### Patch Changes

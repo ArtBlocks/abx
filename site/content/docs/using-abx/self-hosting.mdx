@@ -5,6 +5,10 @@ description: "Run the ABX resolver and effects worker on your own infrastructure
 
 ABX ships a resolver and an effects worker. Neither needs an onchain signing key.
 
+Failed indexing work retains its missing scan interval until recovery completes. Healthy projects
+continue to use shared chain scans; quiet projects do not receive periodic per-project replays.
+Recovery follows the existing retry backoff when an RPC endpoint has not reached the required block.
+
 The reference toolkit supports collections controlled by **one trusted operator**. It is not a
 supported multi-tenant host for unrelated creators. Running third-party programs requires additional
 worker isolation, resource controls, and network and credential separation. Content subdomains protect
