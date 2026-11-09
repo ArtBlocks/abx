@@ -2,11 +2,14 @@ import {randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {
   AbxServiceClient,
+  assertChainId,
   CREATOR_WALLET_INTERFACE,
   CreatorApiClient,
   makePublicClient,
   pinGas,
   resolveChain,
+  chainSupportByKey,
+  isChainSelectable,
   resolveServiceInterfaceEndpoint,
   sleep,
   TxRevertedError,
@@ -18,13 +21,13 @@ import {
   type PreparedTx,
   type PublicClient,
 } from '@artblocks/abx-sdk';
-import type {TransactionReceipt} from 'viem';
-import {CreatorAgentAuthorization, CreatorAuthorizationError} from './creator-agent.js';
+import {formatEther, formatGwei, type TransactionReceipt} from 'viem';
+import {CreatorAgentAuthorization, restoreOrAuthorizeCreatorAgent} from './creator-agent.js';
 import {CreatorKeyringStore} from './creator-keyring.js';
+import {quoteCreatorPayment, assertCreatorSigningRequest, preflightCreatorPayment} from './creator-payment.js';
 import {warn} from './output.js';
 import {ABX_SERVICES_URL} from './remote.js';
 
-const SPONSORABLE_BASE_CHAINS = new Set([8_453, 84_532]);
 const CREATOR_GRANTS_URL = 'https://services.abx.io/authorize';
 
 /** Preserve the exact RPC estimate across the JSON service boundary. This is a serialization
@@ -44,9 +47,10 @@ export function assertSponsorConfigured(chainKey: string): void {
 }
 
 function assertSponsorConfiguredWithEnv(chainKey: string, env: NodeJS.ProcessEnv): void {
-  if (!SPONSORABLE_BASE_CHAINS.has(resolveChain(chainKey).id)) {
+  const support = chainSupportByKey(chainKey);
+  if (!support || !isChainSelectable(support)) {
     throw new Error(
-      '--sponsor is supported on eligible Base networks (Base and Base Sepolia only) and still requires live provider and account eligibility. Use --send, --sign, or --unsigned on this network.',
+      'The creator-wallet lane requires a selectable ABX network and live wallet eligibility.',
     );
   }
   if (!env.ABX_SERVICES_API_KEY) {
@@ -96,8 +100,9 @@ export async function sponsoredWalletAddress(
           'Run `abx auth wallet` once, then rerun; the preview will not create external state.',
     );
   }
-  if (!account.capabilities.sponsorship || !account.capabilities.sponsoredChains.includes(chain.id)) {
-    throw new Error(`ABX gas sponsorship is not enabled for ${chain.name} on this account.`);
+  if (!(account.capabilities.selfPayment && account.capabilities.walletChains?.includes(chain.id)) &&
+      !(account.capabilities.sponsorship && account.capabilities.sponsoredChains.includes(chain.id))) {
+    throw new Error(`ABX creator-wallet payment is not enabled for ${chain.name} on this account.`);
   }
   return account.wallet.address;
 }
@@ -105,6 +110,7 @@ export async function sponsoredWalletAddress(
 export interface SponsoredReceipt {
   txHash: Hex;
   receipt: TransactionReceipt;
+  paymentMode?: 'sponsored' | 'self-paid';
 }
 
 export interface SponsoredSession {
@@ -125,7 +131,7 @@ export async function sponsoredOperationStatus(
   if (!/^op_[a-zA-Z0-9]+$/.test(operationId)) throw new Error('Invalid sponsored operation id.');
   const chain = resolveChain(chainKey);
   return new CreatorApiClient({
-    baseUrl: await creatorApiUrl(chain.id, env),
+    baseUrl: await creatorApiUrl(chain.id, env, false),
     token: env.ABX_SERVICES_API_KEY!,
     fetchImpl: options.fetchImpl,
   }).getOperation(operationId);
@@ -140,40 +146,44 @@ export async function confirmedSponsoredReceipt(
   op: string,
   line: (message: string) => void = console.log,
 ): Promise<SponsoredReceipt> {
-  line(`  Sponsored operation ${operation.operationId} confirmed by ABX Services.`);
+  const label = operation.paymentMode === 'self-paid' ? 'Self-paid' : 'Sponsored';
+  line(`  ${label} operation ${operation.operationId} confirmed by ABX Services.`);
   line(`  Transaction: ${operation.transactionHash}`);
   let receipt: TransactionReceipt;
   try {
     receipt = await waitForTransactionReceiptResilient(publicClient, {hash: operation.transactionHash});
   } catch (cause) {
     throw new Error(
-      `Sponsored operation ${operation.operationId} was submitted as ${operation.transactionHash}, but the configured RPCs ` +
+      `${label} operation ${operation.operationId} was submitted as ${operation.transactionHash}, but the configured RPCs ` +
         `could not read its receipt. Do not retry it. Run \`abx auth operation ${operation.operationId}\` or check the transaction in a block explorer.`,
       {cause},
     );
   }
   if (receipt.status !== 'success') throw new TxRevertedError(op, operation.transactionHash);
-  return {txHash: operation.transactionHash, receipt};
+  return {txHash: operation.transactionHash, receipt, ...(operation.paymentMode ? {paymentMode: operation.paymentMode} : {})};
 }
 
 /** Pure boundary check shared by every sponsored operation. Privy's sponsored relay requires a
  * call target, so custom-contract deployments must already be expressed as a call to the keyless
  * CREATE2 proxy before they reach this boundary. */
-export function assertSponsoredPreparedTx(
+export function assertCreatorPreparedTx(
   tx: PreparedTx,
   chainId: number,
 ): asserts tx is PreparedTx & {to: Address} {
   if (tx.chainId !== chainId) {
     throw new Error(`Refusing sponsored transaction for chain ${tx.chainId}; expected ${chainId}.`);
   }
-  if (BigInt(tx.value) !== 0n) {
-    throw new Error('ABX sponsorship never covers a transaction that transfers ETH.');
-  }
   if (tx.to === null) {
     throw new Error(
       'ABX sponsorship requires a call target; use `abx deploy-contract --sponsor` to route exact initcode through CREATE2.',
     );
   }
+}
+
+/** Compatibility check for callers specifically preparing an ABX-paid transaction. */
+export function assertSponsoredPreparedTx(tx: PreparedTx, chainId: number): asserts tx is PreparedTx & {to: Address} {
+  if (BigInt(tx.value) !== 0n) throw new Error('ABX sponsorship never covers a transaction that transfers ETH.');
+  assertCreatorPreparedTx(tx, chainId);
 }
 
 function checkedCreatorApiUrl(raw: string): string {
@@ -196,14 +206,14 @@ function checkedCreatorApiUrl(raw: string): string {
 /** Resolve the first-party wallet API from its public remote catalog. The env override is an
  * explicit local/staging escape hatch; production callers discover the interface from the
  * services catalog and do not need to know a deployment hostname. */
-export async function creatorApiUrl(chainId: number, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+export async function creatorApiUrl(chainId: number, env: NodeJS.ProcessEnv = process.env, requireChain = true): Promise<string> {
   if (env.ABX_CREATORS_API_URL) return checkedCreatorApiUrl(env.ABX_CREATORS_API_URL);
   const descriptor = await new AbxServiceClient({baseUrl: ABX_SERVICES_URL, timeoutMs: 10_000}).descriptor();
   const endpoint = resolveServiceInterfaceEndpoint(ABX_SERVICES_URL, descriptor, CREATOR_WALLET_INTERFACE);
   if (!endpoint) {
     throw new Error('The ABX remote does not advertise an account-bound creator-wallet service. Use --send, --sign, or --unsigned.');
   }
-  if (!endpoint.chains.includes(chainId)) {
+  if (requireChain && !endpoint.chains.includes(chainId)) {
     throw new Error(`The ABX creator-wallet service does not support chain ${chainId}. Use --send, --sign, or --unsigned.`);
   }
   return endpoint.baseUrl;
@@ -253,17 +263,19 @@ function openBrowser(url: string): void {
 export async function openSponsoredSession(chainKey: string): Promise<SponsoredSession> {
   const chain = resolveChain(chainKey);
   assertSponsorConfigured(chainKey);
+  await assertChainId(chainKey);
   const apiKey = process.env.ABX_SERVICES_API_KEY;
   if (!apiKey) throw new Error('ABX Services API key disappeared after sponsorship preflight.');
 
   const api = new CreatorApiClient({baseUrl: await creatorApiUrl(chain.id), token: apiKey});
   const wallet = await api.provisionWallet();
   const account = await api.account();
-  if (!account.wallet || account.wallet.address.toLowerCase() !== wallet.address.toLowerCase()) {
+  if (!account.wallet || !account.capabilities.wallet || account.wallet.address.toLowerCase() !== wallet.address.toLowerCase()) {
     throw new Error('ABX Creators returned inconsistent wallet binding. Nothing was signed.');
   }
-  if (!account.capabilities.sponsorship || !account.capabilities.sponsoredChains.includes(chain.id)) {
-    throw new Error(`ABX gas sponsorship is not enabled for ${chain.name} on this account.`);
+  if (!(account.capabilities.selfPayment && account.capabilities.walletChains?.includes(chain.id)) &&
+      !(account.capabilities.sponsorship && account.capabilities.sponsoredChains.includes(chain.id))) {
+    throw new Error(`ABX creator-wallet payment is not enabled for ${chain.name} on this account.`);
   }
 
   let persistenceWarningShown = false;
@@ -273,40 +285,32 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
     warn('Could not use the OS credential store. This authorization works for the current command only.');
   };
   const store = new CreatorKeyringStore(wallet.providerAppId, wallet.address);
-  let authorization = new CreatorAgentAuthorization({
+  const authorization = new CreatorAgentAuthorization({
     appId: wallet.providerAppId,
     store,
     onPersistenceError: persistenceWarning,
   });
   try {
-    let canPersist = true;
-    let newlyApproved = false;
-    let wallets;
-    try {
-      wallets = await authorization.restore();
-    } catch (error) {
-      if (error instanceof CreatorAuthorizationError) throw error;
-      persistenceWarning();
-      canPersist = false;
-      authorization.dispose();
-      authorization = new CreatorAgentAuthorization({appId: wallet.providerAppId});
-      wallets = null;
-    }
-    if (!wallets) {
-      newlyApproved = true;
-      const device = await authorization.start();
-      const verificationUrl = device.verificationUriComplete ?? device.verificationUri;
-      console.log(`\n  Authorize this agent to use your ABX creator wallet:`);
-      console.log(`  ${verificationUrl}`);
-      console.log(`  Code: ${device.userCode}\n`);
-      openBrowser(verificationUrl);
-      wallets = await authorization.wait();
-    }
+    const {wallets, newlyApproved} = await restoreOrAuthorizeCreatorAgent(authorization, {
+      checkingStore: () => {
+        console.log(`  Checking the saved ABX creator-wallet authorization for ${wallet.address} in your OS credential store.`);
+        if (process.platform === 'darwin') {
+          console.log('  macOS may ask whether Node can access it. This is saved-authorization access; your Mac password stays with macOS.');
+        }
+      },
+      device: (device) => {
+        const verificationUrl = device.verificationUriComplete ?? device.verificationUri;
+        console.log(`\n  Authorize this agent to use your ABX creator wallet:`);
+        console.log(`  ${verificationUrl}`);
+        console.log(`  Code: ${device.userCode}\n`);
+        openBrowser(verificationUrl);
+      },
+    });
     const authorized = wallets.find(
       (candidate) => candidate.chainType === 'ethereum' && candidate.address.toLowerCase() === wallet.address.toLowerCase(),
     );
     if (!authorized) throw new Error(`Privy authorized a different wallet; expected ${wallet.address}.`);
-    if (newlyApproved && canPersist) {
+    if (newlyApproved) {
       try {
         await authorization.remember();
         console.log(`  Agent access saved in your OS credential store. Manage or revoke it at ${CREATOR_GRANTS_URL}.\n`);
@@ -321,7 +325,8 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
       address: wallet.address,
       async send(tx: PreparedTx): Promise<SponsoredReceipt> {
         if (closed) throw new Error('The creator authorization session is closed.');
-        assertSponsoredPreparedTx(tx, chain.id);
+        assertCreatorPreparedTx(tx, chain.id);
+        await preflightCreatorPayment(publicClient, account, tx);
         if (tx.gasFloor && tx.to) await waitForCodeAt(publicClient, tx.to);
         const gas = await pinGas(publicClient, {
           from: wallet.address,
@@ -331,14 +336,19 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           gasFloor: tx.gasFloor,
         });
         const operationId = `op_${randomUUID().replaceAll('-', '')}`;
+        const payment = await quoteCreatorPayment(publicClient, account, tx, gas);
+        console.log(payment.mode === 'self-paid' ? `  Creator wallet pays value and gas (funds required ≈${formatEther(payment.requiredBalance)} ETH; execution fee capped at ${formatGwei(BigInt(payment.maxFeePerGas))} gwei/gas, rollup fees estimated).` : '  ABX pays eligible gas.');
+        const gasLimit = sponsoredGasLimit(gas);
         const prepared = await api.prepare({
           operationId,
           chainId: chain.id,
           to: tx.to,
           value: tx.value,
           data: tx.data,
-          gasLimit: sponsoredGasLimit(gas),
+          gasLimit,
+          ...(payment.mode === 'self-paid' ? {paymentMode: payment.mode, maxFeePerGas: payment.maxFeePerGas, maxPriorityFeePerGas: payment.maxPriorityFeePerGas} : {}),
         });
+        assertCreatorSigningRequest(prepared, {accountId: account.accountId, operationId, walletId: authorized.id, wallet: wallet.address, tx, gasLimit, payment});
         const signed = await authorization.sign({
           walletId: prepared.signingRequest.walletId,
           body: prepared.signingRequest.body,
@@ -359,14 +369,14 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
         ) {
           if (Date.now() >= deadline) {
             throw new Error(
-              `Sponsored operation ${operationId} could not be reconciled. It may have been submitted; check its status before doing anything else and do not retry it.`,
+              `Creator-wallet operation ${operationId} could not be reconciled. It may have been submitted; check its status before doing anything else and do not retry it.`,
             );
           }
           await sleep(1_500);
           operation = await api.getOperation(operationId);
         }
         if (operation.state !== 'confirmed' || !operation.transactionHash) {
-          throw new Error(`Sponsored operation ${operationId} failed${operation.errorCode ? ` (${operation.errorCode})` : ''}.`);
+          throw new Error(`Creator-wallet operation ${operationId} failed${operation.errorCode ? ` (${operation.errorCode})` : ''}.`);
         }
         return confirmedSponsoredReceipt(
           publicClient,

@@ -36,6 +36,8 @@ export function isDryRun(flags: Flags): boolean {
 export function parseFlags(args: string[]): Flags {
   const out: Flags = {};
   const set = (k: string, v: string) => {
+    // One creator-wallet lane. Keep the original spelling as a backwards-compatible alias.
+    if (k === 'embedded') k = 'sponsor';
     out[k] = REPEATABLE_FLAGS.has(k) && out[k] !== undefined ? `${out[k]},${v}` : v;
   };
   for (let i = 0; i < args.length; i++) {

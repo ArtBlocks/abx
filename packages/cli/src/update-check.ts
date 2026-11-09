@@ -117,7 +117,8 @@ export function isNewer(latest: string, current: string): boolean {
  *              ships one.
  *   - `npx`     an npx fetch/run — a temp/cache copy npm never puts on PATH, so it can silently keep
  *              serving a stale build after an upgrade (npm's isolated cache dir contains a telltale
- *              `_npx` path segment; `npm exec` — what `npx` is today — also sets `npm_command=exec`).
+ *              `_npx` path segment; `npm exec` — what `npx` is today — also sets `npm_command=exec`,
+ *              except that `npx abx` resolving the project's own `node_modules` copy is `npm`).
  *   - `npm`     a plain `npm install`, global (`-g`) or a project's local `node_modules` — same fix
  *              either way, so this doesn't split them further.
  * Params are injectable so a test can drive every branch without touching the real filesystem/env.
@@ -128,8 +129,23 @@ export function binaryProvenance(opts: {isSourceCheckout?: boolean; here?: strin
   if (isSourceCheckout) return 'source';
   const here = opts.here ?? fileURLToPath(import.meta.url);
   const env = opts.env ?? process.env;
-  if (/[/\\]_npx[/\\]/.test(here) || env.npm_command === 'exec') return 'npx';
+  if (/[/\\]_npx[/\\]/.test(here)) return 'npx';
+  // `npx abx` inside a project that installed the CLI locally also sets npm_command=exec, but it
+  // runs the project's own node_modules copy — the install the docs recommend, not a cache copy.
+  if (env.npm_command === 'exec' && !isUnderLocalNodeModules(here, env.npm_config_local_prefix)) return 'npx';
   return 'npm';
+}
+
+function isUnderLocalNodeModules(here: string, localPrefix: string | undefined): boolean {
+  if (!localPrefix) return false;
+  // Windows paths compare case-insensitively (`C:\Work` and `c:\work` are the same directory);
+  // POSIX paths stay case-sensitive.
+  const windows = /^[A-Za-z]:[\\/]/.test(localPrefix);
+  const norm = (p: string) => {
+    const slashed = p.replace(/\\/g, '/').replace(/\/+$/, '');
+    return windows ? slashed.toLowerCase() : slashed;
+  };
+  return norm(here).startsWith(`${norm(localPrefix)}/node_modules/`);
 }
 
 function parseSemver(v: string): {main: [number, number, number]; pre: string[]} {

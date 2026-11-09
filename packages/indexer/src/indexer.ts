@@ -21,7 +21,7 @@ export interface ReindexOptions {
    *  per-project `eth_getLogs` — the watch loop that scanned the registered set
    *  holds the delta and should be the only getLogs. */
   logs?: readonly Log[];
-  /** Inclusive scan head `logs` cover. Required with `logs`. */
+  /** Inclusive scan head `logs` cover. Without logs, the minimum successful catch-up boundary. */
   toBlock?: bigint;
   /**
    * Stop the scan boundary at this block tag instead of chain head (the default, unchanged
@@ -124,7 +124,14 @@ export class SelfHostIndexer {
     const factory = reg.factory ? (reg.factory as Address) : undefined;
     const prior = opts.full ? null : this.store.getProject(address);
     const incremental = !!(prior && prior.deployBlock && prior.events.length > 0);
-    const attempts = (this.store.getIndexStatus(address)?.attempts ?? 0) + 1;
+    const indexStatus = this.store.getIndexStatus(address);
+    const attempts = (indexStatus?.attempts ?? 0) + 1;
+    const recovering = indexStatus?.status === 'failed';
+    // Default/manual retries share the watcher's coverage obligation too. Explicit block-tag
+    // snapshots retain their requested boundary. Healthy deltas do no additional store reads.
+    const watchedThrough = opts.toBlock === undefined && opts.blockTag === undefined && (recovering || !incremental)
+      ? this.store.getMeta(`watch:${reg.chainKey}`) : null;
+    const requiredThrough = opts.toBlock ?? (watchedThrough === null ? undefined : BigInt(watchedThrough));
     // `backfilling` is for an initial sync or a forced replay — the long ones a client polls. A
     // routine incremental catch-up keeps its current status until it lands, so a live project's
     // status doesn't flicker on every watcher tick.
@@ -135,7 +142,13 @@ export class SelfHostIndexer {
     let state: ProjectState;
     let mode: 'full' | 'incremental';
     try {
-      if (incremental && opts.logs !== undefined) {
+      const useDelta = incremental && opts.logs !== undefined && !recovering;
+      // Refuse a lagging fallback before spending work on a replay. Healthy fetched deltas
+      // already prove their boundary and add no head request.
+      if (!useDelta && requiredThrough !== undefined &&
+          await this.client(reg.chainKey, opts.rpcUrl).getBlockNumber() < requiredThrough)
+        throw new Error('Network RPC head is behind the required catch-up boundary; retry.');
+      if (incremental && opts.logs !== undefined && !recovering) {
         if (opts.toBlock === undefined) {
           throw new Error('reindex({logs}) requires toBlock — the inclusive scan head those logs cover');
         }
@@ -186,6 +199,10 @@ export class SelfHostIndexer {
         });
         mode = 'full';
       }
+      if (requiredThrough !== undefined && BigInt(state.toBlock) < requiredThrough)
+        throw new Error('Network RPC head is behind the required catch-up boundary; retry.');
+      // Full replays replace the append-only log; incremental writes retain existing events.
+      this.store.putProject(state, {fullReplay: mode === 'full'});
     } catch (err) {
       // Record WHY, as a closed credential-free class — a rate-limited RPC and a broken service are
       // the same 500 to a caller otherwise, and only one of them means "wait".
@@ -197,9 +214,6 @@ export class SelfHostIndexer {
       });
       throw err;
     }
-    // A full replay is the repair path — it purges + rebuilds the append-only event log so a
-    // reorg-replaced event can't survive as a stale row (incremental writes never delete).
-    this.store.putProject(state, {fullReplay: mode === 'full'});
     const now = new Date().toISOString();
     this.store.setIndexStatus(address, {status: 'live', error: null, attempts: 0, lastAttemptAt: now, lastIndexedAt: now});
     return {state, elapsedMs: Date.now() - started, mode};
@@ -218,10 +232,15 @@ export class SelfHostIndexer {
     const key = address.toLowerCase();
     const running = this.inFlight.get(key);
     if (running) {
-      if (!opts.full || running.full) return running.promise;
-      // A forced replay can't be satisfied by an in-flight incremental — chain it on.
-      const chained = running.promise.catch(() => undefined).then(() => this.reindex(address, opts));
-      return this.track(key, chained, true);
+      // A fetched delta or a different scan boundary is work, not a duplicate request.
+      if (opts.logs === undefined && opts.toBlock === undefined && opts.blockTag === undefined && (!opts.full || running.full)) return running.promise;
+      // Preserve work arriving after the current scan. On failure, scan from the stored watermark
+      // rather than folding only a later tail that could skip the failed window.
+      const chained = running.promise.then(
+        () => this.reindex(address, opts),
+        () => this.reindex(address, {...opts, logs: undefined}),
+      );
+      return this.track(key, chained, !!opts.full);
     }
     return this.track(key, this.reindex(address, opts), !!opts.full);
   }

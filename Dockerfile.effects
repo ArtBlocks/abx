@@ -33,5 +33,6 @@ RUN pnpm install --frozen-lockfile
 COPY packages packages
 
 ENV ABX_EFFECTS_PORT=8788
+ENV ABX_EFFECTS_HOST=0.0.0.0
 EXPOSE 8788
 ENTRYPOINT ["pnpm", "abx-effects"]

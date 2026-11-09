@@ -1,3 +1,4 @@
+import {fetchPublicContent, ContentNetworkError} from '@artblocks/abx-sdk/node';
 import {hexToString} from 'viem';
 import {
   buildGeneratorDocument,
@@ -172,7 +173,7 @@ export async function resolveLiveView(
   client: PublicClient,
   state: ProjectState,
   token: TokenState,
-  fetchFn: typeof fetch = fetch,
+  fetchFn: typeof fetch = fetchPublicContent,
 ): Promise<LiveView> {
   const {json} = await buildTokenData(client, state, token, {augment: process.env.ABX_DISABLE_AUGMENT !== '1'});
   const code = codeField(state);
@@ -190,6 +191,7 @@ export async function resolveLiveView(
       const codeRoot = entry.slice(0, entry.lastIndexOf('/') + 1);
       return {kind: 'html', html: injectTokenDataIntoHtml(doc, json, codeRoot)};
     } catch (err) {
+      if (err instanceof ContentNetworkError) throw err;
       // FALLBACK: the ?abx= redirect the old path survived on — never a hard failure.
       console.warn(
         `[code] entry-document fetch failed for ${state.address} (${entry}): ${(err as Error).message} — falling back to the ?abx= redirect`,
@@ -237,7 +239,7 @@ async function fetchEntryDocument(representation: string, url: string, fetchFn: 
   if (entryDocCache.size >= ENTRY_DOC_CACHE_MAX) {
     entryDocCache.delete(entryDocCache.keys().next().value as string); // oldest insert
   }
-  entryDocCache.set(url, {html, expiresAt: Date.now() + ttl});
+  if (Buffer.byteLength(html) <= 1024 * 1024) entryDocCache.set(url, {html, expiresAt: Date.now() + ttl});
   return html;
 }
 

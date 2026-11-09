@@ -1,6 +1,7 @@
 import {DatabaseSync} from 'node:sqlite';
 import {existsSync, mkdirSync, rmSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {contentRouteDigest, type ContentRouteKey} from '@artblocks/abx-sdk';
 import {resolveDataDir} from '@artblocks/abx-sdk/node';
 import type {
   Address,
@@ -198,6 +199,8 @@ export interface Store {
    *  row; routine incremental writes leave the log append-only. */
   putProject(state: ProjectState, opts?: {fullReplay?: boolean}): void;
   getProject(address: string): ProjectState | null;
+  /** Indexed token-root lookup; disposable and reconstructed with the projection. */
+  getContentRoute(digest: string): ContentRouteKey | null;
   listProjects(): ProjectState[];
 
   /** Drop the rebuildable projection (keeps registrations). Proves replay. */
@@ -447,6 +450,16 @@ export class SqliteStore implements Store {
     this.db.exec(SCHEMA);
     this.migrate();
     this.migrateSeq();
+    this.db.exec('UPDATE projects SET rpc_url=NULL WHERE rpc_url IS NOT NULL');
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS tokens_content_digest_idx ON tokens(content_digest)');
+    // Upgrade existing local projections without RPC or a full replay. Only old rows lack a key.
+    const missing = this.db.prepare(`SELECT t.project_address, t.token_id, p.chain_id FROM tokens t JOIN projects p ON p.address=t.project_address WHERE t.content_digest IS NULL`).iterate() as Iterable<{project_address: string; token_id: string; chain_id: number}>;
+    const update = this.db.prepare('UPDATE tokens SET content_digest=? WHERE project_address=? AND token_id=?');
+    this.db.exec('BEGIN');
+    try {
+      for (const row of missing) update.run(contentRouteDigest({chainId: row.chain_id, address: row.project_address, tokenId: row.token_id}), row.project_address, row.token_id);
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
 
   /** Shape changes that must land BEFORE the schema exec (its indexes reference new columns).
@@ -493,6 +506,7 @@ export class SqliteStore implements Store {
     // one JSON column; the shape is the ProjectState fields, spread back on hydrate.
     add('projects', 'code_state TEXT');
     add('tokens', 'params TEXT');
+    add('tokens', 'content_digest TEXT');
     // bound-output content (`effects.md → Bound vs referenced`): traits used to land in the
     // StorageBackend beside the referenced bytes; they belong with the row instead.
     add('effect_artifacts', 'bytes BLOB');
@@ -854,7 +868,7 @@ export class SqliteStore implements Store {
           state.toBlock,
           state.eventCount,
           state.reconstructedAt,
-          state.rpcUrl ?? null,
+          null, // legacy column: transport configuration is never projection data
         );
 
       // tokens: upsert every token in the new state, then delete any id that's no longer present
@@ -872,13 +886,13 @@ export class SqliteStore implements Store {
         for (const id of removedIds) delToken.run(key, id);
       }
       const upsertToken = this.db.prepare(
-        `INSERT INTO tokens (project_address, token_id, lifecycle, owner, token_uri, fields, locked_fields, params, supply, max_supply, max_supply_overridden, holders)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        `INSERT INTO tokens (project_address, token_id, lifecycle, owner, token_uri, fields, locked_fields, params, supply, max_supply, max_supply_overridden, holders, content_digest)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(project_address, token_id) DO UPDATE SET
            lifecycle=excluded.lifecycle, owner=excluded.owner, token_uri=excluded.token_uri,
            fields=excluded.fields, locked_fields=excluded.locked_fields, params=excluded.params,
            supply=excluded.supply, max_supply=excluded.max_supply,
-           max_supply_overridden=excluded.max_supply_overridden, holders=excluded.holders`,
+           max_supply_overridden=excluded.max_supply_overridden, holders=excluded.holders, content_digest=excluded.content_digest`,
       );
       for (const t of state.tokens) {
         upsertToken.run(
@@ -896,6 +910,7 @@ export class SqliteStore implements Store {
           // `undefined` (a 721 token) stays NULL; only an id with its own MaxSupplyUpdated writes 1.
           t.maxSupplyOverridden === undefined ? null : b(t.maxSupplyOverridden),
           t.holders && Object.keys(t.holders).length ? JSON.stringify(t.holders) : null,
+          contentRouteDigest({chainId: state.chainId, address: state.address, tokenId: t.tokenId}),
         );
       }
 
@@ -936,6 +951,11 @@ export class SqliteStore implements Store {
   getProject(address: string): ProjectState | null {
     const row = this.db.prepare(`SELECT * FROM projects WHERE address = ?`).get(lc(address));
     return row ? this.hydrate(row as unknown as ProjectRow) : null;
+  }
+
+  getContentRoute(digest: string): ContentRouteKey | null {
+    const row = this.db.prepare(`SELECT p.chain_id, p.address, t.token_id FROM tokens t JOIN projects p ON p.address=t.project_address WHERE t.content_digest=?`).get(digest) as {chain_id: number; address: string; token_id: string} | undefined;
+    return row ? {chainId: row.chain_id, address: row.address, tokenId: row.token_id} : null;
   }
 
   listProjects(): ProjectState[] {
@@ -1127,7 +1147,6 @@ export class SqliteStore implements Store {
       toBlock: p.to_block,
       eventCount: p.event_count,
       reconstructedAt: p.reconstructed_at,
-      rpcUrl: p.rpc_url ?? undefined,
     };
   }
 }

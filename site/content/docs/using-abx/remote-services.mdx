@@ -157,3 +157,21 @@ abx migrate 0xYourContract --from <source> --to <destination>
 
 The command copies offchain values, checks hashes, and compares both resolvers. It does not update DNS
 or the onchain base URI.
+
+## Project content
+
+The first-party provider serves metadata at `resolver.abx.io` and each token's application at the
+root of its own hashed subdomain of `abxcontent.app`. Accounts and creator controls remain at
+`services.abx.io`. Existing metadata/animation URLs and older collection content URLs remain
+compatible entrypoints: browser navigation redirects to the token origin; marketplace frames and
+downloads receive a restricted wrapper. Token artifacts use the token's origin, and collection
+artifacts use a separate collection origin. Copies of an ERC-1155 ID share that ID's origin.
+
+For direct viewing or integrations, read the service descriptor's `content` advertisement with
+`abx remote abx`, use the SDK's `discoveredLiveViewUrl`, or read the live-view response's canonical
+`Link` header. Preserve query parameters and fragments. Keep chain, address, and token ID in your
+application's identity data; they are not encoded as readable URL path segments on the content root.
+Do not guess a provider's hostname policy or replace a contract's resolver base with a content URL.
+Contracts retain their existing metadata URI construction; fully on-chain URI rendering remains
+independent of this hosted service. See [self-hosting content origins](/docs/using-abx/self-hosting#content-origins)
+for the hash format, rebuildable lookup, and limits of sandbox-only hosting.

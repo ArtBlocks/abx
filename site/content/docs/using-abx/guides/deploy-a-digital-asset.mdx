@@ -70,6 +70,18 @@ Inspect the program before choosing custody:
 abx inspect ./sketch.js
 ```
 
+`inspect`, script deployment (both ERC-721 and ERC-1155), and `replace-script` warn about an HTML
+embedding restriction: a literal `<!--` followed later by `<script` can leave the generated script
+element unterminated, even when those characters are inside a JavaScript string or comment. The
+upload can succeed while the browser never runs the artwork. A lone `<!--` and ordinary closing
+script sequences are not this finding; the current generator already escapes closing script tags.
+
+Correct the source in a way appropriate to its JavaScript context. For example, in an ordinary
+string literal, write `'<!-' + '-'` instead of `'<!--'`. Do not blindly rewrite arbitrary source or
+insert a comment terminator. These local checks warn without executing or changing the source and
+add no contract validation. Preview the generated page before uploading and before `lock-script`:
+an unlocked script can be replaced, but locking permanently freezes its stored bytes.
+
 Then deploy an onchain script with a hosted resolver:
 
 ```bash

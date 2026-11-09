@@ -174,6 +174,10 @@ For an active JavaScript sale, run continuous effects. For a fixed supply or rep
 may be sufficient. With an on-chain Solidity image renderer, no effects service is needed for the
 image; do not deploy infrastructure merely because the collection is a code contract.
 
+Effects triggers require JSON and accept up to 1 MiB per request. Tokenless loopback mode refuses
+requests from other browser origins; ordinary CLI calls work directly. Failed index recovery retries
+only the affected project with backoff, preserving the missing range without periodic project sweeps.
+
 Protect public effects endpoints with the generated token. An unauthenticated force-render endpoint
 can burn compute and storage. Keep resolver admin/effects credentials separate from wallet signing.
 
@@ -243,3 +247,47 @@ compare resolver state without cutting over prematurely.
 
 Never describe resolver migration as moving the NFT. Ownership, parameters, commitments, and canonical
 events remain on-chain; only the serving/indexing projection changes.
+
+## Browser content origins
+
+Metadata/control endpoints and executable project pages can have different origins. Read the
+provider descriptor (`abx remote <name-or-url>`) for `content.domain` and
+`content.liveViewUrlTemplate`, or use a live-view response's canonical `Link` header. Prefer that
+direct content URL for standalone apps and integrations. Preserve token query parameters. Never
+invent content hostnames or replace a contract's metadata resolver base with the content domain.
+The first-party content domain is `abxcontent.app`; each token has a fixed-length hashed subdomain
+and its live application is at `/`. Use `discoveredLiveViewUrl` for advertised templates, including
+older providers, rather than assuming a hostname format.
+
+Existing animation URLs remain marketplace-compatible wrapper/redirect entry points. Within a
+collection, token IDs have separate DOM/storage origins; copies of one ERC-1155 ID share an origin.
+Collection artifacts have a separate origin. Self-contained on-chain metadata/HTML does
+not require this HTTP service.
+
+For self-hosting, configure wildcard DNS and HTTPS for a separate domain, then set
+`ABX_CONTENT_DOMAIN` on the resolver and effects worker. Remote effects runners use advertised content
+origins when the provider supplies them during service discovery. Without it, project documents run in an opaque-origin sandbox;
+persistent browser storage and some wallet flows will not work. Keep application sessions and
+sensitive cookies off the content domain. No on-chain transaction is needed for a hosting-origin
+change when the existing resolver routes remain available.
+
+Contract-facing URI bases remain the resolver's `/t` and `/c` endpoints; their contracts append
+chain/address/token coordinates. Do not point these bases at hashed content hosts. Both first-party
+and reference self-hosted resolvers support token-root routing from a chain-derived index that is
+rebuilt with the projection. No contract update or private routing registry is required. On-chain
+data documents and external creator hosts do not inherit the resolver's HTTP headers. Use runtime
+token data for identity, not `location.pathname`; new content URLs have no identifying path.
+
+### Reference hosting trust boundary
+
+The self-hosted resolver/effects toolkit supports collections controlled by one trusted operator.
+Do not recommend it as a multi-tenant sandbox for unrelated creators. Content origins protect browser
+isolation; untrusted rendering also requires worker/network isolation and resource controls.
+Project-controlled server fetches use public HTTP(S) destinations only, including after DNS and
+redirect validation. Entry documents are capped at 16 MiB decoded / 10 seconds.
+
+Preview and browser signing are loopback-only. Preview excludes hidden files and symlinks outside its
+build root. Open the exact signing URL printed by the CLI; its session secret is temporary and private.
+Public effects listeners require a nonempty ABX_EFFECTS_TOKEN. Deterministic cloud image templates
+must use `<publicBase>/<chainId>/<lowercase-contract-address>/{id}.png` (or another path under that
+collection prefix). New `--image-base` code deployments add that namespace automatically. Explain the required prefix migration for an existing custom template.

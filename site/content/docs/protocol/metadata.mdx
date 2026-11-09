@@ -34,6 +34,16 @@ field bytes use the stable `/t/{chainId}/{contract}/{tokenId}/data/{field}` rout
 have `/a/{chainId}/{contract}/{tokenId}` as their canonical live application view; an
 `animation_url` may point to either route when they serve the same document.
 
+HTTP resolvers may keep these stable routes while serving project bytes from token-scoped
+content origins. Live-view routes may return a restricted wrapper for marketplace embedding; byte
+artifact routes redirect to the original bytes. A canonical `Link` response header can identify the
+direct content URL. Content hosting does not change the on-chain metadata or URI configuration. Contracts still append
+chain/address/token coordinates to their configured resolver bases. Content hostnames and browser
+paths are provider delivery choices, discovered through the descriptor or canonical link; artwork
+must use token data for identity rather than parse `location.pathname`. Fully on-chain data documents
+and externally hosted content retain their own delivery behavior. See
+[content origins](/docs/using-abx/self-hosting#content-origins) for the reference implementation.
+
 Parameters are separate. Read them from the contract rather than `tokenURI`. See
 [Parameters](/docs/protocol/params).
 

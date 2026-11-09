@@ -23,6 +23,9 @@ permissions:
 
 jobs:
   release:
+    # The npm trusted publisher must require this environment; its branch policy allows only main.
+    if: github.repository == 'ArtBlocks/abx' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: npm-publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -119,5 +119,7 @@ export function resolveDataDir(options: ResolveDataDirOptions = {}): DataDirReso
  * a browser host passes a `DecompressionStream`-based implementation instead.
  */
 export function nodeInflate(bytes: Uint8Array): Uint8Array {
-  return new Uint8Array(gunzipSync(bytes));
+  return new Uint8Array(gunzipSync(bytes, {maxOutputLength: 16 * 1024 * 1024}));
 }
+
+export {contentBrowserEnvironment, CONTENT_BROWSER_ARGS, fetchPublicContent, contentDestination, isPublicAddress, startContentProxy, ContentNetworkError, type PublicNetworkOptions, type PublicFetchOptions} from './public-network.js';

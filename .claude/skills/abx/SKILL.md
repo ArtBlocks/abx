@@ -1,21 +1,27 @@
 ---
 name: abx
 description: >-
-  Use the ABX CLI (`abx`) to plan, launch, host, inspect, and operate ABX NFT projects on supported
-  networks: static 1/1s, image series, editions, JavaScript/code drops, and Solidity-rendered projects.
+  Use the ABX CLI (`abx`) to explore, plan, launch, host, inspect, and operate programmable NFT
+  projects on supported networks, from artwork to shared resources and stateful digital objects.
   Covers on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
   PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
   requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
-  change an ABX collection, or to determine whether ABX supports a mechanic.
+  change an ABX collection, develop project ideas or ecosystem integrations, or determine whether
+  ABX supports a mechanic.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
-  version: "0.7.1"
+  version: "0.8.7"
 ---
 
 # ABX
 
 Use `abx` as the execution and truth surface. Help, capability output, dry runs, on-chain reads, and
 typed errors outrank remembered prose.
+
+Think of ABX NFTs as programmable, durable digital objects that use blockchain technology. Their
+data, state, permissions, and behavior can matter as much as their appearance. Configure and transfer
+hooks can execute contract actions, including creating assets or interacting with financial protocols.
+For project ideation, read [ideation.md](reference/ideation.md) before choosing an implementation path.
 
 ## Non-negotiable rules
 
@@ -62,17 +68,19 @@ typed errors outrank remembered prose.
 
 ## Use the lifecycle
 
-Follow this state machine instead of accumulating retries:
+For implementation and operations, follow this state machine instead of accumulating retries:
 
 1. **Discover** — identify the working directory, CLI provenance/version, active chain, artifacts,
    existing contract addresses, configured remote, and signer preference. Run `abx doctor` for a
    deployment or unfamiliar environment. Surface and recommend any available CLI update before
    planning a deployment or write; do not bury the notice in setup output. If the creator has not
-   chosen a signer, inspect the live remote and prefer `--sponsor` when the active chain and command
+   chosen a signer, inspect the live remote and prefer `--embedded` when the active chain and command
    are advertised as eligible; otherwise choose the appropriate bring-your-own lane. Never silently
    replace an explicit signer choice.
 2. **Classify surfaces** — decide collection shape, runtime, required public surfaces, custody,
    resolution, authority, mutability, and mint/sale timing. Use the model below.
+   For ecosystem integrations, load [ecosystem.md](reference/ecosystem.md); choose inputs that fit
+   the object's behavior and explain ongoing dependencies before choosing third-party tools.
 3. **Inspect** — run `abx capabilities --json`; for code run `abx inspect` and `abx preview`. For an
    existing collection run `abx state`, `abx tokens`, `abx tokenuri`, and `abx verify` as relevant.
 4. **Plan** — use the selected deploy command with `--dry-run --json`. Read its normalized shape,
@@ -143,7 +151,7 @@ Important boundaries:
   `abx_image_type`. See `reference/deploy.md` for repairing a raster that serves as SVG.
 - Deploy tested custom hooks/renderers from exact compiled initcode with `abx deploy-contract`.
   ABX sends the bytes; it does not compile, link, audit, or infer constructor types. Test on the
-  paired testnet and source-verify before wiring a production address. Under `--sponsor`, the
+  paired testnet and source-verify before wiring a production address. Under `--embedded`, the
   keyless CREATE2 proxy is the constructor caller, so pass ownership explicitly instead of relying
   on `msg.sender` in the constructor.
 - A code project may need no public host when its image/traits are computed by Solidity renderers.
@@ -191,7 +199,7 @@ Before any real deploy, say these choices explicitly when relevant:
 
 ## Use capability classification, not optimism or refusal
 
-Classify an unusual request as exactly one of:
+When assessing implementation feasibility, classify an unusual request as exactly one of:
 
 1. **Native** — a documented CLI lane performs it.
 2. **Extension** — a custom minter, configure/transfer/augment hook, field renderer, or seed source
@@ -211,11 +219,13 @@ lane. Read [capabilities.md](reference/capabilities.md) before designing a custo
 - Static projects, editions, placement, costs, and deploy confirmation → [deploy.md](reference/deploy.md)
 - Programs, renderers, thumbnails, traits, PostParams, seeds, and dependencies → [code.md](reference/code.md)
 - First-party hosted services, OAuth device login, and core/provider feedback → [services.md](reference/services.md)
+- The reference self-hosted toolkit is for collections controlled by one trusted operator, not unrelated tenants. Explain its network, preview, signing, and storage limits in the hosting reference.
 - Generic remotes, self-hosted resolvers/effects, storage, lifecycle, and migration → [hosting.md](reference/hosting.md)
 - Existing-project reads, mint/sales, fields, transfers, authority, and locks → [operate.md](reference/operate.md)
 - Failure classification, resume, RPC/storage/rendering faults, and retry discipline → [diagnose.md](reference/diagnose.md)
 - Capability questions, extension seams, mechanics, and hard boundaries → [capabilities.md](reference/capabilities.md)
 - ERC-721C/ERC-1155C enrollment and validator operations → [creator-token.md](reference/creator-token.md)
+- Ecosystem ideation, official third-party tools, chain coverage, and setup footprint → [ecosystem.md](reference/ecosystem.md)
 
 Read every reference applicable to the requested workflow before sending a real transaction. Do not
 load unrelated references merely because they exist.

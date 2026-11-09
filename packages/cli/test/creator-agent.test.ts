@@ -4,8 +4,8 @@ import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {Chacha20Poly1305} from '@hpke/chacha20poly1305';
 import {CipherSuite, DhkemP256HkdfSha256, HkdfSha256} from '@hpke/core';
 import {generateP256KeyPair} from '@privy-io/node';
-import {CreatorAgentAuthorization, CreatorAuthorizationError} from '../src/creator-agent.js';
-import {CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/creator-keyring.js';
+import {CreatorAgentAuthorization, CreatorAuthorizationError, restoreOrAuthorizeCreatorAgent} from '../src/creator-agent.js';
+import {CreatorCredentialStoreAccessError, CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/creator-keyring.js';
 import {
   assertSponsorConfigured,
   assertSponsoredPreparedTx,
@@ -223,16 +223,78 @@ test('native credential records round-trip without exposing a plaintext fallback
   assert.equal(await store.load(), null);
 });
 
-test('sponsor preflight permits Base networks behind the live account gate and requires the API key', () => {
+test('denied credential reads stop before another device grant, retry, write, or deletion', async () => {
+  const events: string[] = [];
+  const store = new CreatorKeyringStore('app_test', creatorWallet.address, {
+    async getPassword() {
+      events.push('read');
+      throw new Error('private native error detail');
+    },
+    async setPassword() { events.push('write'); },
+    async deleteCredential() { events.push('delete'); return true; },
+  });
+  const authorization = {
+    async restore() { await store.load(); return []; },
+    async start() { events.push('start'); return {userCode: 'test', verificationUri: 'https://example.test'}; },
+    async wait() { events.push('wait'); return []; },
+  };
+  await assert.rejects(
+    restoreOrAuthorizeCreatorAgent(authorization, {
+      checkingStore: () => events.push('context'),
+      device: () => events.push('show-device'),
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof CreatorCredentialStoreAccessError);
+      assert.match(error.message, /stopped before signing or starting another agent grant/);
+      assert.equal(error.message.includes('private native error detail'), false);
+      return true;
+    },
+  );
+  assert.deepEqual(events, ['context', 'read']);
+});
+
+test('a reusable grant does not start another device authorization', async () => {
+  const wallets = [{id: creatorWallet.id, address: creatorWallet.address, chainType: 'ethereum'}];
+  const events: string[] = [];
+  const result = await restoreOrAuthorizeCreatorAgent({
+    async restore() { events.push('read'); return wallets; },
+    async start() { throw new Error('must not start'); },
+    async wait() { throw new Error('must not wait'); },
+  }, {
+    checkingStore: () => events.push('context'),
+    device: () => { throw new Error('must not show device flow'); },
+  });
+  assert.deepEqual(result, {wallets, newlyApproved: false});
+  assert.deepEqual(events, ['context', 'read']);
+});
+
+test('an absent grant starts exactly one device flow after credential-store context', async () => {
+  const events: string[] = [];
+  const wallets = [{id: creatorWallet.id, address: creatorWallet.address, chainType: 'ethereum'}];
+  const result = await restoreOrAuthorizeCreatorAgent({
+    async restore() { events.push('read'); return null; },
+    async start() { events.push('start'); return {userCode: 'test', verificationUri: 'https://example.test'}; },
+    async wait() { events.push('wait'); return wallets; },
+  }, {
+    checkingStore: () => events.push('context'),
+    device: () => events.push('show-device'),
+  });
+  assert.deepEqual(result, {wallets, newlyApproved: true});
+  assert.deepEqual(events, ['context', 'read', 'start', 'show-device', 'wait']);
+});
+
+test('sponsor preflight permits Base and Arbitrum networks behind the live account gate and requires the API key', () => {
   const before = process.env.ABX_SERVICES_API_KEY;
+  const eligible = ['base', 'base-sepolia', 'arbitrum', 'arbitrum-sepolia', 'ethereum', 'sepolia', 'robinhood', 'robinhood-testnet'];
   try {
     delete process.env.ABX_SERVICES_API_KEY;
-    assert.throws(() => assertSponsorConfigured('sepolia'), /Base and Base Sepolia only/);
-    assert.throws(() => assertSponsorConfigured('base'), /ABX_SERVICES_API_KEY/);
-    assert.throws(() => assertSponsorConfigured('base-sepolia'), /ABX_SERVICES_API_KEY/);
+    for (const chain of eligible) {
+      assert.throws(() => assertSponsorConfigured(chain), /ABX_SERVICES_API_KEY/);
+    }
     process.env.ABX_SERVICES_API_KEY = 'abx_test_key';
-    assert.doesNotThrow(() => assertSponsorConfigured('base'));
-    assert.doesNotThrow(() => assertSponsorConfigured('base-sepolia'));
+    for (const chain of eligible) {
+      assert.doesNotThrow(() => assertSponsorConfigured(chain));
+    }
   } finally {
     if (before === undefined) delete process.env.ABX_SERVICES_API_KEY;
     else process.env.ABX_SERVICES_API_KEY = before;
@@ -344,7 +406,7 @@ test('the explicit creator API override is a bounded development escape hatch', 
   );
 });
 
-test('sponsored preview resolves the existing account wallet with a read-only request', async () => {
+test('sponsored preview resolves the same account wallet on Base and Arbitrum with read-only requests', async () => {
   const address = '0xadCaecC6539F91646293ea058A9f398dCC2271A6' as Address;
   const requests: Array<{url: string; method: string}> = [];
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -353,18 +415,20 @@ test('sponsored preview resolves the existing account wallet with a read-only re
       accountId: 'acct_test',
       emailVerified: true,
       wallet: {address, provider: 'privy', providerAppId: 'app_test'},
-      capabilities: {wallet: true, sponsorship: true, sponsoredChains: [8453, 84532]},
+      capabilities: {wallet: true, sponsorship: true, sponsoredChains: [8453, 84532, 42161, 421614]},
     });
   };
 
-  assert.equal(
-    await sponsoredPreviewAddress('base', {
-      env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
-      fetchImpl,
-    }),
-    address,
-  );
-  assert.deepEqual(requests, [{url: 'https://api.example/v1/account', method: 'GET'}]);
+  for (const chain of ['base', 'base-sepolia', 'arbitrum', 'arbitrum-sepolia']) {
+    assert.equal(
+      await sponsoredPreviewAddress(chain, {
+        env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+        fetchImpl,
+      }),
+      address,
+    );
+  }
+  assert.deepEqual(requests, Array.from({length: 4}, () => ({url: 'https://api.example/v1/account', method: 'GET'})));
 });
 
 test('sponsored preview refuses to provision missing account state', async () => {
@@ -460,12 +524,14 @@ test('sponsored preview enforces live per-chain entitlement', async () => {
       capabilities: {wallet: true, sponsorship: true, sponsoredChains: [84532]},
     });
 
-  await assert.rejects(
-    () =>
-      sponsoredPreviewAddress('base', {
-        env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
-        fetchImpl,
-      }),
-    /not enabled for Base/,
-  );
+  for (const chain of ['base', 'arbitrum', 'arbitrum-sepolia']) {
+    await assert.rejects(
+      () =>
+        sponsoredPreviewAddress(chain, {
+          env: {ABX_SERVICES_API_KEY: 'abx_test_key', ABX_CREATORS_API_URL: 'https://api.example'},
+          fetchImpl,
+        }),
+      /not enabled for/,
+    );
+  }
 });

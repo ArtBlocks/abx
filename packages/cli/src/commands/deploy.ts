@@ -1,3 +1,4 @@
+import {collectionImageTemplate, resolveImageNamespace} from '../image-template.js';
 /**
  * Deploy commands — the biggest domain, kept as ONE module (they share the salt/dry-run/staging
  * machinery too tightly to split further without duplicating it):
@@ -437,6 +438,7 @@ export function deploySeriesCommandLine(flags: Flags, salt: string): string {
   const bool = (k: string) => { if (flags[k] === '' || flags[k] === 'true') parts.push(`--${k}`); };
   str('dir', flags.dir); str('count', flags.count); str('name', flags.name); str('symbol', flags.symbol);
   str('description', flags.description); str('external-url', flags['external-url']); str('attributes', flags.attributes); // were DROPPED → the "redeploy identically" line lost the description
+  for (const [flag] of AUTHORSHIP_DEPLOY_FIELDS) str(flag, flags[flag]);
   bool('onchain-uri'); bool('onchain-image'); str('compress', flags.compress);
   str('backend', flags.backend); str('gateway', flags.gateway); str('bucket', flags.bucket);
   str('ipfs-gateway', flags['ipfs-gateway']); str('arweave-gateway', flags['arweave-gateway']);
@@ -459,6 +461,7 @@ export function deployCodeCommandLine(flags: Flags, salt: string): string {
   const bool = (k: string) => { if (flags[k] === '' || flags[k] === 'true') parts.push(`--${k}`); };
   str('script', flags.script); str('code-dir', flags['code-dir']);
   str('name', flags.name); str('symbol', flags.symbol); str('description', flags.description); str('external-url', flags['external-url']);
+  for (const [flag] of AUTHORSHIP_DEPLOY_FIELDS) str(flag, flags[flag]);
   str('image-renderer', flags['image-renderer']); str('image-base', flags['image-base']); str('attributes-renderer', flags['attributes-renderer']);
   str('max', flags.max); str('schema', flags.schema); bool('no-seed'); str('seed-source', flags['seed-source']);
   bool('onchain-uri'); str('generator', flags.generator); str('renderer', flags.renderer);
@@ -1273,6 +1276,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: '1of1' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
         // The 1/1 lane's InitParams has no minter/primaryPayee field at all — `null` here means
         // "no concept on this lane", not "unset".
@@ -1455,6 +1459,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: '1of1' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
       roles: {signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null, primaryPayee: null, minter: null},
       royalty: {bps: royaltyBps, capBps: maxRoyaltyBps, burnable},
@@ -1872,6 +1877,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: '1of1-edition' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -1998,6 +2004,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: '1of1-edition' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging', 'deploy'] : null},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -2507,6 +2514,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'series' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         // A staged on-chain collection is many chunk-write txs, one per file — that per-token detail
         // is printed above (`previewImageStaging`), not re-derived here; `legs` just names the shape.
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per token)', 'deploy'] : null},
@@ -2661,6 +2669,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: 'series' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per token)', 'deploy'] : null},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -3131,6 +3140,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'series-edition' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per id)', 'deploy'] : null},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -3252,6 +3262,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: 'series-edition' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: onchainImage ? ['onchain-image-staging (per id)', 'deploy'] : null},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -3542,7 +3553,7 @@ export const DEPLOY_CODE_FLAGS = new Set([
   // storage (directory mode) — mirrors storageOverrides()
   'backend', 'endpoint', 'bucket', 'region', 'prefix', 'public-base', 'gateway', 'mode', 'api-url', 'upload-url', 'provider', 'storage-signer',
   // signing lane + safety + trust anchor ('send' = the default lane, stated explicitly; see SHARED_DEPLOY_FLAGS)
-  'send', 'sign', 'sponsor', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'sponsor', 'embedded', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   // preview / confirm
   'dry-run', 'confirm', 'yes',
   'json', // the deployed address as data, narration to stderr
@@ -3569,7 +3580,7 @@ export const SHARED_DEPLOY_FLAGS = [
   // ignored — the guard firing on the tool's own documentation. Explicit is also better than bare for
   // a script or an agent: the lane that signs and sends is worth stating out loud.
   'send',
-  'sign', 'sponsor', 'unsigned', 'for', 'sign-url-file', 'dry-run', 'confirm', 'yes', 'salt', 'factory', 'bootstrap-factory', 'port', 'renderer', 'public-base-url',
+  'sign', 'sponsor', 'embedded', 'unsigned', 'for', 'sign-url-file', 'dry-run', 'confirm', 'yes', 'salt', 'factory', 'bootstrap-factory', 'port', 'renderer', 'public-base-url',
   '721c', // opt-in ERC-721C enrollment (recommended | 0x…) — every deploy path takes it
   'json', // the deployed address as data, narration to stderr — every deploy path takes it
 ];
@@ -4083,10 +4094,10 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     } else if (/(^|\/\/)s3[.-][^/]*amazonaws\.com/i.test(base) || /\.s3[.-][^/]*amazonaws\.com/i.test(base)) {
       warn(`--image-base ${base} looks like the S3 API host — marketplaces can read it ONLY if the bucket has public-read (or you front it with CloudFront/a domain). If it's not public, use that URL in ${bold('ABX_S3_ENDPOINT')} and pass a public URL here instead.`);
     }
-    const imageTemplate = base.includes('{id}') ? base : `${base.replace(/\/+$/, '')}/{id}.png`;
+    const imageTemplate = collectionImageTemplate(base, resolveChain(CHAIN).id, process.env.ABX_S3_PUBLIC_BASE);
     contractFields.push({field: encodeTag(F.image), representation: encodeTag(R.urlTemplate), value: toHex(imageTemplate)});
     identityFields.push('image');
-    info(`collection image → on-chain url-template ${bold(imageTemplate)} ${dim('(off-chain thumbnail at a deterministic per-token URL; the effect runner overwrites each key)')}`);
+    info(`collection image → on-chain url-template ${bold(imageTemplate)} (collection address resolved before signing) ${dim('(off-chain thumbnail at a deterministic per-token URL; the effect runner overwrites each key)')}`);
     // Name the EXACT upload vars the runner needs (an agent guessed R2_* names that abx never reads,
     // breaking the upload). --image-base is the public READ base; these are the write side.
     info(`  ${dim('the runner uploads stills here via')} ${bold('ABX_S3_ENDPOINT · ABX_S3_BUCKET · ABX_S3_ACCESS_KEY_ID · ABX_S3_SECRET_ACCESS_KEY')} ${dim('(set ABX_S3_PUBLIC_BASE to this same --image-base; `abx storage show` checks them; details → reference/hosting.md)')}`);
@@ -4587,6 +4598,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         // here would hit its temporal dead zone. `laneFromFlags` is pure (flags only), so call it
         // directly; the sent-side emit, below `const lane = …`, uses the hoisted binding instead.
         lane: laneFromFlags(flags),
+        paymentPolicy: laneFromFlags(flags) === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -4640,7 +4652,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   // baking a misleading localhost (the renderer is authoritative while set) — the same rule as
   // the 1/1's on-chain lane. The renderers themselves are set as setup-multicall legs, so the
   // on-chain lane flips on atomically WITH the content/params it resolves from.
-  const initParamsFor = (owner: Address) => ({
+  const initParamsFor = (owner: Address, clone: Address) => ({
     owner,
     name,
     symbol,
@@ -4667,7 +4679,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     mintTo: foldIntoInit && mintCount > 0 ? owner : zeroAddress,
     mintCount: foldIntoInit ? BigInt(mintCount) : 0n,
     tokenFields: [],
-    contractFields,
+    contractFields: resolveImageNamespace(contractFields, clone),
   });
   // `setupLegGroups` (the shared, resume-compatible builder) and the fresh-deploy batch shape
   // (`freshDeployBatches`) are hoisted above — see the comment there for why. Build the REAL
@@ -4685,7 +4697,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
       mints: Array.from({length: setupMintCount}, () => mintSetupLeg(g.mints.data)),
     });
     const setupTxs = codeSetupTxsFromBatches(batches, {contract: clone, chainId: cid, deps: deps.map((d) => d.display)});
-    const txs = [prepareDeploySeriesCode({factory, params: initParamsFor(owner), salt, chainId: cid, clone}), ...setupTxs];
+    const txs = [prepareDeploySeriesCode({factory, params: initParamsFor(owner, clone), salt, chainId: cid, clone}), ...setupTxs];
     return {clone, txs};
   };
 
@@ -4815,6 +4827,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: isEdition ? 'code-edition' : 'code',
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       roles: {signer: owner, owner, royaltyReceiver: null, primaryPayee: null, minter: null},
       royalty: null,
       // renderer/image: null — both are InitParams facts fixed at the ORIGINAL deploy (like
@@ -5091,6 +5104,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'code' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,
@@ -5209,7 +5223,7 @@ export const DEPLOY_CODE_EDITION_FLAGS = new Set<string>([
   'max', 'mint-count', 'mint-all', 'no-mint', 'mint-amount', 'unpaused', 'minter', 'primary-payee', 'royalty-bps', 'royalty-cap', 'burnable', '721c',
   'schema', 'no-seed', 'seed-source',
   'public-base-url', 'onchain-uri', 'generator', 'renderer', 'port',
-  'send', 'sign', 'sponsor', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
+  'send', 'sign', 'sponsor', 'embedded', 'unsigned', 'for', 'salt', 'factory', 'bootstrap-factory', 'sign-url-file',
   'dry-run', 'confirm', 'yes', 'json', 'copies',
   // storage (directory mode + --image-base's off-chain still) — mirrors storageOverrides(), same
   // allowlist entries as the 721 twin's DEPLOY_CODE_FLAGS.
@@ -5531,9 +5545,9 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
     } else if (/(^|\/\/)s3[.-][^/]*amazonaws\.com/i.test(base) || /\.s3[.-][^/]*amazonaws\.com/i.test(base)) {
       warn(`--image-base ${base} looks like the S3 API host — marketplaces can read it ONLY if the bucket has public-read (or you front it with CloudFront/a domain). If it's not public, use that URL in ${bold('ABX_S3_ENDPOINT')} and pass a public URL here instead.`);
     }
-    const imageTemplate = base.includes('{id}') ? base : `${base.replace(/\/+$/, '')}/{id}.png`;
+    const imageTemplate = collectionImageTemplate(base, resolveChain(CHAIN).id, process.env.ABX_S3_PUBLIC_BASE);
     contractFields.push({field: encodeTag(F.image), representation: encodeTag(R.urlTemplate), value: toHex(imageTemplate)});
-    info(`collection image → on-chain url-template ${bold(imageTemplate)} ${dim('(off-chain thumbnail at a deterministic per-id URL; the effect runner overwrites each key once a copy is minted)')}`);
+    info(`collection image → on-chain url-template ${bold(imageTemplate)} (collection address resolved before signing) ${dim('(off-chain thumbnail at a deterministic per-id URL; the effect runner overwrites each key once a copy is minted)')}`);
     info(`  ${dim('the runner uploads stills here via')} ${bold('ABX_S3_ENDPOINT · ABX_S3_BUCKET · ABX_S3_ACCESS_KEY_ID · ABX_S3_SECRET_ACCESS_KEY')} ${dim('(set ABX_S3_PUBLIC_BASE to this same --image-base; `abx storage show` checks them; details → reference/hosting.md)')}`);
     const s3Base = process.env.ABX_S3_PUBLIC_BASE?.replace(/\/+$/, '');
     if (s3Base && !imageTemplate.startsWith(`${s3Base}/`)) {
@@ -5553,7 +5567,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   // there for a renderer-only, no-program drop, which this function refuses anyway — every
   // edition-code deploy has a program). A setup large enough to miss the `eth_estimateGas` ceiling
   // (a big script) splits into MORE than one setup transaction — see `planCodeSetupBatches`.
-  const initParamsFor = (owner: Address): EditionCodeInitParams => ({
+  const initParamsFor = (owner: Address, clone: Address): EditionCodeInitParams => ({
     owner,
     name,
     symbol,
@@ -5576,7 +5590,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
     mintCount: 0n,
     mintAmount: 0n,
     tokenFields: [],
-    contractFields,
+    contractFields: resolveImageNamespace(contractFields, clone),
   });
   // Gas-bounded setup-transaction legs — script chunks, schemas, deps, on-chain-URI wiring are all
   // OWNER-INDEPENDENT (only a mint call's calldata embeds the owner+id+amount; its gas is a flat
@@ -5615,7 +5629,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
       planCodeSetupBatches({chunks: chunkLegs, config: configLegs, mints: mintLegsFor(owner)}),
       {contract: clone, chainId, deps: deps.map((d) => d.display)},
     );
-    const txs = [prepareDeployEditionCode({factory, params: initParamsFor(owner), salt, chainId, clone}), ...setupTxs];
+    const txs = [prepareDeployEditionCode({factory, params: initParamsFor(owner, clone), salt, chainId, clone}), ...setupTxs];
     return {clone, txs};
   };
   // deps ride the same setup batch as chunks/schemas/mints when everything fits one transaction, so
@@ -5684,6 +5698,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
         schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
         family: 'code-edition' satisfies DeployPlanFamily,
         lane,
+        paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
         transactions: {approvals, legs: planSetupLegs},
         roles: {
           signer: deployer, owner: deployer, royaltyReceiver: deployer,
@@ -5801,6 +5816,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
       schemaVersion: DEPLOY_PLAN_SCHEMA_VERSION,
       family: 'code-edition' satisfies DeployPlanFamily,
       lane,
+      paymentPolicy: lane === 'sponsor' ? 'prefer-self-payment' : null,
       transactions: {approvals, legs: planSetupLegs},
       roles: {
         signer: deployerAddr ?? null, owner: deployerAddr ?? null, royaltyReceiver: deployerAddr ?? null,

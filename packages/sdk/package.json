@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-sdk",
-  "version": "0.7.0",
+  "version": "0.10.3",
   "license": "MIT",
   "description": "Typed SDK for ABX protocol reads, deployments, operations, reconstruction, and verification.",
   "type": "module",
@@ -62,9 +62,11 @@
     "sync-abis": "tsx scripts/sync-abis.ts"
   },
   "dependencies": {
+    "ipaddr.js": "^2.5.0",
     "viem": "^2.56.5"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "parse5": "7.3.0"
   }
 }

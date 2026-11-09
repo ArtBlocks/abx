@@ -34,8 +34,13 @@ abx storage status <locator>
 | `propagating` | Another gateway has the bytes; yours is behind. |
 | `unreachable` | No checked gateway can fetch the locator yet. |
 
-Upload first. Wait for `ready`. Then write the locator into a token. Re-uploading does not make a slow
-gateway catch up.
+`abx storage upload` takes one file and prints the locator `abx attach` wants. It refuses a
+directory. To deploy a folder, pass it to the deploy command instead: `abx deploy-series --dir <folder>`
+for a folder of images, or `abx deploy-code --code-dir <folder>` for a code build. Neither needs a
+separate `storage upload` first.
+
+When you attach a file yourself: upload first. Wait for `ready`. Then write the locator into a
+token. Re-uploading does not make a slow gateway catch up.
 
 ## IPFS
 

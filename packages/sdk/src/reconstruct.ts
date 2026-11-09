@@ -732,7 +732,6 @@ async function assembleState(
     toBlock: toBlock.toString(),
     eventCount: events.length,
     reconstructedAt: new Date().toISOString(),
-    rpcUrl: client.transport?.url as string | undefined,
   };
 
   await applyHeadReads(client, state, factory, readUriDocuments, reuseScript);

@@ -1,3 +1,4 @@
+import {discoveredLiveViewUrl, type ServiceDescriptor} from '@artblocks/abx-sdk';
 import {createServer, type Server} from 'node:http';
 import {hexToString} from 'viem';
 import {
@@ -10,6 +11,9 @@ import {
   isCodeProject,
   linearBackoffDelay,
   locatorRejectionReason,
+  projectContentPolicy,
+  projectContentUrl,
+  type ProjectContentPolicy,
   renderArtifactKey,
   sleep,
   type Hex,
@@ -101,6 +105,10 @@ export interface EffectArtifactRecord {
 
 export interface RunnerOptions {
   resolverUrl: string;
+  /** Direct collection-content domain; remote discovery takes precedence when advertised. */
+  contentDomain?: string;
+  /** Canonical public resolver origin when the transport URL is a local alias. */
+  publicBaseUrl?: string;
   client: PublicClient | null;
   storage: StorageBackend;
   effects: EffectModule[];
@@ -157,6 +165,8 @@ export class EffectRunner {
   private readonly log: (line: string) => void;
   /** The resolver control-plane client (the locator-bridge publish lane) — null when co-located. */
   private readonly service: AbxServiceClient | null;
+  private contentPolicy: ProjectContentPolicy;
+  private discoveredContent?: {baseUrl: string; content: ServiceDescriptor['content']};
   /** Per-artifact-key failed-run counter (see MAX_ATTEMPTS). */
   private readonly attempts = new Map<string, number>();
   /** The notification queue: per-project pending work, merged on enqueue (tokenIds union;
@@ -180,6 +190,10 @@ export class EffectRunner {
 
   constructor(opts: RunnerOptions) {
     this.opts = opts;
+    this.contentPolicy = projectContentPolicy(
+      opts.publicBaseUrl ?? process.env.ABX_PUBLIC_BASE_URL ?? opts.resolverUrl,
+      opts.contentDomain ?? process.env.ABX_CONTENT_DOMAIN,
+    );
     this.log = opts.log ?? ((line) => console.log(`[effects] ${line}`));
     this.service = opts.adminToken ? new AbxServiceClient({baseUrl: opts.resolverUrl, token: opts.adminToken}) : null;
     // Boot guard: in the publish topology (we don't share the resolver's disk), referenced output
@@ -279,6 +293,8 @@ export class EffectRunner {
       this.preflightOnce = (async () => {
         try {
           const d = await this.service!.descriptor();
+          // The descriptor base is a diagnostic echo, not authority to redirect the configured transport.
+          this.discoveredContent = {baseUrl: this.opts.resolverUrl, content: d.content};
           if (!d.interfaces?.includes(CONTROL_PLANE_INTERFACE)) {
             this.log(
               `warning: ${this.opts.resolverUrl} declares no ${CONTROL_PLANE_INTERFACE} — publishes may be refused ` +
@@ -423,7 +439,10 @@ export class EffectRunner {
       state,
       token,
       tokenData,
-      liveViewUrl: `${this.opts.resolverUrl}/a/${state.chainId}/${state.address}/${token.tokenId}`,
+      liveViewUrl: this.discoveredContent
+        ? discoveredLiveViewUrl(this.discoveredContent.baseUrl, this.discoveredContent.content, {chainId: state.chainId, address: state.address, tokenId: token.tokenId})
+        : projectContentUrl(this.contentPolicy, `/a/${state.chainId}/${state.address}/${token.tokenId}`) ??
+          `${this.opts.resolverUrl}/a/${state.chainId}/${state.address}/${token.tokenId}`,
     };
     await this.reportStatus(probeKey, state, token, effect, 'rendering');
     let outputs: Record<string, EffectOutput | null>;
@@ -652,7 +671,10 @@ export class EffectRunner {
    *     synchronous sweep, returns the stats.
    *  Both require `Authorization: Bearer <authToken>` when one is configured (a public runner
    *  with an open force-render endpoint is a resource-burn hole); `/health` stays open. */
-  startHttp(port: number): Server {
+  startHttp(port: number, host = '127.0.0.1'): Server {
+    if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !this.opts.authToken?.trim()) {
+      throw new Error('A public effects listener requires a nonempty ABX_EFFECTS_TOKEN.');
+    }
     const server = createServer(async (req, res) => {
       try {
         const url = new URL(req.url ?? '/', 'http://localhost');
@@ -669,6 +691,20 @@ export class EffectRunner {
         if (this.opts.authToken && req.headers.authorization !== `Bearer ${this.opts.authToken}`) {
           res.writeHead(401, {'content-type': 'application/json'});
           return res.end(JSON.stringify({error: 'unauthorized — send Authorization: Bearer <ABX_EFFECTS_TOKEN>'}));
+        }
+        // Loopback is still reachable from other browser origins. Keep tokenless mode local
+        // without requiring another credential for normal CLI-to-runner requests.
+        if (!this.opts.authToken) {
+          const authority = new URL(`http://${req.headers.host ?? ''}`);
+          if (!['127.0.0.1', 'localhost', '[::1]'].includes(authority.hostname) ||
+              Number(authority.port || 80) !== (server.address() as import('node:net').AddressInfo).port ||
+              (req.headers.origin !== undefined && req.headers.origin !== authority.origin)) {
+            res.writeHead(403); return res.end('local effects origin refused');
+          }
+        }
+        if (req.method === 'POST' && ['/run', '/notify'].includes(url.pathname) &&
+            req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+          res.writeHead(415); return res.end('application/json required');
         }
         if (req.method === 'POST' && url.pathname === '/notify') {
           const body = JSON.parse(await readBody(req)) as {address?: string; tokenIds?: string[]; force?: boolean};
@@ -693,11 +729,13 @@ export class EffectRunner {
         res.writeHead(404, {'content-type': 'application/json'});
         res.end(JSON.stringify({error: 'unknown route'}));
       } catch (err) {
-        res.writeHead(500, {'content-type': 'application/json'});
-        res.end(JSON.stringify({error: (err as Error).message}));
+        if (res.destroyed || res.writableEnded) return;
+        if (err instanceof TriggerBodyError && !res.headersSent) res.setHeader('connection', 'close');
+        if (!res.headersSent) res.writeHead(err instanceof TriggerBodyError ? err.status : err instanceof SyntaxError || err instanceof TypeError ? 400 : 500, {'content-type': 'application/json'});
+        res.end(JSON.stringify({error: err instanceof TriggerBodyError ? err.message : 'effects request failed'}));
       }
     });
-    server.listen(port);
+    server.listen(port, host);
     return server;
   }
 
@@ -749,9 +787,19 @@ export class EffectRunner {
       return null;
     }
     const url = template.split('{id}').join(token.tokenId);
-    const prefix = `${publicBase}/`;
-    if (!url.startsWith(prefix)) return null; // template points at a different host — leave it to the normal path
-    return {objectKey: url.slice(prefix.length), url};
+    let objectKey: string;
+    try {
+      const base = new URL(`${publicBase.replace(/\/$/, '')}/`);
+      const target = new URL(url);
+      if (target.origin !== base.origin || !target.pathname.startsWith(base.pathname)) return null;
+      objectKey = decodeURIComponent(target.pathname.slice(base.pathname.length));
+    } catch {return null;}
+    const ownPrefix = `${state.chainId}/${state.address.toLowerCase()}/`;
+    if (!objectKey.startsWith(ownPrefix) || objectKey.split('/').some((p) => p === '..' || p === '.')) {
+      throw new Error(`Deterministic image template must use the collection's storage namespace: ${ownPrefix}`);
+    }
+    return {objectKey, url};
+
   }
 
   private async getState(address: string): Promise<ProjectState | null> {
@@ -786,11 +834,20 @@ export class EffectRunner {
   }
 }
 
-function readBody(req: import('node:http').IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => resolve(data));
-    req.on('error', reject);
-  });
+class TriggerBodyError extends Error {
+  constructor(readonly status: number, message: string) { super(message); }
+}
+
+async function readBody(req: import('node:http').IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let bytes = 0;
+  for await (const chunk of req.iterator({destroyOnReturn: false})) {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > 1024 * 1024) {
+      req.resume();
+      throw new TriggerBodyError(413, 'effects request exceeds 1 MiB');
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }

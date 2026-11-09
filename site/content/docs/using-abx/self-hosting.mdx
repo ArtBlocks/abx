@@ -5,6 +5,28 @@ description: "Run the ABX resolver and effects worker on your own infrastructure
 
 ABX ships a resolver and an effects worker. Neither needs an onchain signing key.
 
+Failed indexing work retains its missing scan interval until recovery completes. Healthy projects
+continue to use shared chain scans; quiet projects do not receive periodic per-project replays.
+Recovery follows the existing retry backoff when an RPC endpoint has not reached the required block.
+
+The reference toolkit supports collections controlled by **one trusted operator**. It is not a
+supported multi-tenant host for unrelated creators. Running third-party programs requires additional
+worker isolation, resource controls, and network and credential separation. Content subdomains protect
+browser origins; they do not make the reference worker a complete sandbox. Use a managed provider
+that explicitly supports third-party creators for that use case.
+
+Project-controlled server fetches accept public HTTP(S) destinations. Private, loopback, link-local,
+and reserved network addresses are refused, including DNS answers and redirect hops. Entry documents
+have a 16 MiB decoded response limit, a 10-second fetch deadline, and a five-redirect limit; gzip field/dependency expansion is also limited to 16 MiB; only documents up to 1 MiB enter
+the 32-entry cache. These are host limits, not restrictions on ABX contracts or on collectors' browsers.
+A refused destination is not fetched by the server or converted into an unsafe fallback.
+
+`abx preview` and browser-wallet signing listen on loopback only. Preview assets must stay inside the
+build directory after symlinks are resolved, and hidden files are not served. Put required assets
+inside the build root rather than linking to files elsewhere. Signing links contain a temporary
+session secret: open the exact link the CLI prints, and do not publish it. The browser-signing lane
+verifies direct EVM transactions; wrapped smart-account and multisig workflows use `--unsigned`.
+
 ## Local data directory
 
 ABX stores its SQLite projection, managed Arweave key, and content index together. It chooses one
@@ -60,6 +82,63 @@ abx status 0xYourContract
 
 The reference resolver assumes one trusted operator. Do not share it with unrelated customers without
 adding tenant isolation, quotas, and rate limits.
+
+## Content origins
+
+Project HTML and other active documents must execute separately from the resolver dashboard and
+control plane. By default, the reference resolver serves publisher documents with an opaque-origin
+CSP sandbox. Scripts and embedding remain enabled, but persistent browser storage and some wallet
+connections require a dedicated content domain.
+
+For complete websites, configure a separate domain with wildcard DNS and HTTPS pointing at the
+resolver, then set on the resolver and its effects worker:
+
+```bash
+ABX_CONTENT_DOMAIN=content.example.net
+```
+
+Each token's live application is served at `https://t-{digest}.content.example.net/`, with query
+parameters and fragments preserved. The digest is the full SHA-256 of the canonical UTF-8 string
+`abx-content-v1:token:{chainId}:{lowercaseAddress}:{decimalTokenId}`, encoded as lowercase, unpadded
+RFC 4648 base32. The complete label is 54 characters even for the largest uint256 token ID. Use the
+SDK's `contentOriginLabel` or discovery helper rather than implementing a provider's hostname policy
+in artwork. Token artifacts retain their protocol paths on that token's origin. Collection artifacts
+use a separate `c-` origin (the hash preimage is `abx-content-v1:collection:{chainId}:{lowercaseAddress}`).
+A content host refuses other tokens, account, dashboard, and control routes. Keep application
+sessions and sensitive cookies off the dedicated domain: sibling origins separate DOM and storage,
+but parent-domain cookies can be shared. Token editions share an origin for all copies of one ID.
+
+Existing `/a/` URLs and the older `{chainId}-{address}` collection hosts remain entrypoints:
+top-level browser navigation redirects to the token origin; frames and server-side downloads receive
+a restricted marketplace wrapper. Image and artifact routes redirect without changing committed
+bytes. The response's canonical `Link` header identifies the direct URL. Service descriptors advertise
+`content.domain`, `content.scheme`, and `content.liveViewUrlTemplate`; `abx remote` displays these.
+SDK clients can use `discoveredLiveViewUrl` to expand a provider's template or fall back to `/a/` for
+an unknown scheme. Fallbacks retain the configured resolver path prefix; a descriptor’s diagnostic
+base URL does not override that transport. Do not infer token coordinates from the browser path; use the ABX runtime's token
+identity. Relative resources must be valid at `/` or use explicit URLs.
+
+The SQLite index stores a disposable reverse lookup for token hashes, backfills existing projections
+on startup, and maintains it during indexing. An independently hosted resolver can rebuild the same
+URLs from chain state without this provider's database. Unknown hashes and unavailable tokens fail
+with the same lifecycle rules as `/a/`. No inventory of possible unminted IDs is generated.
+
+Keep contract-facing token and collection URI bases on the resolver (`https://resolver.example/t`
+and `https://resolver.example/c`). Contracts append their chain/address/token coordinates; the
+content domain is a browser delivery layer, not a replacement metadata base. This also applies to
+on-chain applications that fetch HTTP resources: discover their canonical URL or follow the resolver
+entrypoint. Fully on-chain URI renderers still return their own data documents; external IPFS,
+Arweave, or creator-hosted URLs retain those hosts' security policies. This resolver cannot impose
+HTTP isolation on documents served elsewhere or directly embedded as data URIs.
+
+For local development, use `ABX_PUBLIC_BASE_URL=http://127.0.0.1:8787` with
+`ABX_CONTENT_DOMAIN=localhost:8787` for HTTP token subdomains on the same port. The `localhost` root
+remains a public alias for local control reads. Use HTTPS for public domains and configure wildcard
+DNS and certificates before enabling the setting. Moving to a new origin resets browser storage and
+may require a fresh wallet connection. Without a content domain, opaque-origin sandboxing prevents
+shared-origin DOM access but limits storage and wallet integrations; do not remove that sandbox to
+make untrusted multi-project hosting work. Provider-specific embeds that copy artwork into their own
+origin must supply their own sandbox and isolation.
 
 ## SQLite maintenance
 

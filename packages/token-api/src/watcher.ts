@@ -184,7 +184,11 @@ export function startChainWatcher(opts: WatcherOptions): {stop(): void; status()
     for (const row of pending) {
       if (!indexer.store.getRegistration(row.address)) continue; // deregistered under us
       try {
-        const {state, mode} = await indexer.reindexShared(row.address as Address);
+        const reg = indexer.store.getRegistration(row.address)!;
+        const watchedThrough = indexer.store.getMeta(`watch:${reg.chainKey}`);
+        const {state, mode} = await indexer.reindexShared(row.address as Address, {
+          ...(watchedThrough === null ? {} : {toBlock: BigInt(watchedThrough)}),
+        });
         notify(row.address);
         log(`${row.address}: catch-up complete (${mode}, ${state.eventCount} event(s)) → live`);
       } catch (err) {
