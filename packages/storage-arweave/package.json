@@ -50,6 +50,6 @@
   },
   "dependencies": {
     "@ardrive/turbo-sdk": "^2.2.0",
-    "viem": "^2.56.5"
+    "viem": "^2.57.16"
   }
 }
