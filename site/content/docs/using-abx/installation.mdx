@@ -73,3 +73,7 @@ npm install @artblocks/abx-storage-arweave
 
 Install it beside the CLI, then use `--backend arweave` or `ABX_STORAGE_BACKEND=arweave`. You can also
 use `--provider http-bundler --upload-url <bundler>` without the package.
+
+The optional adapter uses Turbo 2 for prepaid uploads, credit balances, and hosted checkout. It does
+not install the optional x402/browser wallet connector tree or enable x402 payments. Local Ethereum
+signatures use viem; browser-wallet signatures use the supplied callback, and Arweave keys use RSA.

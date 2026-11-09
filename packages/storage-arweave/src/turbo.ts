@@ -1,14 +1,14 @@
 import {createHash} from 'node:crypto';
+import type {TurboAuthenticatedClient} from '@ardrive/turbo-sdk';
 import {hashMessage, hexToBytes, recoverPublicKey, type Hex} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 
 /**
  * ArDrive Turbo (Arweave) uploader implementation — split out of `@artblocks/abx-storage` so a
  * default `@artblocks/abx-cli` / `@artblocks/abx-storage` install never installs it.
- * `@ardrive/turbo-sdk` depends on `x402-fetch` -> `x402` -> `wagmi`, which drags in the
- * entire browser wallet-connector ecosystem (`@reown/appkit`, `@walletconnect/*`, `@metamask/sdk`,
- * `@coinbase/wallet-sdk`, `@base-org/account`, `porto`) that a Node CLI never executes — hundreds of
- * megabytes a resolver, indexer, or fs/cloud/ipfs-only self-host never needed.
+ * Turbo 2 keeps x402 funding as an optional peer. ABX uses prepaid uploads and does not install
+ * x402-fetch or its browser wallet-connector ecosystem. The adapter remains opt-in so ordinary
+ * fs/cloud/ipfs installs also avoid Turbo's remaining native and multi-chain dependencies.
  *
  * `@artblocks/abx-storage`'s `ArweaveBackend` lazily `await import('@artblocks/abx-storage-arweave')`s
  * this module — only when the `turbo` provider actually needs to sign an upload / check a balance /
@@ -235,8 +235,8 @@ export class TurboUploader implements ArweaveUploader {
     }
   }
 
-  private clientPromise?: Promise<unknown>;
-  private client(): Promise<any> {
+  private clientPromise?: Promise<TurboAuthenticatedClient>;
+  private client(): Promise<TurboAuthenticatedClient> {
     return (this.clientPromise ??= this.buildClient());
   }
 
@@ -247,7 +247,7 @@ export class TurboUploader implements ArweaveUploader {
    *  Security boundary: always pass the EVM signer. Passing a private key would make Turbo build
    *  its ethers-v5/elliptic signer (GHSA-848j-6mx2-7j84). Likewise, do not add a Solana identity
    *  without first resolving Turbo's bigint-buffer path (GHSA-3gc7-fjrx-p6mg). */
-  private async buildClient(): Promise<any> {
+  private async buildClient(): Promise<TurboAuthenticatedClient> {
     const m = await this.sdk();
     const id = this.identity;
     if (id.kind === 'arweave') {

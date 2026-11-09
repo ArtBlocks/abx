@@ -82,6 +82,13 @@ inputs. It is a high-fidelity authoring preview, not an end-to-end deployment pr
 - that marketplace metadata contains image and attributes;
 - that a hosted resolver/effects/storage path is reachable.
 
+Use `abx preview --check --json` to look for repeated-run drift in fresh Chromium contexts. It waits
+for `abx.done()` and compares pixels and normalized traits (exit 0: matching completed runs;
+1: observed drift; 2: incomplete execution or harness failure). Add `--frames <k>` to sample later
+frames at one-second targets; the report includes trait/pixel `driftFrames`, hazards through the last
+capture, errors, and actual capture times. A pass is bounded evidence for the sampled inputs and
+runtime, not proof of purity or cross-browser reproducibility. Clock/network/randomness observations
+do not alone fail matching output. See the public CLI reference for option bounds and limits.
 Use `--shoot` for representative frames. Exercise more than the default seed and every user-facing
 parameter. Then run `abx inspect` to analyze dependencies, deterministic seed usage, declared traits,
 document size, and lane fit. Treat findings as evidence and the deploy dry run/testnet verification as
