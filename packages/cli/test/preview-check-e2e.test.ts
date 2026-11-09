@@ -1,0 +1,51 @@
+/**
+ * `abx preview --check` against a real Chromium. Gated: the browser is an opt-in devDependency, so a
+ * machine without Playwright + a Chromium build skips rather than fails.
+ */
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {resolve} from 'node:path';
+
+const CLI = resolve(import.meta.dirname, '../src/main.ts');
+const FIXTURES = resolve(import.meta.dirname, '../../../fixtures/determinism');
+
+async function chromiumAvailable(): Promise<boolean> {
+  try {
+    const {chromium} = await import('playwright');
+    const {existsSync} = await import('node:fs');
+    return existsSync(chromium.executablePath());
+  } catch {
+    return false;
+  }
+}
+
+const available = await chromiumAvailable();
+
+function check(script: string) {
+  const r = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', CLI, 'preview', '--script', resolve(FIXTURES, script), '--check', '--runs', '2', '--count', '2', '--json'],
+    {encoding: 'utf8', timeout: 90_000},
+  );
+  return {status: r.status, report: JSON.parse(r.stdout) as {ok: boolean; verdict: string; seeds: Array<{hazards: string[]}>}};
+}
+
+test('--check: a pure program passes (exit 0) and stdout is the JSON report only', {skip: !available}, () => {
+  const {status, report} = check('pure.js');
+  assert.equal(status, 0);
+  assert.equal(report.verdict, 'pass');
+});
+
+test('--check: Math.random drifts (exit 1) and is named as a hazard', {skip: !available}, () => {
+  const {status, report} = check('random.js');
+  assert.equal(status, 1);
+  assert.equal(report.verdict, 'drift');
+  assert.ok(report.seeds[0].hazards.includes('Math.random'));
+});
+
+test('--check: Date.now drifts (exit 1)', {skip: !available}, () => {
+  const {status, report} = check('clock.js');
+  assert.equal(status, 1);
+  assert.equal(report.verdict, 'drift');
+});

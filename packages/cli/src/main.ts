@@ -652,13 +652,15 @@ const COMMAND_HELP: Record<string, string> = {
     ${g('--port')} <n>                  studio port (default ${DEFAULT_PREVIEW_PORT}; the resolver's ${DEFAULT_PORT} stays free)
     ${g('--shoot')} <dir>               render headlessly to PNGs + traits.json and EXIT ${dim('(for an agent that has no browser)')}
     ${g('--count')} <n>                 seeds to shoot / show in the grid (default 9)   ${g('--width')} <px>   ${g('--timeout-ms')} <n>
+    ${g('--check')} [--runs <n>]        render each seed in <n> fresh browser contexts (default 3) and compare pixels + traits; exit 0 pass · 1 drift · 2 harness. ${g('--json')} prints the report only
     Serves the ${bold('same document the generator serves')} — real ${g('abx.js')}, real tokenData shape, real dep tags — with a synthetic
     seed, so what you iterate on is what deploys. Routes: ${g('/')} studio (seed + params + live traits) · ${g('/grid')} N seeds at once,
     all live · ${g('/view')} the bare document. The program is re-read from disk per render, so ${bold('edit and refresh')} — no watcher.
     Unlike a still-image sweep this shows ${bold('animation')}, which is most of what a screenshot throws away.
     ${dim('Still do both after the work settles:')} ${g('abx inspect')} ${dim('(is it wired right?) and a testnet deploy (the faithful end-to-end).')}
       ${g('abx preview')} --script art.js --schema palette:HexColor:TokenOwner
-      ${g('abx preview')} --script art.js --shoot ./frames --count 12`,
+      ${g('abx preview')} --script art.js --shoot ./frames --count 12
+      ${g('abx preview')} --script art.js --check --json`,
   inspect: `
   ${bold('abx inspect')} <script.js> ${dim('— static analysis of a generative script + a lane recommendation. Read-only; the script is never executed.')}
     ${g('--dep <name@version>[,…]')}   the on-chain deps you plan to declare, so the assembled-document size estimate is realistic (e.g. --dep p5@1.0.0)

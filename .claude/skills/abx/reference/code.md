@@ -82,6 +82,8 @@ inputs. It is a high-fidelity authoring preview, not an end-to-end deployment pr
 - that marketplace metadata contains image and attributes;
 - that a hosted resolver/effects/storage path is reachable.
 
+Use `abx preview --check` to prove the render is a pure function of the seed: it renders each seed in fresh browser
+contexts and compares pixels and traits (exit 0 pass, 1 drift, 2 harness failure; `--json` prints the report only).
 Use `--shoot` for representative frames. Exercise more than the default seed and every user-facing
 parameter. Then run `abx inspect` to analyze dependencies, deterministic seed usage, declared traits,
 document size, and lane fit. Treat findings as evidence and the deploy dry run/testnet verification as
