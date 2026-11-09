@@ -80,12 +80,19 @@ async function capture(
   wantTraits: boolean,
 ): Promise<{png: Uint8Array; traits: string | null}> {
   const page = await browser.newPage({viewport: {width, height}});
+  let executionFailure: string | undefined;
+  page.on('pageerror', () => { executionFailure ??= 'live view raised an uncaught script error'; });
+  page.on('crash', () => { executionFailure ??= 'live view page crashed'; });
+  const assertExecutionSucceeded = () => {
+    if (executionFailure) throw new Error(`${executionFailure} — nothing was stored.`);
+  };
   const resp = await page.goto(liveViewUrl, {waitUntil: 'load', timeout: 60_000});
   // Refuse to capture a failed navigation. The live view 302s to the content gateway; if that
   // ends in an error status we'd otherwise screenshot the gateway's error page and store it as
   // the "still" — a silent garbage thumbnail. The common trigger is a fresh Arweave/Turbo
   // upload that hasn't propagated yet ("hashpath cannot be resolved on this node, yet"), or a
   // dead/HTML-refusing gateway. Fail loudly instead so `abx render` reports it and nothing is stored.
+  assertExecutionSucceeded();
   const status = resp?.status?.() ?? 0;
   if (status >= 400) {
     throw new Error(
@@ -98,12 +105,15 @@ async function capture(
   await page
     .waitForFunction('window.abx && window.abx.__done === true', undefined, {timeout: timeoutMs})
     .catch(() => undefined);
+  assertExecutionSucceeded();
   const png = (await page.screenshot({type: 'png'})) as Uint8Array;
+  assertExecutionSucceeded();
   const traits = wantTraits
     ? ((await page
         .evaluate('window.abx && window.abx.__traits ? JSON.stringify(window.abx.__traits) : null')
         .catch(() => null)) as string | null)
     : null;
+  assertExecutionSucceeded();
   return {png, traits};
 }
 
@@ -126,6 +136,7 @@ interface Browser {
   close(): Promise<void>;
 }
 interface Page {
+  on(event: 'pageerror' | 'crash', listener: () => void): unknown;
   goto(url: string, opts: {waitUntil: string; timeout: number}): Promise<NavResponse | null>;
   waitForFunction(fn: string, arg: undefined, opts: {timeout: number}): Promise<unknown>;
   screenshot(opts: {type: 'png'}): Promise<Uint8Array>;

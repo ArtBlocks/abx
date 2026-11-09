@@ -89,3 +89,7 @@ automatically, resolving the factory-predicted collection address before signing
 Templates outside that collection namespace are rejected before rendering. Existing self-hosters
 using a custom prefix must update their image template to receive further deterministic thumbnail
 writes; existing stored objects are not moved or deleted automatically.
+
+The reference render effect refuses image and trait outputs when the live document raises an
+uncaught exception or the page crashes before capture completes. Console diagnostics alone do not
+fail a render. Healthy scripts without `abx.done()` retain the bounded capture-delay fallback.
