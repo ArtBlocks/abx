@@ -164,7 +164,27 @@ test('compareCheckRuns: a timeout with matching output is a harness verdict, nev
   assert.deepEqual([CHECK_EXIT.pass, CHECK_EXIT.drift], [0, 1]);
 });
 
+test('compareCheckRuns: drift that starts after frame 1 is caught only when later frames are compared', () => {
+  const run = (later?: string[]) => ({pixelHash: 'a', ...(later ? {laterHashes: later} : {}), traits: null, hazards: []});
+  const single = compareCheckRuns([{seed: 's0', runs: [run(), run(), run()]}]);
+  assert.equal(single.verdict, 'pass');
+  assert.equal(single.frames, 1);
+  assert.deepEqual(single.seeds[0].driftFrames, []);
+
+  const steady = compareCheckRuns([{seed: 's0', runs: [run(['b']), run(['b'])]}]);
+  assert.equal(steady.verdict, 'pass');
+  assert.equal(steady.frames, 2);
+
+  const late = compareCheckRuns([{seed: 's0', runs: [run(['b', 'c']), run(['b', 'x']), run(['b', 'c'])]}]);
+  assert.equal(late.verdict, 'drift');
+  assert.equal(late.frames, 3);
+  assert.deepEqual(late.seeds[0].driftFrames, [3]);
+  assert.equal(late.seeds[0].pixelMatch, false);
+  assert.equal(late.seeds[0].distinctPixels, 2);
+});
+
 test('--check is an accepted preview flag', () => {
   assert.ok(PREVIEW_FLAGS.has('check'));
   assert.ok(PREVIEW_FLAGS.has('runs'));
+  assert.ok(PREVIEW_FLAGS.has('frames'));
 });

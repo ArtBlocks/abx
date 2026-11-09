@@ -38,13 +38,13 @@ async function webglAvailable(): Promise<boolean> {
 const available = await chromiumAvailable();
 const webgl = available && (await webglAvailable());
 
-function check(script: string) {
+function check(script: string, frames = 1) {
   const r = spawnSync(
     process.execPath,
-    ['--import', 'tsx', CLI, 'preview', '--script', resolve(FIXTURES, script), '--check', '--runs', '2', '--count', '2', '--json'],
+    ['--import', 'tsx', CLI, 'preview', '--script', resolve(FIXTURES, script), '--check', '--runs', '2', '--count', '2', '--json', ...(frames > 1 ? ['--frames', String(frames)] : [])],
     {encoding: 'utf8', timeout: 90_000},
   );
-  return {status: r.status, report: JSON.parse(r.stdout) as {ok: boolean; verdict: string; seeds: Array<{hazards: string[]}>}};
+  return {status: r.status, report: JSON.parse(r.stdout) as {ok: boolean; verdict: string; frames: number; seeds: Array<{hazards: string[]; driftFrames: number[]}>}};
 }
 
 test('--check: a pure program passes (exit 0) and stdout is the JSON report only', {skip: !available}, () => {
@@ -76,4 +76,20 @@ test('--check: a WebGL program coloured by Math.random drifts (exit 1)', {skip: 
   const {status, report} = check('webgl-drift.js');
   assert.equal(status, 1);
   assert.equal(report.verdict, 'drift');
+});
+
+test('--check --frames 2: a deterministic animation passes at every frame', {skip: !available}, () => {
+  const {status, report} = check('animated.js', 2);
+  assert.equal(status, 0);
+  assert.equal(report.verdict, 'pass');
+  assert.equal(report.frames, 2);
+});
+
+test('--check: an animation that diverges after frame 1 passes with one frame and drifts with two', {skip: !available}, () => {
+  const one = check('animated-drift.js');
+  assert.equal(one.status, 0);
+  const two = check('animated-drift.js', 2);
+  assert.equal(two.status, 1);
+  assert.equal(two.report.verdict, 'drift');
+  assert.deepEqual(two.report.seeds[0].driftFrames, [2]);
 });

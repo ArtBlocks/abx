@@ -97,10 +97,12 @@ async function cmdPreviewBody(flags: Flags, emit?: (payload: Record<string, unkn
 
   if (checkMode) {
     const runs = Math.max(2, Number(flags.runs ?? 3) || 3);
-    step(`Determinism check — ${count} seeds, ${runs} fresh-context runs each`);
+    const frames = Math.min(Math.max(Math.floor(Number(flags.frames ?? 1)) || 1, 1), 20);
+    step(`Determinism check — ${count} seeds, ${runs} fresh-context runs each${frames > 1 ? `, ${frames} frames` : ''}`);
     try {
       const report = await checkPreview(server.url, count, {
         runs,
+        frames,
         width: Number(flags.width ?? 1000) || 1000,
         timeoutMs: Number(flags['timeout-ms'] ?? 10_000) || 10_000,
         params: parsePreviewParams(flags.param as string | undefined),

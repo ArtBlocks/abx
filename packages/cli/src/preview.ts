@@ -591,6 +591,10 @@ export interface CheckSeedResult {
   traitsMatch: boolean;
   /** Distinct pixel hashes seen — 1 for a deterministic seed; more says HOW unstable it is. */
   distinctPixels: number;
+  /** Frames compared per run (1 = the settled frame only). */
+  frames: number;
+  /** 1-based frames at which the runs disagree — [] when pixels match everywhere. */
+  driftFrames: number[];
   /** A run stopped waiting before the program reported. That says nothing about determinism. */
   timedOut: boolean;
   /** Non-determinism sources the program touched while rendering (Date.now, Math.random…). */
@@ -609,12 +613,15 @@ export interface CheckReport {
   ok: boolean;
   verdict: CheckVerdict;
   runs: number;
+  frames: number;
   seeds: CheckSeedResult[];
 }
 
 /** One run's observable output, reduced to what must be reproducible. */
 export interface CheckRun {
   pixelHash: string;
+  /** Hashes of frames 2..K, taken at fixed intervals after the first (`--frames`). Absent for a single frame. */
+  laterHashes?: string[];
   traits: Record<string, unknown> | null;
   hazards: string[];
   timedOut?: boolean;
@@ -626,16 +633,23 @@ export const CHECK_EXIT: Record<CheckVerdict, number> = {pass: 0, drift: 1, harn
 /** Pure comparison of N runs per seed — kept separate from the browser so it is unit-testable. */
 export function compareCheckRuns(runs: Array<{seed: string; runs: CheckRun[]}>): CheckReport {
   const seeds = runs.map(({seed, runs: rs}) => {
-    const distinctPixels = new Set(rs.map((r) => r.pixelHash)).size;
-    const pixelMatch = distinctPixels === 1;
+    const nFrames = 1 + Math.max(0, ...rs.map((r) => r.laterHashes?.length ?? 0));
+    const frameHash = (r: CheckRun, f: number) => (f === 0 ? r.pixelHash : r.laterHashes?.[f - 1]);
+    const driftFrames: number[] = [];
+    for (let f = 0; f < nFrames; f++) if (new Set(rs.map((r) => frameHash(r, f))).size > 1) driftFrames.push(f + 1);
+    const distinctPixels = new Set(rs.map((r) => JSON.stringify([r.pixelHash, r.laterHashes ?? []]))).size;
+    const pixelMatch = driftFrames.length === 0;
     const traitsMatch = new Set(rs.map((r) => JSON.stringify(r.traits))).size === 1;
     const hazards = [...new Set(rs.flatMap((r) => r.hazards))].sort();
     const timedOut = rs.some((r) => r.timedOut);
-    return {seed, match: pixelMatch && traitsMatch, pixelMatch, traitsMatch, distinctPixels, timedOut, hazards};
+    return {seed, match: pixelMatch && traitsMatch, pixelMatch, traitsMatch, distinctPixels, frames: nFrames, driftFrames, timedOut, hazards};
   });
   const verdict: CheckVerdict = seeds.some((s) => !s.match) ? 'drift' : seeds.some((s) => s.timedOut) ? 'harness' : 'pass';
-  return {ok: verdict === 'pass', verdict, runs: runs[0]?.runs.length ?? 0, seeds};
+  return {ok: verdict === 'pass', verdict, runs: runs[0]?.runs.length ?? 0, frames: seeds[0]?.frames ?? 1, seeds};
 }
+
+/** Gap between `--check --frames` captures, after the first (taken once the program has reported). */
+export const CHECK_FRAME_INTERVAL_MS = 1000;
 
 /** Installed before any program code: records calls to the usual sources of non-determinism. */
 const HAZARD_SHIM = `(() => {
@@ -666,11 +680,12 @@ const HAZARD_SHIM = `(() => {
 export async function checkPreview(
   base: string,
   count: number,
-  opts: {width?: number; timeoutMs?: number; params?: Record<string, string>; runs?: number} = {},
+  opts: {width?: number; timeoutMs?: number; params?: Record<string, string>; runs?: number; frames?: number} = {},
 ): Promise<CheckReport> {
   const width = opts.width ?? STAGE_PX;
   const timeoutMs = opts.timeoutMs ?? 10_000;
   const nRuns = Math.max(2, opts.runs ?? 3);
+  const nFrames = Math.max(1, opts.frames ?? 1);
   const overrides = Object.entries(opts.params ?? {})
     .map(([k, v]) => `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('');
@@ -690,8 +705,16 @@ export async function checkPreview(
         const probe = (await page.evaluate(
           '({traits: (window.abx && window.abx.__traits) || null, done: !!(window.abx && window.abx.__done), hazards: Array.from(window.__abxHazards || [])})',
         )) as {traits: Record<string, unknown> | null; done: boolean; hazards: string[]};
+        const hash = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+        // Animation: more frames at fixed intervals after the first, so drift that starts later is seen.
+        const laterHashes: string[] = [];
+        for (let f = 1; f < nFrames; f++) {
+          await page.waitForTimeout(CHECK_FRAME_INTERVAL_MS);
+          laterHashes.push(hash(await page.screenshot()));
+        }
         return {
-          pixelHash: createHash('sha256').update(shot).digest('hex'),
+          pixelHash: hash(shot),
+          ...(laterHashes.length ? {laterHashes} : {}),
           traits: probe.traits,
           hazards: probe.hazards,
           // Same rule as --shoot: a late report after the wait expired is not a timeout.
@@ -717,7 +740,7 @@ export async function checkPreview(
 // ── flag surface ─────────────────────────────────────────────────────────────────
 
 export const PREVIEW_FLAGS: ReadonlySet<string> = new Set([
-  'script', 'code-dir', 'schema', 'dep', 'port', 'shoot', 'check', 'runs', 'json', 'count', 'width', 'timeout-ms', 'param',
+  'script', 'code-dir', 'schema', 'dep', 'port', 'shoot', 'check', 'runs', 'frames', 'json', 'count', 'width', 'timeout-ms', 'param',
 ]);
 
 /**

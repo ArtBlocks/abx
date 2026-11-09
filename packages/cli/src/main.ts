@@ -652,7 +652,8 @@ const COMMAND_HELP: Record<string, string> = {
     ${g('--port')} <n>                  studio port (default ${DEFAULT_PREVIEW_PORT}; the resolver's ${DEFAULT_PORT} stays free)
     ${g('--shoot')} <dir>               render headlessly to PNGs + traits.json and EXIT ${dim('(for an agent that has no browser)')}
     ${g('--count')} <n>                 seeds to shoot / show in the grid (default 9)   ${g('--width')} <px>   ${g('--timeout-ms')} <n>
-    ${g('--check')} [--runs <n>]        render each seed in <n> fresh browser contexts (default 3) and compare pixels + traits; exit 0 pass · 1 drift · 2 harness. ${g('--json')} prints the report only
+    ${g('--check')} [--runs <n>] [--frames <k>]  render each seed in <n> fresh browser contexts (default 3) and compare pixels + traits; exit 0 pass · 1 drift · 2 harness. ${g('--json')} prints the report only
+                          ${g('--frames')} <k>: compare k frames per run, 1s apart (default 1) — catches an animation that drifts after the first frame
     Serves the ${bold('same document the generator serves')} — real ${g('abx.js')}, real tokenData shape, real dep tags — with a synthetic
     seed, so what you iterate on is what deploys. Routes: ${g('/')} studio (seed + params + live traits) · ${g('/grid')} N seeds at once,
     all live · ${g('/view')} the bare document. The program is re-read from disk per render, so ${bold('edit and refresh')} — no watcher.
