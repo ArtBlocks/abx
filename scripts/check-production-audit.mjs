@@ -20,25 +20,13 @@ const accepted = new Map([
       module: 'elliptic',
       severity: 'low',
       paths: [
-        'packages__storage-arweave>@ardrive/turbo-sdk>@cosmjs/proto-signing>@cosmjs/crypto>elliptic',
+        'packages__storage-arweave>@ardrive/turbo-sdk>@dha-team/arbundles>@ethersproject/hash>@ethersproject/abstract-signer>@ethersproject/abstract-provider>@ethersproject/transactions>@ethersproject/signing-key>elliptic',
       ],
       reason:
-        'no upstream fix; ABX supplies a viem-backed Ethereum signer and does not use Turbo\'s Cosmos/Kyve signing path',
+        'no upstream fix; faulty ECDSA nonce generation belongs to ethers-v5 signing, while ABX supplies viem-backed or remote Ethereum signatures and uses RSA for Arweave; Turbo signer integration tests cover both paths',
     },
   ],
-  [
-    'GHSA-mrhx-c7xc-m3w5',
-    {
-      module: 'zod',
-      severity: 'high',
-      paths: [
-        'packages__storage-arweave>@ardrive/turbo-sdk>@permaweb/aoconnect>zod',
-        'packages__storage-arweave>@ardrive/turbo-sdk>x402-fetch>x402>wagmi>@wagmi/connectors>@walletconnect/ethereum-provider>@reown/appkit>@reown/appkit-wallet>zod',
-      ],
-      reason:
-        'fixed only in zod 4; these zod 3 copies are unreachable — turbo-sdk 1.43.0 declares but never imports @permaweb/aoconnect, and appkit-wallet loads only behind WalletConnect\'s browser QR modal',
-    },
-  ],
+
 ]);
 
 /**
