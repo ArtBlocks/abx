@@ -12,6 +12,7 @@
  * `deploy.ts` call site for the specific reasoning behind its nulls.
  */
 import type {Address} from '@artblocks/abx-sdk';
+import type {SigningReadiness} from './riskgate.js';
 
 /** Bump whenever a field is added, renamed, or reinterpreted — a consumer keys behavior off this,
  *  not off the CLI's own package version (that changes for reasons unrelated to this shape).
@@ -25,8 +26,9 @@ import type {Address} from '@artblocks/abx-sdk';
  *  see each field's own doc comment). A consumer keying behavior off `legs`' shape needs to know
  *  which version it's reading.
  *
- *  v3: added `paymentPolicy` to describe automatic creator-wallet payment. */
-export const DEPLOY_PLAN_SCHEMA_VERSION = 3 as const;
+ *  v3: added `paymentPolicy` to describe automatic creator-wallet payment.
+ *  v4: dry-run command output adds conservative signing `readiness`. */
+export const DEPLOY_PLAN_SCHEMA_VERSION = 4 as const;
 
 /** The six product lanes `deploy.ts` implements — a stable discriminator independent of the legacy
  *  `command`/`kind` fields already on the payload (which exist for backward compat and don't fully
@@ -208,6 +210,8 @@ export interface DeployPlan {
   family: DeployPlanFamily;
   lane: DeployPlanLane;
   paymentPolicy: 'prefer-self-payment' | null;
+  /** Added by the command's JSON renderer on dry runs; post-send summaries omit it. */
+  readiness?: SigningReadiness;
   transactions: DeployPlanTransactions;
   roles: DeployPlanRoles;
   /** `null` on a `--resume` emit: royalty is an InitParams field fixed at the ORIGINAL deploy, and a

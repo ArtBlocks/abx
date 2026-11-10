@@ -33,6 +33,8 @@ import {
 import {CHAIN, localIndexer, storageOptions, storageOverrides} from '../config.js';
 import {type Flags, parseFlags, positionalArgs, warnStrayFlags} from '../flags.js';
 import {jsonSafe, withJson} from '../jsonout.js';
+import {validateCollectionMetadata} from '../collection-metadata.js';
+import {viewerSurface, tokenViewerUrl} from '../view-url.js';
 import {markBatchFailure} from '../errors.js';
 import {assertPortFree, bold, c, dim, g, info, loadEffects, ok, requirePublishableBackend, step, warn} from '../output.js';
 import {detectTokenKind, describeKind, isEditionContract} from '../kind.js';
@@ -567,6 +569,17 @@ async function cmdArtifactsRemote(address: Address, tokenId: string, remote: Rem
   });
 }
 
+export async function cmdViewUrl(address: Address | undefined, flags: Flags, extra: string[] = []): Promise<void> {
+  if (!address || !isAddress(address) || positionalArgs(extra).length) throw new Error('usage: abx view-url <address> [--token <id>] [--remote <name|url> | --base-url <serving-base>] [--json]');
+  const tokenId = flags.token ?? '0';
+  // Validate before discovery/RPC; the default code path here is used only for validation.
+  tokenViewerUrl({baseUrl: 'http://localhost'}, resolveChain(CHAIN).id, address, tokenId, true);
+  const [kind, surface] = await Promise.all([detectTokenKind(makePublicClient({chainKey: CHAIN}), address), viewerSurface(flags)]);
+  const viewerUrl = tokenViewerUrl(surface, resolveChain(CHAIN).id, address, tokenId, kind.kind === 'code' || kind.kind === 'edition-code');
+  if (flags.json !== undefined) console.log(JSON.stringify({contract: address, chainId: resolveChain(CHAIN).id, tokenId: BigInt(tokenId).toString(), viewerUrl}));
+  else console.log(viewerUrl);
+}
+
 export async function cmdTokenUri(address: Address | undefined, flags: Flags, extra: string[] = []) {
   if (!address || address.startsWith('--')) {
     console.error('usage: abx tokenuri <address> [--token <id>] [--fetch] [--json]\n');
@@ -717,6 +730,7 @@ export function reportServedTokenUri(served: ServedTokenUri, address: Address): 
  * guessed path that 404s reads exactly like a broken service. Ask the chain instead.
  */
 export async function cmdContractUri(address: Address | undefined, flags: Flags) {
+  if (flags.validate !== undefined && !['true', 'marketplace'].includes(flags.validate)) throw new Error('--validate supports the marketplace profile');
   if (!address || address.startsWith('--')) {
     console.error('usage: abx contracturi <address>\n');
     process.exitCode = 1;
@@ -764,11 +778,20 @@ export async function cmdContractUri(address: Address | undefined, flags: Flags)
     return;
   }
   return withJson<Record<string, unknown>>(flags, async (emit) => {
+    const report = (document: Record<string, unknown>) => {
+      if (flags.validate === undefined) {emit(document); return;}
+      const validation = validateCollectionMetadata(document);
+      emit({document, validation});
+      if (!validation.valid) {
+        process.exitCode = 1;
+        warn(`collection metadata missing [${validation.missing.join(', ')}]; invalid [${validation.invalid.join(', ')}]`);
+      } else info('collection metadata passes the marketplace profile; third-party ingestion is not guaranteed');
+    };
     console.log(`\n  ${bold('contractURI()')} ${dim(`— read directly from ${address} on ${CHAIN}`)}`);
     const onChain = decodeOnChainJson(uri);
     if (onChain) {
       const document = JSON.parse(onChain) as Record<string, unknown>;
-      emit(document);
+      report(document);
       info('resolution: ON-CHAIN (data: URI from the renderer — no server in the path)');
       console.log(onChain.split('\n').map((l) => '    ' + l).join('\n') + '\n');
       return;
@@ -813,7 +836,7 @@ export async function cmdContractUri(address: Address | undefined, flags: Flags)
     info('resolution: OFF-CHAIN (fetched from the URL the contract commits to)');
     try {
       const document = JSON.parse(body) as Record<string, unknown>;
-      emit(document);
+      report(document);
       console.log(
         JSON.stringify(document, null, 2)
           .split('\n')

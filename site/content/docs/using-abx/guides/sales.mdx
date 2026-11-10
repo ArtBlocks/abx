@@ -58,8 +58,17 @@ Minter assignment, payee, and pause state still apply to the whole contract.
 ## Mint page
 
 ```bash
-abx mint-page <token>
+abx mint-page <token> --static
 ```
 
-This writes a static mint site for the shared minter. A series gets a gallery. An edition gets a token
-ID and quantity form. The generated page currently supports ETH sales.
+Before unpausing, build and check the collector page against the intended network, collection,
+price, and sale state. Include its URL in your launch checklist and share it after opening the sale.
+
+`--static` writes a Next.js project configured for static export. Run `npm install` and
+`npm run build` in the generated directory, then upload the contents of `out/` to any host that
+serves HTML, CSS, and JavaScript. Production needs no Node server. Set public `NEXT_PUBLIC_*`
+configuration before building; changing it requires another build. Omit `--static` for a normal
+Next.js deployment. Both modes use the same browser wallet and bounded, paginated chain reads.
+
+A series gets a gallery. An edition gets a token ID and quantity form. The generated page currently
+supports ETH sales. ERC-20 sales need an explicit allowance and purchase flow before launch.

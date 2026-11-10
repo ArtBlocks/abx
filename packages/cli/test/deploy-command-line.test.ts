@@ -13,6 +13,8 @@ const authorship: Record<string, string> = {
   'display-notes': 'notes with $HOME and spaces',
   'creator-links': 'https://a.example https://b.example',
   license: 'CC0',
+  'banner-image': 'https://example.com/banner.png',
+  'featured-image': 'https://example.com/featured.png',
 };
 
 // Split the printed line the way a POSIX shell would, so the test checks what a user who pastes it gets.

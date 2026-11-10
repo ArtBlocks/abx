@@ -78,6 +78,9 @@ test('deploy --dry-run --json: royalty/burnable/mint/approvals/custody/URI-base 
   assert.equal(code, 0, stderr);
   const payload = JSON.parse(stdout);
   const plan = payload.plan;
+  assert.equal(plan.readiness.status, 'blocked');
+  assert.equal(plan.readiness.ready, false);
+  assert.ok(plan.readiness.missing.includes('local signing key'));
   assert.ok(plan, `no plan object in the JSON payload:\n${stdout}`);
   assert.equal(plan.paymentPolicy, null, 'non-embedded plans explicitly have no creator payment policy');
 
@@ -213,13 +216,18 @@ const FAMILIES: Array<{args: string[]; family: DeployPlanFamily}> = [
   {args: ['deploy', '--copies', '3', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: '1of1-edition'},
   {args: ['deploy-series', '--dir', tmpSeries(), '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: 'series'},
   {args: ['deploy-series', '--dir', tmpSeries(), '--copies', '3', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: 'series-edition'},
+  {args: ['deploy-code', '--script', tmpSketch(), '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: 'code'},
+  {args: ['deploy-code', '--script', tmpSketch(), '--copies', '3', '--for', FOR, '--name', 'X', '--symbol', 'XX', '--onchain-uri'], family: 'code-edition'},
 ];
 
 test('every deploy lane emits the same schemaVersion and a closed-union family', async () => {
   for (const {args, family} of FAMILIES) {
-    const {code, stdout, stderr} = await runCliSplit([...args, '--dry-run', '--json'], NO_KEY);
+    const {code, stdout, stderr} = await runCliSplit([...args, '--banner-image', 'https://example.com/banner.png', '--featured-image', 'https://example.com/featured.png', '--dry-run', '--json'], NO_KEY);
     assert.equal(code, 0, `${args.join(' ')}:\n${stderr}`);
     const plan = JSON.parse(stdout).plan;
+    assert.equal(plan.readiness.status, 'blocked', family);
+    assert.match(stderr, /collection banner_image: https:\/\/example.com\/banner.png/);
+    assert.match(stderr, /collection featured_image: https:\/\/example.com\/featured.png/);
     assert.equal(plan.schemaVersion, DEPLOY_PLAN_SCHEMA_VERSION, `${family}: schemaVersion drifted`);
     assert.equal(plan.paymentPolicy, null, `${family}: paymentPolicy must be explicit`);
     assert.equal(plan.family, family, `${family}: family discriminator drifted`);

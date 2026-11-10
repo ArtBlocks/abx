@@ -145,6 +145,15 @@ Read the dry-run summary and confirm:
 - supply, premint, pause state, and sale plan
 - every expected wallet approval
 
+Dry runs report the selected signing lane and conservative readiness. `blocked` names missing or
+invalid local prerequisites; `unknown` means a wallet connection, external signature, creator grant,
+payment eligibility, execution, or funding has not been verified. Only a matching hot key with a
+successful existing execution/funding simulation earns `ready`. Credential presence alone does not.
+Version 4 deploy JSON exposes this as `plan.readiness`; prepared-write JSON includes `readiness`
+beside its existing simulation. These checks never refresh grants, provision wallets, or send
+transactions, and add no RPC calls. Nonzero transaction value cannot use gas sponsorship; an
+eligible creator wallet may instead self-pay.
+
 The browser signing lane connects once for a staged workflow and asks for explicit approval of each
 action. Rejection or cancellation ends the session. An abandoned session expires after 30 minutes
 without a connection or completed action. Inspect confirmed transaction hashes before resuming a

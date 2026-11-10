@@ -48,6 +48,8 @@ export interface MintPageOptions {
    * way — just without a tile grid underneath them.
    */
   isEdition?: boolean;
+  /** Emit a build-time static export; the same client components perform all chain reads. */
+  staticExport?: boolean;
 }
 
 export interface MintPageArtifact {
@@ -84,7 +86,7 @@ function packageJson(o: MintPageOptions): string {
       name: slug(o.collectionName) + '-mint',
       private: true,
       version: '0.1.0',
-      scripts: {dev: 'next dev', build: 'next build', start: 'next start'},
+      scripts: {dev: 'next dev', build: 'next build', ...(o.staticExport ? {} : {start: 'next start'})},
       dependencies: {
         next: '^15.0.3',
         react: '^19.0.0',
@@ -672,9 +674,9 @@ function readme(o: MintPageOptions): string {
     '## Run it locally\n\n' +
     '```bash\nnpm install\nnpm run dev      # http://localhost:3000\n```\n\n' +
     'Config lives in `.env.local` (already prefilled). It reads sale state + each token\'s image straight from chain — no backend.\n\n' +
-    '## Deploy (Vercel — recommended)\n\n' +
+    (o.staticExport ? '## Deploy to a static host\n\nRun `npm run build` and upload the contents of `out/`. No Node server is needed in production. Set the public `NEXT_PUBLIC_*` configuration before building; changes require rebuilding.\n\n' : '## Deploy (Vercel — recommended)\n\n' +
     '```bash\nnpm i -g vercel\nvercel            # first run links/creates the project\nvercel --prod     # ship it\n```\n\n' +
-    'In the Vercel dashboard set the same `NEXT_PUBLIC_*` vars from `.env.local` (Project → Settings → Environment Variables), then redeploy. Any Next.js host works; Vercel is the least-setup path.\n\n' +
+    'In the Vercel dashboard set the same `NEXT_PUBLIC_*` vars from `.env.local` (Project → Settings → Environment Variables), then redeploy. Any Next.js host works; Vercel is the least-setup path.\n\n') +
     '## Customize (this is a starting point)\n\n' +
     '- **Design** — it is plain React + one `app/globals.css`. Restyle freely; ask your agent for a bespoke layout per drop.\n' +
     '- **Multi-wallet** — V1 uses the injected wallet (`window.ethereum`) with zero config. For WalletConnect/Coinbase/etc., swap in [RainbowKit](https://rainbowkit.com) + wagmi (needs a WalletConnect projectId).\n' +
@@ -692,7 +694,7 @@ export function mintPageArtifact(o: MintPageOptions): MintPageArtifact {
   return {
     files: [
       {path: 'package.json', content: packageJson(o)},
-      {path: 'next.config.mjs', content: NEXT_CONFIG},
+      {path: 'next.config.mjs', content: o.staticExport ? NEXT_CONFIG.replace('const nextConfig = {', "const nextConfig = {output: 'export', trailingSlash: true, ") : NEXT_CONFIG},
       {path: 'tsconfig.json', content: TSCONFIG},
       {path: 'next-env.d.ts', content: NEXT_ENV},
       {path: '.gitignore', content: GITIGNORE},
@@ -701,7 +703,7 @@ export function mintPageArtifact(o: MintPageOptions): MintPageArtifact {
       {path: 'lib/config.ts', content: LIB_CONFIG},
       {path: 'lib/chain.ts', content: LIB_CHAIN},
       {path: 'lib/abi.ts', content: isEdition ? LIB_ABI_EDITION : LIB_ABI},
-      {path: 'lib/meta.ts', content: LIB_META},
+      {path: 'lib/meta.ts', content: isEdition ? LIB_META.replace("functionName: 'tokenURI'", "functionName: 'uri'") : LIB_META},
       {path: 'app/globals.css', content: APP_GLOBALS},
       {path: 'app/layout.tsx', content: APP_LAYOUT},
       {path: 'app/page.tsx', content: APP_PAGE},
@@ -711,7 +713,9 @@ export function mintPageArtifact(o: MintPageOptions): MintPageArtifact {
     steps: [
       'npm install',
       'npm run dev            # preview at http://localhost:3000',
-      'npm i -g vercel && vercel --prod   # deploy (set the NEXT_PUBLIC_* vars in the Vercel dashboard)',
+      ...(o.staticExport
+        ? ['npm run build          # export to out/', 'Upload the contents of out/ to your static host; no server runtime is needed.']
+        : ['npm i -g vercel && vercel --prod   # deploy (set the NEXT_PUBLIC_* vars in the Vercel dashboard)']),
     ],
   };
 }

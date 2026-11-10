@@ -451,7 +451,7 @@ export function assertMintableSeries(token: string, kind: TokenKindInfo | undefi
 }
 
 export async function cmdMintPage(address: string | undefined, flags: Flags) {
-  const usage = 'abx mint-page <token> [--dir mint-page] [--name "…"] [--rpc <public-url>] [--minter-contract 0x..]';
+  const usage = 'abx mint-page <token> [--static] [--dir mint-page] [--name "…"] [--rpc <public-url>] [--minter-contract 0x..]';
   const token = address;
   if (!token || !token.startsWith('0x')) {
     console.error(`usage: ${usage}\n`);
@@ -512,6 +512,7 @@ export async function cmdMintPage(address: string | undefined, flags: Flags) {
     collectionName,
     explorer: chain.blockExplorers?.default?.url,
     isEdition,
+    staticExport: flags.static !== undefined,
   });
   const dir = flags.dir && flags.dir !== 'true' ? flags.dir : 'mint-page';
   const outDir = resolvePath(dir);

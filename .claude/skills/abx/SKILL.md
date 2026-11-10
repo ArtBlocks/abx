@@ -169,6 +169,8 @@ Before deploying, write down the promised value for each applicable row:
 | Contract identity and owner powers | `abx state <addr>` and the deploy readout |
 | Token metadata | `abx tokenuri <addr> --token <id>` |
 | Collection metadata | `abx contracturi <addr>` |
+| Token browser URL | `abx view-url <addr> --token <id> --remote <name> --json` |
+| Collector mint page | `abx mint-page <addr> --static` — build, upload `out/`, check before unpause |
 | Nonblocking service login | `abx auth login --no-wait --no-open --json`, then `abx auth login --resume --no-wait --json` in the same private project directory |
 | Image | decoded metadata plus a successful fetch or on-chain field provenance |
 | Animation/live view | the decoded `animation_url`, loaded with a real minted token |
