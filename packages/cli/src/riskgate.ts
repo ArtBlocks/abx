@@ -324,6 +324,8 @@ export interface GatedSendOptions {
   /** Test-only seam: a pre-built client for the dry-run simulation, instead of one `simulateDryRun`
    *  would otherwise construct from `chainKey`. Every production caller omits this. */
   client?: PublicClient;
+  /** Reuse the same dry-run result in a command's outer JSON envelope. Never runs on a send. */
+  onSimulation?: (simulation: DryRunSimulation) => void;
 }
 
 /** Resolve the signer a preview should simulate from the same source the hot send will use.
@@ -358,6 +360,7 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
     const prepared = await resolveProvider(provider, expectedSigner ?? zeroAddress);
     if (flags.json !== undefined) {
       const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, false, opts.client, lane === 'sponsor');
+      opts.onSimulation?.(simulation);
       console.log(JSON.stringify({
         dryRun: true,
         sent: false,
@@ -375,6 +378,7 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
     } else {
       printDryRunPreview(prepared, expectedSigner);
       const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, true, opts.client, lane === 'sponsor');
+      opts.onSimulation?.(simulation);
       const readiness = currentSigningReadiness(lane, expectedSigner, simulation, BigInt(prepared.value));
       console.log(`    signing lane: ${lane}; readiness: ${readiness.status}`);
       for (const reason of [...readiness.missing, ...readiness.unchecked]) console.log(`    - ${reason}`);

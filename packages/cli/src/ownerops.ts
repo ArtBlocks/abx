@@ -148,7 +148,7 @@ import {planOnChainScript} from './script-chunks.js';
 import {fetchServedTokenUri, servedOk} from './served.js';
 import {openWalletSession, type SignResult, type TxProvider, type WalletSession} from './signer.js';
 import {openSponsoredSession} from './creator-signer.js';
-import {gatedSend, laneFromFlags} from './riskgate.js';
+import {gatedSend, laneFromFlags, type DryRunSimulation} from './riskgate.js';
 import {withJson} from './jsonout.js';
 import {info} from './output.js';
 import {loadCollectionMetadata, validateCollectionMetadata} from './collection-metadata.js';
@@ -287,8 +287,8 @@ function requireFlag(flags: Flags, name: string, usage: string): string {
  * choke point the deploy family's resumed-setup send routes through — so this is now just "gate,
  * then re-index if the project is known."
  */
-async function runWrite(address: Address, provider: TxProvider, flags: Flags, expectedSigner?: Address): Promise<SignResult | null> {
-  const result = await gatedSend(provider, flags, {chainKey: CHAIN, expectedSigner});
+async function runWrite(address: Address, provider: TxProvider, flags: Flags, expectedSigner?: Address, onSimulation?: (simulation: DryRunSimulation) => void): Promise<SignResult | null> {
+  const result = await gatedSend(provider, flags, {chainKey: CHAIN, expectedSigner, onSimulation});
   if (!result) return null; // dry run, or the cold lane — nothing broadcast
   await reindexIfKnown(address, flags);
   return result;
@@ -1023,6 +1023,8 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
   // re-reading `nextTokenId` afterwards — a concurrent mint would make that answer wrong, and a
   // number that is usually right is worse than no number.
   return withJson(flags, async () => {
+    let simulation: DryRunSimulation | undefined;
+    const receiveSimulation = (value: DryRunSimulation) => {simulation = value;};
     const publicClient = makePublicClient({chainKey: CHAIN});
     const kind = await detectTokenKind(publicClient, contract);
     const owner = await read<Address>(contract, 'owner');
@@ -1047,7 +1049,7 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       const amount = flags.amount !== undefined ? parseEditionCountFlag(flags.amount as string, 'amount') : 1n;
       console.log(dim(`  minting ${amount} cop${amount === 1n ? 'y' : 'ies'} of #${tokenId} → ${to}${flags.to ? '' : ' (owner — pass --to for a buyer)'}`));
       const tx = prepareEditionMint({contract, to, tokenId, amount, chainId: chainId()});
-      const result = await runWrite(contract, tx, flags, owner);
+      const result = await runWrite(contract, tx, flags, owner, receiveSimulation);
       if (result) console.log(`  ${green('✓')} minted ${amount} cop${amount === 1n ? 'y' : 'ies'} of ${bold('#' + tokenId)} → ${to}`);
       const viewerUrls = result ? await mintViewerLinks(contract, [tokenId.toString()], kind.kind === 'edition-code', flags) : [];
       console.log(dim(`  next: \`abx refresh ${contract}\` so marketplaces pick up the change.`));
@@ -1062,7 +1064,7 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
         amount: amount.toString(),
         viewerUrls,
         viewerUrl: viewerUrls[0]?.viewerUrl ?? null,
-        ...(isDryRun(flags) ? {readiness: currentSigningReadiness(laneFromFlags(flags), owner)} : {}),
+        ...(isDryRun(flags) ? {readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
       };
     }
 
@@ -1086,7 +1088,7 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       console.log(dim(`  minting token → ${to}${flags.to ? '' : ' (owner — pass --to for a buyer)'}`));
       tx = prepareMint({contract, to, chainId: chainId()});
     }
-    const result = await runWrite(contract, tx, flags, owner);
+    const result = await runWrite(contract, tx, flags, owner, receiveSimulation);
     const tokenIds = result ? await mintedTokenIds(makePublicClient({chainKey: CHAIN}), contract, result.txHash) : [];
     const viewerUrls = await mintViewerLinks(contract, tokenIds, kind.kind === 'code', flags);
     if (result && tokenIds.length) {
@@ -1106,7 +1108,7 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       viewerUrls,
       viewerUrl: viewerUrls.length === 1 ? viewerUrls[0].viewerUrl : null,
       requestedCount: Number(count),
-      ...(isDryRun(flags) ? {readiness: currentSigningReadiness(laneFromFlags(flags), owner)} : {}),
+      ...(isDryRun(flags) ? {readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
     };
   });
 }
