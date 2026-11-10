@@ -1,5 +1,16 @@
 # @artblocks/abx-effects
 
+## 0.1.16
+
+### Patch Changes
+
+- d5a80e1: Drop-in maintenance update for creators and SDK consumers: update production dependencies and normalize missing OS credential records across Keyring versions without retrying denied reads or deleting absent credentials.
+- 146ae1c: Drop-in correctness fix for render-effect users: refuse image and trait outputs after uncaught document exceptions or page crashes. Healthy scripts keep the existing bounded completion fallback, and console diagnostics alone remain nonfatal.
+- Updated dependencies [9865594]
+- Updated dependencies [d5a80e1]
+  - @artblocks/abx-sdk@0.10.4
+  - @artblocks/abx-storage@0.1.16
+
 ## 0.1.15
 
 ### Patch Changes

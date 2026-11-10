@@ -1,5 +1,21 @@
 # @artblocks/abx-cli
 
+## 0.9.0
+
+### Minor Changes
+
+- ccda653: Add `abx preview --check`, which renders each seed in fresh browser contexts (3 runs by default, `--runs`; `--frames <k>` compares k frames per run for animated pieces) and reports pass, drift, or harness failure with exit codes 0, 1, and 2. Requires completion, rejects failed captures, compares normalized traits at every sampled frame, and collects diagnostics through the final capture. Honors `--json`, including harness errors. Results are bounded evidence for the tested runtime and inputs, not a proof of determinism.
+
+### Patch Changes
+
+- d5a80e1: Drop-in maintenance update for creators and SDK consumers: update production dependencies and normalize missing OS credential records across Keyring versions without retrying denied reads or deleting absent credentials.
+- Updated dependencies [9865594]
+- Updated dependencies [d5a80e1]
+  - @artblocks/abx-sdk@0.10.4
+  - @artblocks/abx-indexer@0.2.4
+  - @artblocks/abx-storage@0.1.16
+  - @artblocks/abx-token-api@0.3.4
+
 ## 0.8.7
 
 ### Patch Changes
