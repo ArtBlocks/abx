@@ -33,7 +33,7 @@ import {
 import {CHAIN, localIndexer, storageOptions, storageOverrides} from '../config.js';
 import {type Flags, parseFlags, positionalArgs, warnStrayFlags} from '../flags.js';
 import {jsonSafe, withJson} from '../jsonout.js';
-import {validateCollectionMetadata} from '../collection-metadata.js';
+import {loadCollectionMetadata, validateCollectionMetadata} from '../collection-metadata.js';
 import {viewerSurface, tokenViewerUrl} from '../view-url.js';
 import {markBatchFailure} from '../errors.js';
 import {assertPortFree, bold, c, dim, g, info, loadEffects, ok, requirePublishableBackend, step, warn} from '../output.js';
@@ -788,6 +788,12 @@ export async function cmdContractUri(address: Address | undefined, flags: Flags)
       } else info('collection metadata passes the marketplace profile; third-party ingestion is not guaranteed');
     };
     console.log(`\n  ${bold('contractURI()')} ${dim(`— read directly from ${address} on ${CHAIN}`)}`);
+    if (flags.validate !== undefined) {
+      const document = await loadCollectionMetadata(uri);
+      report(document);
+      console.log(JSON.stringify(document, null, 2));
+      return;
+    }
     const onChain = decodeOnChainJson(uri);
     if (onChain) {
       const document = JSON.parse(onChain) as Record<string, unknown>;

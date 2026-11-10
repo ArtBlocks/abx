@@ -834,7 +834,7 @@ function withJson(flags: Flags, body: (emit: (payload: Record<string, unknown>) 
       info(`signing lane: ${laneFromFlags(flags)}; readiness: ${readiness.status}`);
       for (const reason of [...readiness.missing, ...readiness.unchecked]) info(`  ${reason}`);
     }
-    emit({...payload, plan: {...plan, readiness}});
+    emit({...payload, readiness});
   }));
 }
 

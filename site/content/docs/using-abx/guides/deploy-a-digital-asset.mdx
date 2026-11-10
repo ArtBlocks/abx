@@ -149,8 +149,8 @@ Dry runs report the selected signing lane and conservative readiness. `blocked` 
 invalid local prerequisites; `unknown` means a wallet connection, external signature, creator grant,
 payment eligibility, execution, or funding has not been verified. Only a matching hot key with a
 successful existing execution/funding simulation earns `ready`. Credential presence alone does not.
-Version 4 deploy JSON exposes this as `plan.readiness`; prepared-write JSON includes `readiness`
-beside its existing simulation. These checks never refresh grants, provision wallets, or send
+Deploy JSON adds `readiness` beside its existing version-3 `plan`; prepared-write JSON includes
+`readiness` beside its existing simulation. These checks never refresh grants, provision wallets, or send
 transactions, and add no RPC calls. Nonzero transaction value cannot use gas sponsorship; an
 eligible creator wallet may instead self-pay.
 
