@@ -1,5 +1,12 @@
 # @artblocks/abx-sdk
 
+## 0.10.4
+
+### Patch Changes
+
+- 9865594: Development-only maintenance: update the HTML parser used by SDK conformance tests to its ESM-only release. The published runtime API and dependencies are unchanged.
+- d5a80e1: Drop-in maintenance update for creators and SDK consumers: update production dependencies and normalize missing OS credential records across Keyring versions without retrying denied reads or deleting absent credentials.
+
 ## 0.10.3
 
 ### Patch Changes

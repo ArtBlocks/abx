@@ -1,5 +1,14 @@
 # @artblocks/abx-storage
 
+## 0.1.16
+
+### Patch Changes
+
+- d5a80e1: Drop-in maintenance update for creators and SDK consumers: update production dependencies and normalize missing OS credential records across Keyring versions without retrying denied reads or deleting absent credentials.
+- Updated dependencies [9865594]
+- Updated dependencies [d5a80e1]
+  - @artblocks/abx-sdk@0.10.4
+
 ## 0.1.15
 
 ### Patch Changes

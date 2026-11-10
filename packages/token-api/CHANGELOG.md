@@ -1,5 +1,16 @@
 # @artblocks/abx-token-api
 
+## 0.3.4
+
+### Patch Changes
+
+- d5a80e1: Drop-in maintenance update for creators and SDK consumers: update production dependencies and normalize missing OS credential records across Keyring versions without retrying denied reads or deleting absent credentials.
+- Updated dependencies [9865594]
+- Updated dependencies [d5a80e1]
+  - @artblocks/abx-sdk@0.10.4
+  - @artblocks/abx-indexer@0.2.4
+  - @artblocks/abx-storage@0.1.16
+
 ## 0.3.3
 
 ### Patch Changes

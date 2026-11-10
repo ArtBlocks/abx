@@ -1,5 +1,12 @@
 # @artblocks/abx-storage-arweave
 
+## 0.1.2
+
+### Patch Changes
+
+- d5a80e1: Drop-in maintenance update for creators and SDK consumers: update production dependencies and normalize missing OS credential records across Keyring versions without retrying denied reads or deleting absent credentials.
+- 8e8d38c: Drop-in update for existing Arweave and Ethereum Turbo users: migrate prepaid uploads to Turbo 2, remove the unused x402/browser wallet dependency tree, and retain viem-backed local/remote Ethereum signing and RSA Arweave signing. No new payment mode is enabled.
+
 ## 0.1.1
 
 ### Patch Changes
