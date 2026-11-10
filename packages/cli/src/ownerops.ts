@@ -1064,7 +1064,7 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
         amount: amount.toString(),
         viewerUrls,
         viewerUrl: viewerUrls[0]?.viewerUrl ?? null,
-        ...(isDryRun(flags) ? {readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
+        ...(isDryRun(flags) ? {lane: laneFromFlags(flags), readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
       };
     }
 
@@ -1108,7 +1108,7 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       viewerUrls,
       viewerUrl: viewerUrls.length === 1 ? viewerUrls[0].viewerUrl : null,
       requestedCount: Number(count),
-      ...(isDryRun(flags) ? {readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
+      ...(isDryRun(flags) ? {lane: laneFromFlags(flags), readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
     };
   });
 }

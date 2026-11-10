@@ -107,7 +107,7 @@ printf '%s' "$VIEW_JSON" | node --input-type=module -e 'let s="";for await(const
 UNMINTED_JSON="$(ABX_DEPLOYER_PK="$ANVIL_PK" pnpm -s abx deploy --image "$SVG" --onchain-image --compress fastlz --name "Mint Preview" --symbol MP --no-mint --json)"
 UNMINTED="$(printf '%s' "$UNMINTED_JSON" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;console.log(JSON.parse(s).address)')"
 MINT_PREVIEW="$(ABX_DEPLOYER_PK="$ANVIL_PK" pnpm -s abx mint "$UNMINTED" --dry-run --json)"
-printf '%s' "$MINT_PREVIEW" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const p=JSON.parse(s);if(p.sent!==false||p.readiness.status!=="ready"||p.readiness.valueCompatibleWithSponsorship!==true||p.transactions.count!==1)process.exit(1)'
+printf '%s' "$MINT_PREVIEW" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const p=JSON.parse(s);if(p.sent!==false||p.lane!=="send"||p.readiness.status!=="ready"||p.readiness.valueCompatibleWithSponsorship!==true||p.transactions.count!==1)process.exit(1)'
 if cast call "$UNMINTED" 'ownerOf(uint256)(address)' 0 --rpc-url "$RPC" >/dev/null 2>&1; then fail "mint preview issued a token"; fi
 
 # Capture the sign URL the way a backgrounding AGENT should: read the file the CLI writes the
