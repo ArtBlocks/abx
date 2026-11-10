@@ -1,5 +1,25 @@
 # @artblocks/abx-cli
 
+## 0.10.0
+
+### Minor Changes
+
+- d9a08d4: Add collection banner/featured artwork deploy flags, a marketplace collection-metadata validation profile, and bounded metadata checks before admin handoff. Collection artwork stays separate from the image field inherited by token artwork.
+- 3a78010: Add nonblocking, resumable device login with structured pending, completed, denied, and expired results. Pending device secrets stay in the private ignored environment file; polling intervals persist across invocations.
+- d9a08d4: Report conservative signing readiness in dry-run command results without extra RPC calls, credential-store access, authorization refresh, or transactions. Preserve the existing version-3 deploy plan; prepared writes reuse their existing execution/funding simulation.
+
+  Refuse `demo --dry-run` before it enters the live walkthrough; direct callers to the supported deployment-preview command.
+
+- d9a08d4: Add static mint-page export and collector-page guidance before and after opening a sale. Static and framework builds retain the same wallet behavior and paginated reads.
+
+  Correct the edition scaffold's metadata helper to use ERC-1155 `uri`, so both page families build against the published SDK.
+
+- d9a08d4: Add provider-aware token viewer URLs for live code applications and image content, with structured output and custom serving-base support. URL discovery is a public read shared across all tokens in an operation.
+
+### Patch Changes
+
+- 3a78010: Keep browser signing queues bounded and recoverable: abandoned sessions expire after 30 minutes of inactivity, cancellation/close reject pending work, and ended sessions refuse further items. Existing sequential signing still requires explicit approval for every action.
+
 ## 0.9.0
 
 ### Minor Changes
