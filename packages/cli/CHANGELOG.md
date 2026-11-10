@@ -1,5 +1,13 @@
 # @artblocks/abx-cli
 
+## 0.11.0
+
+### Minor Changes
+
+- 430d592: Add read-only `abx utils` discovery and utility descriptors in capability output. Integrate optional
+  ABX FS packages into the bundled skill for website publishing, project assets, and preservation,
+  with embedded-first presentation guidance, chain-gateway defaults, and explicit opt-in IPFS.
+
 ## 0.10.0
 
 ### Minor Changes
