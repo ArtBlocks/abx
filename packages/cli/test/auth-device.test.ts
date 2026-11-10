@@ -48,6 +48,117 @@ function successfulFetch(accessToken: string): {fetchImpl: typeof fetch; request
   return {fetchImpl, requests};
 }
 
+test('nonblocking login resumes privately, respects polling intervals and clears a completed grant', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'abx-auth-resume-'));
+  const envPath = join(dir, '.env');
+  const fake = successfulFetch('abxk_private-completed-token');
+  let now = 0;
+  const deps = {fetchImpl: fake.fetchImpl, now: () => now, sleep: async () => {}, line: () => {}, openBrowser: () => false, warning: () => {}};
+  const opts = {baseUrl: BASE, envVar: 'ABX_TEST_TOKEN', envPath, noWait: true, noOpen: true};
+  const started = await deviceLogin(opts, deps);
+  assert.equal(started.status, 'pending');
+  assert.equal(started.userCode, 'ABCD-EFGH');
+  assert.equal(started.expiresAt, new Date(900_000).toISOString());
+  assert.equal(statSync(envPath).mode & 0o777, 0o600);
+  assert.doesNotMatch(JSON.stringify(started), /device-code-that|private-completed-token/);
+  await assert.rejects(deviceLogin(opts, deps), /already pending/);
+  await assert.rejects(deviceLogin({...opts, baseUrl: 'https://other.example', resume: true}, deps), /provider mismatch/);
+  const pollCount = () => fake.requests.filter(r => r.url.endsWith('/oauth/token')).length;
+  assert.equal((await deviceLogin({...opts, resume: true}, deps)).status, 'pending');
+  assert.equal(pollCount(), 0, 'an early resume must not poll the token endpoint');
+  now = 1000;
+  assert.equal((await deviceLogin({...opts, resume: true}, deps)).status, 'pending');
+  now = 2000;
+  assert.equal((await deviceLogin({...opts, resume: true}, deps)).interval, 6);
+  now = 7999;
+  await deviceLogin({...opts, resume: true}, deps);
+  assert.equal(pollCount(), 2, 'slow_down persists across invocations');
+  now = 8000;
+  assert.deepEqual(await deviceLogin({...opts, resume: true}, deps), {status: 'completed'});
+  assert.match(readFileSync(envPath, 'utf8'), /ABX_TEST_TOKEN=abxk_private-completed-token/);
+  assert.doesNotMatch(readFileSync(envPath, 'utf8'), /PENDING_LOGIN/);
+  assert.equal(fake.requests.filter(r => r.url.endsWith('/oauth/device_authorization')).length, 1);
+});
+
+test('resumed authorization distinguishes denial and expiry without revealing the pending secret', async () => {
+  for (const status of ['denied', 'expired'] as const) {
+    const envPath = join(mkdtempSync(join(tmpdir(), 'abx-auth-terminal-')), '.env');
+    const fake = successfulFetch('unused');
+    let now = 0;
+    const deps = {fetchImpl: (async (input, init) => String(input).endsWith('/oauth/token')
+      ? response({error: 'access_denied'}, 400) : fake.fetchImpl(input, init)) as typeof fetch,
+      now: () => now, sleep: async () => {}, line: () => {}, warning: () => {}};
+    const opts = {baseUrl: BASE, envVar: 'ABX_TEST_TOKEN', envPath, noWait: true, noOpen: true};
+    await deviceLogin(opts, deps);
+    now = status === 'expired' ? 900_000 : 1000;
+    assert.deepEqual(await deviceLogin({...opts, resume: true}, deps), {status});
+    assert.doesNotMatch(readFileSync(envPath, 'utf8'), /PENDING_LOGIN|ABX_TEST_TOKEN=/);
+  }
+});
+
+test('nonblocking CLI JSON contains one plain handoff object and no device secret', async () => {
+  const cwd = process.cwd();
+  const oldUrl = process.env.ABX_REMOTE_JSONTEST_URL;
+  const originalFetch = globalThis.fetch;
+  const originalLog = console.log;
+  const lines: string[] = [];
+  try {
+    process.chdir(mkdtempSync(join(tmpdir(), 'abx-auth-json-')));
+    process.env.ABX_REMOTE_JSONTEST_URL = BASE;
+    globalThis.fetch = successfulFetch('unused').fetchImpl;
+    console.log = (...args) => {lines.push(args.join(' '));};
+    await cmdAuth(['login', 'jsontest'], {'no-wait': 'true', 'no-open': 'true', json: 'true'});
+    assert.equal(lines.length, 1);
+    assert.equal(JSON.parse(lines[0]).status, 'pending');
+    assert.doesNotMatch(lines[0], /\x1b|device-code-that|unused/);
+  } finally {
+    process.chdir(cwd);
+    globalThis.fetch = originalFetch;
+    console.log = originalLog;
+    if (oldUrl === undefined) delete process.env.ABX_REMOTE_JSONTEST_URL;
+    else process.env.ABX_REMOTE_JSONTEST_URL = oldUrl;
+  }
+});
+
+test('terminal token failures release the pending slot while transient failures preserve it', async () => {
+  for (const outcome of ['invalid_grant', 'invalid_response', 'temporary'] as const) {
+    const envPath = join(mkdtempSync(join(tmpdir(), 'abx-auth-recovery-')), '.env');
+    const fake = successfulFetch('abxk_unused');
+    let now = 0;
+    const deps = {fetchImpl: (async (input, init) => {
+      if (!String(input).endsWith('/oauth/token')) return fake.fetchImpl(input, init);
+      if (outcome === 'invalid_grant') return response({error: 'invalid_grant'}, 400);
+      if (outcome === 'invalid_response') return response({token_type: 'Bearer'});
+      return response({error: 'temporarily_unavailable'}, 503);
+    }) as typeof fetch, now: () => now, sleep: async () => {}, line: () => {}, warning: () => {}};
+    const opts = {baseUrl: BASE, envVar: 'ABX_TEST_TOKEN', envPath, noWait: true, noOpen: true};
+    await deviceLogin(opts, deps);
+    now = 1000;
+    if (outcome === 'temporary') {
+      assert.equal((await deviceLogin({...opts, resume: true}, deps)).status, 'pending');
+      assert.match(readFileSync(envPath, 'utf8'), /PENDING_LOGIN=/);
+      await assert.rejects(deviceLogin(opts, deps), /already pending/);
+    } else {
+      await assert.rejects(deviceLogin({...opts, resume: true}, deps), /invalid_grant|invalid OAuth access token/);
+      assert.doesNotMatch(readFileSync(envPath, 'utf8'), /PENDING_LOGIN=/);
+      assert.equal((await deviceLogin(opts, deps)).status, 'pending', 'a new approval can start immediately');
+    }
+  }
+});
+
+test('a fresh interactive login removes an expired pending grant', async () => {
+  const envPath = join(mkdtempSync(join(tmpdir(), 'abx-auth-expired-replacement-')), '.env');
+  const fake = successfulFetch('abxk_replacement');
+  let now = 0;
+  const deps = {fetchImpl: fake.fetchImpl, now: () => now, sleep: async () => {}, line: () => {}, warning: () => {}};
+  const opts = {baseUrl: BASE, envVar: 'ABX_TEST_TOKEN', envPath, noOpen: true};
+  await deviceLogin({...opts, noWait: true}, deps);
+  now = 900_000;
+  assert.equal((await deviceLogin(opts, deps)).status, 'completed');
+  assert.doesNotMatch(readFileSync(envPath, 'utf8'), /PENDING_LOGIN=/);
+  assert.match(readFileSync(envPath, 'utf8'), /ABX_TEST_TOKEN=abxk_replacement/);
+});
+
 test('device login follows discovery + RFC polling, stores the key privately, and never prints either secret', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'abx-auth-device-'));
   const envPath = join(dir, '.env');

@@ -388,6 +388,8 @@ export interface WalletSessionOptions {
   total?: number;
   /** Write the sign-page URL to this file the instant the server is ready (agent capture). */
   signUrlFile?: string;
+  /** Bound abandoned local sessions. Defaults to 30 minutes without a connection/completed item. */
+  idleTimeoutMs?: number;
 }
 
 export async function openWalletSession(opts: WalletSessionOptions): Promise<WalletSession> {
@@ -402,6 +404,9 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
     resolveConnect = res;
     rejectAll = rej;
   });
+  // Expiry/close may happen before the caller starts awaiting connect(). Keep the original
+  // promise rejected for that caller without producing an unhandled process rejection.
+  void connected.catch(() => {});
 
   // The single item the page should currently show; `consumed` flips once it's signed, so `/next`
   // returns idle until the CLI queues the next. An item is either an EVM tx (eth_sendTransaction →
@@ -417,13 +422,31 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   let finished = false;
   let sessionError: string | null = null;
   let connectedAddress: Address | undefined;
+  let busy = false;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const idleTimeoutMs = opts.idleTimeoutMs ?? 30 * 60_000;
+  if (!Number.isFinite(idleTimeoutMs) || idleTimeoutMs <= 0) throw new Error('signing session idle timeout must be positive');
   const sessionToken = randomBytes(32).toString('hex');
   const usedHashes = new Set<string>();
 
   const fail = (e: Error) => {
+    if (sessionError || finished) return;
     sessionError = 'Signing stopped. Check the CLI before retrying.';
+    clearTimeout(idleTimer);
     pendingReject?.(e);
     rejectAll?.(e);
+    process.removeListener('SIGINT', onSigint);
+    setTimeout(() => server.close(), 1200).unref();
+  };
+  const onSigint = () => fail(new Error('cancelled'));
+  const touch = () => {
+    clearTimeout(idleTimer);
+    if (!finished && !sessionError) idleTimer = setTimeout(() => fail(new Error('signing session expired; inspect confirmed transactions before resuming')), idleTimeoutMs).unref();
+  };
+  const claim = () => {
+    if (finished || sessionError) throw new Error('signing session ended; inspect confirmed transactions before resuming');
+    if (busy) throw new Error('a signing action is already pending; approve it before queueing another');
+    busy = true;
   };
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -465,6 +488,7 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         res.end(JSON.stringify({ok: true}));
         connectedAddress = signer as Address;
         resolveConnect(connectedAddress);
+        touch();
         return;
       }
       if (url.pathname === '/next') {
@@ -521,12 +545,16 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
   announceSignUrl(signUrl, opts.signUrlFile);
   console.log(`  ${dim('The key never touches this process — only signed tx hashes come back. Ctrl-C to cancel.')}\n`);
 
-  const onSigint = () => fail(new Error('cancelled'));
   process.once('SIGINT', onSigint);
+  touch();
 
   return {
-    connect: () => connected,
+    connect: async () => {
+      if (finished || sessionError) throw new Error('signing session ended; inspect confirmed transactions before resuming');
+      return connected;
+    },
     async send(tx: PreparedTx): Promise<SignedReceipt> {
+      claim();
       try {
         const signer = await connected;
         const minimumNonce = await publicClient.getTransactionCount({address: signer, blockTag: 'pending'});
@@ -555,13 +583,17 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
         usedHashes.add(txHash.toLowerCase());
         console.log(`  ${green('✓')} confirmed`);
         current = null; // back to idle until the next send()
+        touch();
         return {txHash, receipt};
       } catch (error) {
-        sessionError ??= 'Transaction was not verified. Check the CLI and inspect the transaction before retrying.';
+        fail(error instanceof Error ? error : new Error('transaction was not verified'));
         throw error;
-      }
+      } finally {busy = false; pendingResolve = null; pendingReject = null; current = null;}
     },
     async signMessage(message: Uint8Array, summary?: string): Promise<Hex> {
+      claim();
+      try {
+      await connected;
       index += 1;
       current = {index, kind: 'msg', msg: {messageHex: bytesToHex(message), summary: summary ?? 'Sign storage upload (Arweave/Turbo)'}, consumed: false};
       console.log(`  ${dim(`sign ${opts.total ? `${index}/${opts.total}` : index}:`)} ${current.msg!.summary} ${dim('— approve in your wallet …')}`);
@@ -573,10 +605,21 @@ export async function openWalletSession(opts: WalletSessionOptions): Promise<Wal
       pendingReject = null;
       console.log(`  ${green('✓')} signed`);
       current = null; // back to idle
+      touch();
       return sig;
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error('message was not signed'));
+        throw error;
+      } finally {busy = false; pendingResolve = null; pendingReject = null; current = null;}
     },
     close() {
+      if (finished) return;
       finished = true;
+      clearTimeout(idleTimer);
+      const error = new Error('signing session closed; inspect confirmed transactions before resuming');
+      pendingReject?.(error);
+      rejectAll?.(error);
+      current = null;
       process.removeListener('SIGINT', onSigint);
       // Brief grace so the page's next poll can render "all done" before the socket drops.
       setTimeout(() => server.close(), 1200).unref();

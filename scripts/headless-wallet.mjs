@@ -23,6 +23,15 @@ if (!base || !rpc || !pk) {
   console.error('usage: headless-wallet.mjs <signUrl> <rpcUrl> <privateKey> [expectedTotal]');
   process.exit(2);
 }
+const signUrl = new URL(base);
+const sessionToken = signUrl.searchParams.get('session');
+if (!sessionToken) throw new Error('sign URL must contain a session token');
+function sessionFetch(path, options = {}) {
+  return fetch(new URL(path, signUrl.origin), {
+    ...options,
+    headers: {...options.headers, 'x-abx-session-token': sessionToken},
+  });
+}
 const expectedTotal = expectedTotalRaw ? Number(expectedTotalRaw) : null;
 const account = privateKeyToAccount(pk);
 const wallet = createWalletClient({account, transport: http(rpc)});
@@ -32,7 +41,7 @@ const log = (m) => console.log(`  [wallet] ${m}`);
 async function waitForServer() {
   for (let i = 0; i < 100; i++) {
     try {
-      const r = await fetch(base + '/');
+      const r = await sessionFetch('/');
       if (r.ok) return;
     } catch {
       /* not up yet */
@@ -46,14 +55,14 @@ async function waitForServer() {
 async function expectReject() {
   await waitForServer();
   log(`connecting as ${account.address} — expecting REJECTION`);
-  const r = await fetch(base + '/connect', {
+  const r = await sessionFetch('/connect', {
     method: 'POST',
     headers: {'content-type': 'application/json'},
     body: JSON.stringify({signer: account.address}),
   });
-  if (r.ok) throw new Error(`guard FAILED: wrong wallet ${account.address} was accepted (expected 409)`);
+  if (r.status !== 409) throw new Error(`guard FAILED: wrong-wallet request returned ${r.status}, expected 409`);
   log(`connect correctly rejected (HTTP ${r.status}) — wrong wallet blocked`);
-  await fetch(base + '/cancel', {method: 'POST'}).catch(() => {});
+  await sessionFetch('/cancel', {method: 'POST'}).catch(() => {});
   process.exit(0);
 }
 
@@ -61,11 +70,12 @@ async function main() {
   if (expectedTotalRaw === 'reject') return expectReject();
   await waitForServer();
   log(`connecting as ${account.address}`);
-  await fetch(base + '/connect', {
+  const connected = await sessionFetch('/connect', {
     method: 'POST',
     headers: {'content-type': 'application/json'},
     body: JSON.stringify({signer: account.address}),
   });
+  if (!connected.ok) throw new Error(`wallet connection refused (HTTP ${connected.status})`);
 
   let lastIndex = 0;
   let signedCount = 0;
@@ -73,11 +83,12 @@ async function main() {
   while (Date.now() < deadline) {
     let d;
     try {
-      d = await (await fetch(base + '/next')).json();
+      d = await (await sessionFetch('/next')).json();
     } catch {
       // server may be closing right after `done`; treat as finished.
       break;
     }
+    if (d.error) throw new Error(d.error);
     if (d.done) {
       log(`session done — signed ${signedCount} tx(s)`);
       if (expectedTotal != null && signedCount !== expectedTotal) {
@@ -95,13 +106,15 @@ async function main() {
         to: tx.to ?? undefined,
         data: tx.data,
         value: BigInt(tx.value ?? '0x0'),
+        ...(tx.gas ? {gas: BigInt(tx.gas)} : {}),
       });
       log(`  sent ${hash}`);
-      await fetch(base + '/signed', {
+      const accepted = await sessionFetch('/signed', {
         method: 'POST',
         headers: {'content-type': 'application/json'},
         body: JSON.stringify({index: d.index, txHash: hash}),
       });
+      if (!accepted.ok) throw new Error(`signed transaction refused (HTTP ${accepted.status})`);
       signedCount++;
     }
     await sleep(300);
@@ -111,6 +124,6 @@ async function main() {
 
 main().catch((e) => {
   console.error(`  [wallet] ERROR: ${e.message}`);
-  fetch(base + '/cancel', {method: 'POST'}).catch(() => {});
+  sessionFetch('/cancel', {method: 'POST'}).catch(() => {});
   process.exit(1);
 });

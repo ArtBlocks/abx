@@ -303,6 +303,7 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
         console.log(`\n  Authorize this agent to use your ABX creator wallet:`);
         console.log(`  ${verificationUrl}`);
         console.log(`  Code: ${device.userCode}\n`);
+        console.log('  Waiting for human approval. Open the URL above if no browser appears; Ctrl-C stops this authorization attempt.');
         openBrowser(verificationUrl);
       },
     });

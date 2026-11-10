@@ -69,6 +69,7 @@ export ABX_DATA_DIR="$DATA_DIR"
 # ── Phase A — hot lane: bootstrap shared infra + regression-test refactored staging ──
 echo "▸ A/3  hot lane: deploy --onchain-image (bootstraps factory/renderer/chunk-store)"
 A_OUT="$(ABX_DEPLOYER_PK="$ANVIL_PK" pnpm -s abx deploy \
+  --bootstrap-factory \
   --image "$SVG" --onchain-image --compress fastlz \
   --name "Hot OnChain" --symbol HOT 2>&1)" || { echo "$A_OUT"; fail "hot-lane onchain-image deploy failed (staging refactor regression)"; }
 CLONE_A="$(printf '%s\n' "$A_OUT" | grep -oiE 'deployed 0x[0-9a-f]{40}' | head -1 | grep -oiE '0x[0-9a-f]{40}')"

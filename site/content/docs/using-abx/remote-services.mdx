@@ -21,6 +21,21 @@ keys continue to work; acceptance is checked only when a new key is created.
 
 An account may have five active keys. The service cannot recover a lost key value.
 
+For agents and other nonblocking workflows:
+
+```bash
+abx auth login --no-wait --no-open --json
+abx auth login --resume --no-wait --json
+```
+
+The first command returns `pending`, the verification URL, user code, absolute expiry, and polling
+interval. The private device grant stays in an ignored, mode-0600 `.env` entry beside the eventual
+API key; it is never printed. Run resume from the same directory and for the same named remote.
+Resume polls at most once when `--no-wait` is present and respects the provider interval across
+invocations; omit `--no-wait` to wait until approval. Results distinguish `pending`, `completed`,
+`denied`, and `expired`; denied and expired exit unsuccessfully. Terminal states remove the pending
+entry. JSON stdout contains only the result object. The default login remains interactive.
+
 ```bash
 abx auth keys
 abx auth revoke-key <key-id>

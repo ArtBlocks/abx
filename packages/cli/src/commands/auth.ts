@@ -58,6 +58,45 @@ export interface DeviceLoginOptions {
   envPath: string
   force?: boolean
   noOpen?: boolean
+  noWait?: boolean
+  resume?: boolean
+  structured?: boolean
+}
+
+export type DeviceLoginResult = {
+  status: 'pending' | 'completed' | 'denied' | 'expired'
+  verificationUrl?: string
+  userCode?: string
+  expiresAt?: string
+  interval?: number
+}
+
+interface PendingDeviceLogin {
+  issuer: string
+  grant: DeviceAuthorizationResponse
+  deadline: number
+  nextPollAt: number
+  pollSeconds: number
+}
+
+function pendingLogin(options: DeviceLoginOptions): {key: string; raw?: string; value?: PendingDeviceLogin} {
+  const key = `${options.envVar}_PENDING_LOGIN`
+  const raw = envFileValue(options.envPath, key)
+  if (!raw) return {key}
+  let value: PendingDeviceLogin
+  try {
+    if (raw.length > 32_768) throw new Error()
+    value = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as PendingDeviceLogin
+    if (value.issuer !== cleanBaseUrl(options.baseUrl) ||
+        typeof value.grant?.device_code !== 'string' || !value.grant.device_code ||
+        typeof value.grant.user_code !== 'string' ||
+        !Number.isFinite(value.deadline) || !Number.isFinite(value.nextPollAt) ||
+        !Number.isFinite(value.pollSeconds) || value.pollSeconds < 1) throw new Error()
+    assertUrl(value.grant.verification_uri_complete ?? value.grant.verification_uri, 'verification_uri')
+  } catch {
+    throw new Error('invalid pending login or provider mismatch; remove the pending login entry from your private .env before starting again')
+  }
+  return {key, raw, value}
 }
 
 export interface OAuthLogoutOptions {
@@ -94,9 +133,12 @@ function oauthFailure(
   body: Record<string, unknown>,
   sensitiveValues: string[] = []
 ): Error {
-  const code = safeDescription(body.error) || `HTTP ${response.status}`
+  let code = safeDescription(body.error) || `HTTP ${response.status}`
   let detail = safeDescription(body.error_description)
-  for (const value of sensitiveValues) if (value) detail = detail.replaceAll(value, '[redacted]')
+  for (const value of sensitiveValues) if (value) {
+    detail = detail.replaceAll(value, '[redacted]')
+    code = code.replaceAll(value, '[redacted]')
+  }
   return new Error(`${prefix}: ${code}${detail ? ` — ${detail}` : ''}`)
 }
 
@@ -314,7 +356,7 @@ function assertLoginDestination(options: DeviceLoginOptions): void {
 }
 
 /** Standards-only core, dependency-injected for a no-secret-output regression test. */
-export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLoginDeps = {}): Promise<void> {
+export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLoginDeps = {}): Promise<DeviceLoginResult> {
   assertLoginDestination(options)
   const fetchImpl = deps.fetchImpl ?? fetch
   const sleep = deps.sleep ?? defaultSleep
@@ -322,6 +364,13 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
   const openBrowser = deps.openBrowser ?? defaultOpenBrowser
   const line = deps.line ?? console.log
   const warning = deps.warning ?? console.warn
+  const persistent = !!(options.noWait || options.resume)
+  const pending = pendingLogin(options)
+  if (options.resume && !pending?.value) throw new Error('no pending login; run `abx auth login --no-wait` first')
+  if (!options.resume && pending?.value && pending.value.deadline > now()) {
+    throw new Error('a login is already pending; run `abx auth login --resume` instead of starting another approval')
+  }
+  if (!options.resume && pending.raw) removeEnvSecret(options.envPath, pending.key, pending.raw)
 
   const metadata = await discoverOAuthMetadata(options.baseUrl, fetchImpl)
   if (!metadata.grant_types_supported?.includes(DEVICE_GRANT_TYPE)) {
@@ -330,15 +379,15 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
   const deviceEndpoint = assertUrl(metadata.device_authorization_endpoint, 'device_authorization_endpoint')
   const tokenEndpoint = assertUrl(metadata.token_endpoint, 'token_endpoint')
 
-  const startResponse = await fetchImpl(deviceEndpoint, {
+  const startResponse = options.resume ? undefined : await fetchImpl(deviceEndpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
     body: new URLSearchParams({ client_id: DEVICE_CLIENT_ID }),
     signal: AbortSignal.timeout(15_000)
   })
-  const startBody = await jsonObject(startResponse)
-  if (!startResponse.ok) throw oauthFailure('device authorization failed', startResponse, startBody)
-  const grant = startBody as unknown as DeviceAuthorizationResponse
+  const startBody = startResponse ? await jsonObject(startResponse) : undefined
+  if (startResponse && !startResponse.ok) throw oauthFailure('device authorization failed', startResponse, startBody!)
+  const grant = pending?.value && options.resume ? pending.value.grant : startBody as unknown as DeviceAuthorizationResponse
   if (
     typeof grant.device_code !== 'string' ||
     typeof grant.user_code !== 'string' ||
@@ -349,21 +398,44 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
     throw new Error('the provider returned an invalid device authorization response')
   }
   const verificationUrl = assertUrl(grant.verification_uri_complete ?? grant.verification_uri, 'verification_uri')
-  let pollSeconds =
+  if (verificationUrl.includes(grant.device_code)) throw new Error('provider verification URL contains the private device secret')
+  let pollSeconds = pending?.value && options.resume ? pending.value.pollSeconds :
     typeof grant.interval === 'number' && Number.isFinite(grant.interval) && grant.interval >= 1
       ? grant.interval
       : 5
-  const deadline = now() + grant.expires_in * 1000
+  const deadline = pending?.value && options.resume ? pending.value.deadline : now() + grant.expires_in * 1000
+  let nextPollAt = pending?.value && options.resume ? pending.value.nextPollAt : now() + pollSeconds * 1000
+  let storedRaw = pending?.raw
+  const persist = () => {
+    if (!persistent) return
+    assertLoginDestination(options)
+    storedRaw = Buffer.from(JSON.stringify({issuer: cleanBaseUrl(options.baseUrl), grant, deadline, nextPollAt, pollSeconds})).toString('base64url')
+    saveEnvSecret(options.envPath, pending!.key, storedRaw)
+  }
+  const clearPending = () => {
+    if (storedRaw) removeEnvSecret(options.envPath, pending.key, storedRaw)
+  }
+  const finish = (status: DeviceLoginResult['status']): DeviceLoginResult => {
+    clearPending()
+    return {status}
+  }
+  const result = (): DeviceLoginResult => ({status: 'pending', verificationUrl, userCode: grant.user_code,
+    expiresAt: new Date(deadline).toISOString(), interval: pollSeconds})
+
+  if (persistent && !options.resume) persist()
+  if (now() >= deadline) return finish('expired')
 
   line(`Browser approval: ${verificationUrl}`)
   line(`Confirm code: ${grant.user_code}`)
-  if (!options.noOpen && !openBrowser(verificationUrl)) {
+  if (!options.resume && !options.noOpen && !openBrowser(verificationUrl)) {
     warning('Could not open a browser automatically; open the approval URL above.')
   }
   line('Waiting for human approval…')
+  if (options.noWait && (!options.resume || now() < nextPollAt)) return result()
 
   while (now() < deadline) {
-    await sleep(pollSeconds * 1000)
+    await sleep(Math.max(0, Math.min(nextPollAt, deadline) - now()))
+    if (now() >= deadline) break
     // Re-check before polling so a destination changed during the human approval wait normally
     // aborts before the provider consumes a one-time grant and issues an orphaned credential.
     assertLoginDestination(options)
@@ -382,10 +454,14 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
     } catch {
       pollSeconds = Math.min(Math.max(pollSeconds * 2, 5), 30)
       warning(`The provider is temporarily unreachable; retrying in ${pollSeconds}s.`)
+      nextPollAt = now() + pollSeconds * 1000
+      persist()
+      if (options.noWait) return result()
       continue
     }
     const body = await jsonObject(response)
     if (response.ok) {
+      try {
       const accessToken = body.access_token
       if (typeof accessToken !== 'string' || !accessToken || /[\r\n]/.test(accessToken)) {
         throw new Error('the provider returned an invalid OAuth access token')
@@ -397,25 +473,51 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
       // or newly populated the destination while this command was polling.
       assertLoginDestination(options)
       saveEnvSecret(options.envPath, options.envVar, accessToken)
-      return
+      } catch (error) {
+        clearPending()
+        throw error
+      }
+      return finish('completed')
     }
 
     const code = safeDescription(body.error)
-    if (code === 'authorization_pending') continue
+    nextPollAt = now() + pollSeconds * 1000
+    if (code === 'authorization_pending') {
+      persist()
+      if (options.noWait) return result()
+      continue
+    }
     if (code === 'slow_down') {
       pollSeconds += 5
+      nextPollAt = now() + pollSeconds * 1000
+      persist()
+      if (options.noWait) return result()
       continue
     }
     if (response.status === 429 || response.status >= 500) {
       const retryAfter = Number(response.headers.get('retry-after'))
       pollSeconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : Math.min(pollSeconds * 2, 30)
       warning(`The provider asked the CLI to wait; retrying in ${pollSeconds}s.`)
+      nextPollAt = now() + pollSeconds * 1000
+      persist()
+      if (options.noWait) return result()
       continue
     }
-    if (code === 'access_denied') throw oauthFailure('device authorization failed', response, body)
-    if (code === 'expired_token') throw new Error('device authorization expired; run login again')
+    if (code === 'access_denied') {
+      finish('denied')
+      if (persistent || options.structured) return {status: 'denied'}
+      throw oauthFailure('device authorization failed', response, body, [grant.device_code])
+    }
+    if (code === 'expired_token') {
+      finish('expired')
+      if (persistent || options.structured) return {status: 'expired'}
+      throw new Error('device authorization expired; run login again')
+    }
+    clearPending()
     throw oauthFailure('OAuth token exchange failed', response, body, [grant.device_code])
   }
+  finish('expired')
+  if (persistent || options.structured) return {status: 'expired'}
   throw new Error('device authorization expired; run login again')
 }
 
@@ -557,20 +659,41 @@ export async function cmdAuth(args: string[], flags: Flags): Promise<void> {
   }
 
   if (target.token && flags.force === undefined) {
+    if (flags.json !== undefined) {
+      console.log(JSON.stringify({status: 'completed', reused: true}))
+      return
+    }
     ok(`reusing the existing ${target.tokenVar} credential`)
     info(`verify it with ${g(`abx remote ${target.name?.toLowerCase() ?? spec}`)}`)
     return
   }
 
-  console.log(`\n  ${bold('ABX device login')} ${dim(`→ ${target.url}`)}`)
-  info('Email and the one-time code stay in your browser. The CLI receives the API key after approval and never prints it.')
-  await deviceLogin({
+  const structured = flags.json !== undefined
+  if (!structured) {
+    console.log(`\n  ${bold('ABX device login')} ${dim(`→ ${target.url}`)}`)
+    info('Email and the one-time code stay in your browser. The CLI receives the API key after approval and never prints it.')
+  }
+  const result = await deviceLogin({
     baseUrl: target.url,
     envVar: target.tokenVar,
     envPath,
     force: flags.force !== undefined,
-    noOpen: flags['no-open'] !== undefined
-  })
+    noOpen: flags['no-open'] !== undefined,
+    noWait: flags['no-wait'] !== undefined,
+    resume: flags.resume !== undefined,
+    structured
+  }, structured ? {line: () => {}, warning: (message) => process.stderr.write(`${message}\n`)} : {})
+  if (structured) console.log(JSON.stringify(result))
+  if (result.status === 'pending') {
+    if (!structured) info(`Approval is pending. Resume with abx auth login ${positionalTarget ?? ''} --resume${flagTarget ? ` --remote ${flagTarget}` : ''}`)
+    return
+  }
+  if (result.status !== 'completed') {
+    if (!structured) info(`Device login ${result.status}; run login again to start a new approval.`)
+    process.exitCode = 1
+    return
+  }
+  if (structured) return
   ok(`authorized and saved ${target.tokenVar} in your private .env (the key was not printed)`)
   info(`verify it with ${g(`abx remote ${target.name?.toLowerCase() ?? spec}`)}`)
 }
@@ -581,6 +704,8 @@ export const AUTH_HELP = `
     ${g('abx auth login <name>')}      another named remote configured by ABX_REMOTE_<NAME>_URL
     ${g('--remote <name>')}            equivalent target spelling for agent workflows
     ${g('--no-open')}                  print the browser URL and code without trying to open it
+    ${g('--no-wait --json')}           return approval details; keep the pending grant in the private .env
+    ${g('--resume [--no-wait] --json')} resume waiting, or poll once when the provider interval allows
     ${g('--force')}                    recovery only: replace the local value without revoking the displaced key
     ${dim(`The browser owns email + OTP approval. Only the waiting CLI receives the key, stores it as ${ABX_SERVICES_API_KEY_VAR}`)}
     ${dim('(or the named remote\'s token variable), and never prints it. .env must be Git-ignored and must not be tracked.')}
