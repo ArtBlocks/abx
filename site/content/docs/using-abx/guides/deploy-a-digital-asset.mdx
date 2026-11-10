@@ -145,4 +145,9 @@ Read the dry-run summary and confirm:
 - supply, premint, pause state, and sale plan
 - every expected wallet approval
 
+The browser signing lane connects once for a staged workflow and asks for explicit approval of each
+action. Rejection or cancellation ends the session. An abandoned session expires after 30 minutes
+without a connection or completed action. Inspect confirmed transaction hashes before resuming a
+partially completed deployment; approval of a session does not approve later transactions.
+
 After deployment, run `abx verify <address>`.

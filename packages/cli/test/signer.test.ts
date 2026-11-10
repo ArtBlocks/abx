@@ -8,6 +8,52 @@ import {envKeyRequiresYes, openWalletSession, walletFundingGuidance, assertWalle
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+test('one connected session requires a fresh, matching approval for every queued action', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'abx-sign-sequence-'));
+  const file = join(dir, 'url');
+  const session = await openWalletSession({chainKey: 'sepolia', port: 0, total: 3, signUrlFile: file});
+  const url = new URL(boundUrl(file));
+  const headers = {'x-abx-session-token': url.searchParams.get('session')!, 'content-type': 'application/json'};
+  const account = privateKeyToAccount(`0x${'01'.repeat(32)}`);
+  const post = (path: string, body: unknown) => fetch(`${url.origin}/${path}`, {method: 'POST', headers, body: JSON.stringify(body)});
+  try {
+    assert.equal((await post('connect', {signer: account.address})).status, 200);
+    await session.connect();
+    let previousSignature: string | undefined;
+    for (let i = 1; i <= 3; i++) {
+      const message = new Uint8Array([i]);
+      const pending = session.signMessage(message, `action ${i}`);
+      await assert.rejects(session.signMessage(new Uint8Array([99])), /already pending/);
+      const next = await (await fetch(`${url.origin}/next`, {headers})).json() as {index: number; msg: {messageHex: string}};
+      assert.equal(next.index, i);
+      assert.equal(next.msg.messageHex, `0x0${i}`);
+      if (previousSignature) assert.equal((await post('signed', {index: i, signature: previousSignature})).status, 400);
+      const signature = await account.signMessage({message: {raw: message}});
+      assert.equal((await post('signed', {index: i, signature})).status, 200);
+      assert.equal(await pending, signature);
+      previousSignature = signature;
+    }
+    const pending = session.signMessage(new Uint8Array([4]));
+    const rejected = assert.rejects(pending, /cancelled/);
+    await post('cancel', {});
+    await rejected;
+    await assert.rejects(session.signMessage(new Uint8Array([5])), /session ended/);
+  } finally {session.close(); rmSync(dir, {recursive: true, force: true});}
+});
+
+test('abandoned sessions expire and closing rejects an unfinished connection', async () => {
+  const expired = await openWalletSession({chainKey: 'sepolia', port: 0, idleTimeoutMs: 20});
+  try {
+    await assert.rejects(expired.connect(), /expired/);
+    await assert.rejects(expired.signMessage(new Uint8Array([1])), /session ended/);
+  } finally {expired.close();}
+  const closed = await openWalletSession({chainKey: 'sepolia', port: 0});
+  const connecting = closed.connect();
+  const rejected = assert.rejects(connecting, /closed/);
+  closed.close();
+  await rejected;
+});
+
 test('session URL replacement is private and does not follow an existing symlink', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'abx-sign-private-'));
   const target = join(dir, 'other'); const file = join(dir, 'url');

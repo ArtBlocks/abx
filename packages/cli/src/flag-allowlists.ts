@@ -126,7 +126,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
     'yes',
     'json',
   ]),
-  'auth login': set(['remote', 'no-open', 'force']),
+  'auth login': set(['remote', 'no-open', 'force', 'no-wait', 'resume', 'json']),
   'auth logout': set(['remote']),
   'auth keys': set(['remote']),
   'auth revoke-key': set(['remote']),

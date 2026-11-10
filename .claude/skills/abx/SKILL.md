@@ -169,6 +169,7 @@ Before deploying, write down the promised value for each applicable row:
 | Contract identity and owner powers | `abx state <addr>` and the deploy readout |
 | Token metadata | `abx tokenuri <addr> --token <id>` |
 | Collection metadata | `abx contracturi <addr>` |
+| Nonblocking service login | `abx auth login --no-wait --no-open --json`, then `abx auth login --resume --no-wait --json` in the same private project directory |
 | Image | decoded metadata plus a successful fetch or on-chain field provenance |
 | Animation/live view | the decoded `animation_url`, loaded with a real minted token |
 | Marketplace traits | decoded `attributes`, not merely console output from the program |
