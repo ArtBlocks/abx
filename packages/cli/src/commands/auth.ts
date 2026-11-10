@@ -370,6 +370,7 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
   if (!options.resume && pending?.value && pending.value.deadline > now()) {
     throw new Error('a login is already pending; run `abx auth login --resume` instead of starting another approval')
   }
+  if (!options.resume && pending.raw) removeEnvSecret(options.envPath, pending.key, pending.raw)
 
   const metadata = await discoverOAuthMetadata(options.baseUrl, fetchImpl)
   if (!metadata.grant_types_supported?.includes(DEVICE_GRANT_TYPE)) {
@@ -411,8 +412,11 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
     storedRaw = Buffer.from(JSON.stringify({issuer: cleanBaseUrl(options.baseUrl), grant, deadline, nextPollAt, pollSeconds})).toString('base64url')
     saveEnvSecret(options.envPath, pending!.key, storedRaw)
   }
+  const clearPending = () => {
+    if (storedRaw) removeEnvSecret(options.envPath, pending.key, storedRaw)
+  }
   const finish = (status: DeviceLoginResult['status']): DeviceLoginResult => {
-    if (persistent && storedRaw) removeEnvSecret(options.envPath, pending!.key, storedRaw)
+    clearPending()
     return {status}
   }
   const result = (): DeviceLoginResult => ({status: 'pending', verificationUrl, userCode: grant.user_code,
@@ -457,6 +461,7 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
     }
     const body = await jsonObject(response)
     if (response.ok) {
+      try {
       const accessToken = body.access_token
       if (typeof accessToken !== 'string' || !accessToken || /[\r\n]/.test(accessToken)) {
         throw new Error('the provider returned an invalid OAuth access token')
@@ -468,6 +473,10 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
       // or newly populated the destination while this command was polling.
       assertLoginDestination(options)
       saveEnvSecret(options.envPath, options.envVar, accessToken)
+      } catch (error) {
+        clearPending()
+        throw error
+      }
       return finish('completed')
     }
 
@@ -504,6 +513,7 @@ export async function deviceLogin(options: DeviceLoginOptions, deps: DeviceLogin
       if (persistent || options.structured) return {status: 'expired'}
       throw new Error('device authorization expired; run login again')
     }
+    clearPending()
     throw oauthFailure('OAuth token exchange failed', response, body, [grant.device_code])
   }
   finish('expired')

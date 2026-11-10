@@ -120,6 +120,45 @@ test('nonblocking CLI JSON contains one plain handoff object and no device secre
   }
 });
 
+test('terminal token failures release the pending slot while transient failures preserve it', async () => {
+  for (const outcome of ['invalid_grant', 'invalid_response', 'temporary'] as const) {
+    const envPath = join(mkdtempSync(join(tmpdir(), 'abx-auth-recovery-')), '.env');
+    const fake = successfulFetch('abxk_unused');
+    let now = 0;
+    const deps = {fetchImpl: (async (input, init) => {
+      if (!String(input).endsWith('/oauth/token')) return fake.fetchImpl(input, init);
+      if (outcome === 'invalid_grant') return response({error: 'invalid_grant'}, 400);
+      if (outcome === 'invalid_response') return response({token_type: 'Bearer'});
+      return response({error: 'temporarily_unavailable'}, 503);
+    }) as typeof fetch, now: () => now, sleep: async () => {}, line: () => {}, warning: () => {}};
+    const opts = {baseUrl: BASE, envVar: 'ABX_TEST_TOKEN', envPath, noWait: true, noOpen: true};
+    await deviceLogin(opts, deps);
+    now = 1000;
+    if (outcome === 'temporary') {
+      assert.equal((await deviceLogin({...opts, resume: true}, deps)).status, 'pending');
+      assert.match(readFileSync(envPath, 'utf8'), /PENDING_LOGIN=/);
+      await assert.rejects(deviceLogin(opts, deps), /already pending/);
+    } else {
+      await assert.rejects(deviceLogin({...opts, resume: true}, deps), /invalid_grant|invalid OAuth access token/);
+      assert.doesNotMatch(readFileSync(envPath, 'utf8'), /PENDING_LOGIN=/);
+      assert.equal((await deviceLogin(opts, deps)).status, 'pending', 'a new approval can start immediately');
+    }
+  }
+});
+
+test('a fresh interactive login removes an expired pending grant', async () => {
+  const envPath = join(mkdtempSync(join(tmpdir(), 'abx-auth-expired-replacement-')), '.env');
+  const fake = successfulFetch('abxk_replacement');
+  let now = 0;
+  const deps = {fetchImpl: fake.fetchImpl, now: () => now, sleep: async () => {}, line: () => {}, warning: () => {}};
+  const opts = {baseUrl: BASE, envVar: 'ABX_TEST_TOKEN', envPath, noOpen: true};
+  await deviceLogin({...opts, noWait: true}, deps);
+  now = 900_000;
+  assert.equal((await deviceLogin(opts, deps)).status, 'completed');
+  assert.doesNotMatch(readFileSync(envPath, 'utf8'), /PENDING_LOGIN=/);
+  assert.match(readFileSync(envPath, 'utf8'), /ABX_TEST_TOKEN=abxk_replacement/);
+});
+
 test('device login follows discovery + RFC polling, stores the key privately, and never prints either secret', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'abx-auth-device-'));
   const envPath = join(dir, '.env');
