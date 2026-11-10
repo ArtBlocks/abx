@@ -166,6 +166,12 @@ warnings, required public surfaces, dependencies, and resume state. Unknown valu
 groups they contain. Large code deployments may split setup across transactions. `deploy-code
 --resume` continues the idempotent setup steps, and reserve mints run last.
 
+## Optional utilities
+
+`abx utils [utility] [--json]` discovers optional official packages and their use cases.
+`abx utils abxfs` describes ABX FS. The same descriptors appear in capability output.
+Discovery does not install or execute utility packages; see the [utilities guide](/docs/using-abx/guides/utilities).
+
 ## Agent skill and updates
 
 `abx skill install` installs the version-matched agent skill. `abx doctor` reports drift between the

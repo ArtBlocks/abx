@@ -21,6 +21,9 @@ designs are all possible; choose deliberately for the intended lifespan, trust, 
 Durability need not mean frozen state. Use [ecosystem.md](ecosystem.md) for relevant integrations,
 favoring official third-party tools rather than rebuilding them.
 
+Consider [ABX FS](utilities.md) when preserved files, a project archive, or a static companion site
+serve the idea. Its compression, versions, and owner-controlled publishing can remove custom storage work.
+
 Keep exploration separate from implementation. Research and compare concepts until the creator
 chooses a direction and asks to implement it; do not start code, create repositories or cloud
 resources, or deploy during ideation. Future launch intent or available accounts and wallets do
