@@ -123,6 +123,7 @@ import {cmdVacuum, VACUUM_HELP} from './commands/maintenance.js';
 import {cmdFeedback} from './commands/feedback.js';
 import {AUTH_HELP, cmdAuth} from './commands/auth.js';
 import {ABX_CAPABILITIES, cmdCapabilities} from './capabilities.js';
+import {cmdUtils} from './utilities.js';
 import {CHAIN} from './config.js';
 import {CliError} from './errors.js';
 import {allowlistFor} from './flag-allowlists.js';
@@ -363,6 +364,13 @@ async function main() {
     return;
   }
 
+  // Utility discovery is local and works before any utility package, remote, or wallet is configured.
+  if (cmd === 'utils') {
+    if (flags.help !== undefined || rest.includes('-h')) return printCommandHelp('utils');
+    warnStrayFlags(flags, allowlistFor('utils')!, 'utils');
+    return cmdUtils(positionalArgs(rest), flags);
+  }
+
   // Notify-only "you're behind" nudge (cached, opt-out, stderr — see update-check.ts). Awaited so
   // the notice lands before command output, but it hits the network at most once every 6h and never
   // throws, so it can't break or meaningfully slow a command. Skipped for the pure help path below.
@@ -519,6 +527,11 @@ async function cmdMinter(rest: string[]) {
 // ── per-command usage (printed by `<cmd> --help` / `abx help <cmd>`; read-only) ──
 const COMMAND_HELP: Record<string, string> = {
   auth: AUTH_HELP,
+  utils: `
+  ${bold('abx utils [utility]')} ${dim('— discover optional ABX utilities; read-only, no installation')}
+    ${g('abx utils')}                  list available utilities
+    ${g('abx utils abxfs --json')}     official packages, use cases, and compatibility boundaries
+    ${dim('ABX FS performs its operations through its own CLI/SDK. Check that installed CLI help and chain registry.')}`,
   capabilities: `
   ${bold('abx capabilities')} ${dim('— stable product boundaries for agents and automation; read-only')}
     ${g('abx capabilities')}          concise human summary
@@ -1400,6 +1413,7 @@ function help() {
                             project + notify the effects layer on change (${g('ABX_WATCH_INTERVAL_MS')}; 0 = off)
 
   ${bold('code / generative projects')} ${dim('— a program is the content; output is a function of live on-chain state')}
+    ${g('abx utils [utility]')}       optional utility packages, use cases, and integration guidance   [${g('--json')}]
     ${g('abx capabilities')}          stable native lanes, extension seams, irreversible choices, and unsupported cases   [${g('--json')}]
     ${g('abx preview')} (--script <f> | --code-dir <d>)   ${bold('while you are still making it')} — run the program on localhost, live: refresh for new seeds,
                             drive your PostParams, watch it animate. Same document the generator serves. ${g('--shoot <dir>')} for headless frames. No chain.

@@ -5,27 +5,29 @@ automatic optimism nor reflexive refusal; it is a proven route with explicit cos
 
 ## Contents
 
-- [Use the four-way classification](#use-the-four-way-classification)
+- [Use the five-way classification](#use-the-five-way-classification)
 - [Inspect the machine-readable contract](#inspect-the-machine-readable-contract)
 - [Use canonical extension seams](#use-canonical-extension-seams)
 - [Map mechanics to seams](#map-mechanics-to-seams)
 - [Respect deploy-time prerequisites](#respect-deploy-time-prerequisites)
 - [Know the supported boundary](#know-the-supported-boundary)
 
-## Use the four-way classification
+## Use the five-way classification
 
 Classify the request as one of:
 
 1. **Native** — a current CLI command/flag combination performs it directly.
 2. **Extension** — a custom minter, hook, field renderer, seed source, or transfer validator performs
    it while the token remains a canonical factory clone.
-3. **Unsupported/foreclosed** — the capability contract lists it as unsupported, or the existing
+3. **Utility** — an official optional package performs the work. Inspect `abx utils` and
+   [utilities.md](utilities.md); the utility's own version, chain registry, and signer rules apply.
+4. **Unsupported/foreclosed** — the capability contract lists it as unsupported, or the existing
    contract's immutable type/options exclude the prerequisite.
-4. **Unknown** — no supported route has been demonstrated. Inspect help, implementation/contracts,
+5. **Unknown** — no supported route has been demonstrated. Inspect help, implementation/contracts,
    and state; report uncertainty if it remains unproven.
 
 Never infer “unsupported” from the absence of a flag. Never infer “possible” merely because an item is
-absent from a short no-list. A capability claim needs a native lane or an exact extension seam.
+absent from a short no-list. A capability claim needs a native lane, utility capability, or exact extension seam.
 
 Give the creator the route, engineering required, authority model, gas/hosting/reach tradeoff,
 irreversible prerequisites, and verification plan. “Possible” without those qualifiers is not useful.

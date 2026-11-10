@@ -3,6 +3,9 @@
 Use this reference for `preview`, `inspect`, `deploy-code`, JavaScript/build projects, Solidity field
 renderers, marketplace stills and traits, seeds, dependencies, parameters, and code-project locks.
 
+Consider [ABX FS](utilities.md) for durable static builds, shared files, or bounded native content reads.
+Use its packages and adapter when appropriate; a project's executable ABX script remains its own surface.
+
 ## Contents
 
 - [Choose the runtime lane](#choose-the-runtime-lane)

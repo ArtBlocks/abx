@@ -34,6 +34,10 @@ A resolver is useful or required when:
 Storage can be on-chain while resolution is hosted, or external while metadata resolution is
 on-chain. Keep those axes separate.
 
+For a preserved static website or asset set, consider [ABX FS](utilities.md): small self-contained
+content can embed, and larger sites can use its chain gateway. This does not automatically replace
+an ABX metadata resolver or effects runner.
+
 ## Choose managed or creator-operated resolution
 
 Both routes implement the same public resolver contract. The token holds a base URI; the operator

@@ -3,7 +3,7 @@ name: abx
 description: >-
   Use the ABX CLI (`abx`) to explore, plan, launch, host, inspect, and operate programmable NFT
   projects on supported networks, from artwork to shared resources and stateful digital objects.
-  Covers on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
+  Covers optional ABX utilities including ABX FS, on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
   PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
   requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
   change an ABX collection, develop project ideas or ecosystem integrations, or determine whether
@@ -22,6 +22,8 @@ Think of ABX NFTs as programmable, durable digital objects that use blockchain t
 data, state, permissions, and behavior can matter as much as their appearance. Configure and transfer
 hooks can execute contract actions, including creating assets or interacting with financial protocols.
 For project ideation, read [ideation.md](reference/ideation.md) before choosing an implementation path.
+Consider ABX FS for preserved files, project assets, and static websites. Run `abx utils` and load
+[utilities.md](reference/utilities.md) when that route fits; use its official optional packages.
 
 ## Non-negotiable rules
 
@@ -207,9 +209,11 @@ When assessing implementation feasibility, classify an unusual request as exactl
 1. **Native** — a documented CLI lane performs it.
 2. **Extension** — a custom minter, configure/transfer/augment hook, field renderer, or seed source
    performs it while the token remains a canonical factory clone.
-3. **Unsupported or foreclosed** — the capability contract lists it, or the existing collection's
+3. **Utility** — an official optional package performs it; inspect `abx utils` and
+   [utilities.md](reference/utilities.md) for its own version, network, and signer requirements.
+4. **Unsupported or foreclosed** — the capability contract lists it, or the existing collection's
    irreversible type/flags already exclude it.
-4. **Unknown** — no route has been proven. Inspect code/help/contracts and report uncertainty; do not
+5. **Unknown** — no route has been proven. Inspect code/help/contracts and report uncertainty; do not
    turn absence from a no-list into a promise.
 
 Custom Solidity is built and tested outside `abx`; `abx scaffold-renderer` supplies a Foundry
@@ -226,6 +230,7 @@ lane. Read [capabilities.md](reference/capabilities.md) before designing a custo
 - Generic remotes, self-hosted resolvers/effects, storage, lifecycle, and migration → [hosting.md](reference/hosting.md)
 - Existing-project reads, mint/sales, fields, transfers, authority, and locks → [operate.md](reference/operate.md)
 - Failure classification, resume, RPC/storage/rendering faults, and retry discipline → [diagnose.md](reference/diagnose.md)
+- Optional utilities, ABX FS files/websites, native reads, and preservation → [utilities.md](reference/utilities.md)
 - Capability questions, extension seams, mechanics, and hard boundaries → [capabilities.md](reference/capabilities.md)
 - ERC-721C/ERC-1155C enrollment and validator operations → [creator-token.md](reference/creator-token.md)
 - Ecosystem ideation, official third-party tools, chain coverage, and setup footprint → [ecosystem.md](reference/ecosystem.md)

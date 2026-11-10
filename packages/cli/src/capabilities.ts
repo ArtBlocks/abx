@@ -1,5 +1,6 @@
 import {CHAIN_SUPPORT, DEFAULT_CHAIN_KEY, KNOWN_CHAIN_KEYS} from '@artblocks/abx-sdk';
 import type {Flags} from './flags.js';
+import {ABX_UTILITIES} from './utilities.js';
 
 /**
  * The machine-readable ABX capability contract.
@@ -11,7 +12,8 @@ import type {Flags} from './flags.js';
  * matrices in prose.
  */
 export const ABX_CAPABILITIES = {
-  schemaVersion: 5,
+  schemaVersion: 6,
+  utilities: ABX_UTILITIES,
   defaultChain: DEFAULT_CHAIN_KEY,
   chains: CHAIN_SUPPORT,
   /** Compatibility field for consumers that only need selectable chain keys. */
@@ -139,6 +141,7 @@ export const ABX_CAPABILITIES = {
   interpretation: {
     native: 'A documented command/flag combination performs the request directly.',
     extension: 'A canonical extension seam performs it while the token remains a factory clone.',
+    utility: 'An optional official utility package performs it; inspect its installed capabilities and deployment registry.',
     unsupported: 'The request is listed under unsupportedToday or is blocked by an irreversible choice already made.',
     unknown: 'Do not infer support from absence. Inspect command help, contract type, and this contract; report uncertainty if no route is proven.',
   },
@@ -175,6 +178,9 @@ export function cmdCapabilities(flags: Flags): void {
   for (const seam of ABX_CAPABILITIES.extensionRoutes) {
     console.log(`  ${seam.route}: ${seam.availableOn} — ${seam.useFor.join(', ')}`);
   }
+
+  console.log('\nOptional utilities (abx utils):');
+  for (const utility of ABX_CAPABILITIES.utilities) console.log(`  ${utility.id}: ${utility.summary}`);
 
   console.log('\nUnsupported today:');
   for (const item of ABX_CAPABILITIES.unsupportedToday) console.log(`  - ${item}`);

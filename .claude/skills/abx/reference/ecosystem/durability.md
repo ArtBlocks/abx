@@ -28,6 +28,9 @@ Replacing an HTTP API with a hardcoded browser RPC endpoint retains a service de
 passing state computed in the EVM into the artwork. An oracle/attestation is also a dependency:
 identify its publishers, update funding, stale-data policy, and trust model before recommending it.
 
+For file and directory preservation, consider [ABX FS](../utilities.md) and its native reader.
+Choose a fixed content root with replaceable delivery when an HTTP gateway remains useful.
+
 ## Make on-chain reads resilient
 
 - Verify chain, contract/version, official interface, and the selected field's semantics. Inspect

@@ -81,6 +81,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   // ── read-only ──
   inspect: set(['dep']),
   capabilities: set(['json']),
+  utils: set(['json']),
   predict: set(['salt', 'for', 'factory', 'copies', 'script', 'code-dir', 'image-renderer', 'dir', 'image']),
   tokenuri: set(['token', 'fetch', 'json']),
   'view-url': set(['token', 'json', 'remote', 'base-url']),

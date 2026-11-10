@@ -1,0 +1,78 @@
+---
+title: ABX utilities
+description: Use optional utility packages for on-chain files, project assets, and preservation.
+---
+
+ABX utilities add capabilities through their own official tools and interfaces. Discover them without
+installing any utility package:
+
+```bash
+abx utils
+abx utils abxfs --json
+abx capabilities --json
+```
+
+The same utility descriptors appear in capability output. These commands provide package and
+documentation references; they do not install or run another CLI.
+
+## ABX FS
+
+[ABX FS](https://fs.abx.io) stores content-addressed files and directories on-chain with compression.
+Its ABX-based project layer adds ownership, publishing history, and tags. It can preserve a static
+website or dapp, NFT assets, project documentation, or other digital work. Content can exist without
+a project token, and an ABX collection can use FS content independently of the FS project's identity.
+
+Install only what the project needs:
+
+```bash
+pnpm add --save-dev @artblocks/abxfs-cli
+pnpm exec abxfs --help
+# For programmatic integration:
+pnpm add @artblocks/abxfs-sdk
+```
+
+The [ABX FS documentation](https://docs.fs.abx.io) maintains command syntax, package interfaces,
+deployed contracts, and limits. FS uses its own chain and signing configuration. Inspect its help
+and registry; ABX signing flags and chain settings do not automatically apply to it.
+
+## Preserve the work and choose its delivery
+
+FS content stays on the network where it was stored. The preferred delivery method is a separate
+choice:
+
+| Experience | Preferred route |
+| --- | --- |
+| Suitable small self-contained media or HTML | Auto selects an embedded data URI after inspection |
+| Multi-file website or larger content | A chain gateway serves the preserved bytes over HTTP |
+| Creator explicitly maintains IPFS availability | Opt-in IPFS presentation with creator-managed pins |
+
+A data URI contains one resource, so relative sibling files do not acquire a directory origin.
+An existing build process can produce self-contained HTML where appropriate. Runtime network
+dependencies still need inspection: uploading JavaScript does not preserve every service it calls.
+“Fully on-chain” describes the source bytes and resolution, while the browser executes the experience.
+
+The chain gateway is the straightforward default when embedding is unsuitable. A gateway is an
+off-chain delivery dependency, even though its content can be reconstructed from chain. IPFS adds a
+content-derived distribution address, with continuing pinning and gateway availability requirements;
+Auto does not select a paid provider or create pins.
+
+Presentation-capable project generations support changing methods and independent irreversible locks
+on displayed content, delivery method, and endpoint configuration. Locking content fixes its concrete
+root and entrypoint; project publishing can continue. This makes fixed content with replaceable delivery
+possible. Endpoint locks do not guarantee endpoint availability. Review the exact lock and its scope
+before signing, and preserve endpoint flexibility unless a creator deliberately chooses otherwise.
+
+Existing orgs keep the factory and renderer they were created with. The FS registry retains earlier
+generations, while new-project defaults use the current factory. Inspect the particular org's
+capabilities; a software update does not upgrade an existing token.
+
+## Connect FS content to an ABX project
+
+Use existing ABX metadata, link, or attachment surfaces for served content. Use the official FS native
+reader and fixed-source ABX reader adapter when the field must consume bounded EVM-readable content.
+The reader's supported codecs and execution budgets are documented by FS; do not reimplement them.
+
+Verify the exact token metadata, animation, image, and attachment experience after integration.
+A preserved website does not itself supply a mutable backend, an indexed attachment list, or a
+marketplace thumbnail. Choose those surfaces deliberately using the [storage guide](/docs/using-abx/guides/storage) and
+[deployment guide](/docs/using-abx/guides/deploy-a-digital-asset).
