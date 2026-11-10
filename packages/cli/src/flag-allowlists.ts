@@ -83,7 +83,8 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   capabilities: set(['json']),
   predict: set(['salt', 'for', 'factory', 'copies', 'script', 'code-dir', 'image-renderer', 'dir', 'image']),
   tokenuri: set(['token', 'fetch', 'json']),
-  contracturi: set(['json']),
+  'view-url': set(['token', 'json', 'remote', 'base-url']),
+  contracturi: set(['json', 'validate']),
   tokens: set(['json', 'limit', 'from', 'holder']),
   state: set(['json']),
   status: set(['watch'], REMOTE),
@@ -136,7 +137,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   // ── rendering / effects ──
   render: set(['force', 'effects-url'], REMOTE, STORAGE_OVERRIDE),
   effects: set(['once', 'port', 'resolver-port', 'interval-ms', 'concurrency'], REMOTE, STORAGE_OVERRIDE),
-  'mint-page': set(['dir', 'name', 'rpc', 'minter-contract']),
+  'mint-page': set(['dir', 'name', 'rpc', 'minter-contract', 'static']),
   'scaffold-renderer': set(['force']),
   'scaffold solidity': set(['force']),
 

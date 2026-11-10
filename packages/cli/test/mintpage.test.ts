@@ -19,6 +19,22 @@ function fileMap(o = OPTS): Record<string, string> {
   return Object.fromEntries(mintPageArtifact(o).files.map((f) => [f.path, f.content]));
 }
 
+test('static exports preserve the purchase and read components for both token families', () => {
+  for (const isEdition of [false, true]) {
+    const framework = fileMap({...OPTS, isEdition});
+    const files = fileMap({...OPTS, isEdition, staticExport: true});
+    assert.match(files['next.config.mjs'], /output: 'export'/);
+    assert.match(files['next.config.mjs'], /trailingSlash: true/);
+    assert.equal(JSON.parse(files['package.json']).scripts.start, undefined);
+    for (const path of ['app/mint-client.tsx', 'lib/chain.ts', 'lib/abi.ts', 'lib/meta.ts']) {
+      assert.equal(files[path], framework[path], path);
+    }
+    assert.match(files['README.md'], /out\//);
+    assert.match(files['README.md'], /static host/);
+    assert.match(files['lib/meta.ts'], isEdition ? /functionName: 'uri'/ : /functionName: 'tokenURI'/);
+  }
+});
+
 test('mintPageArtifact: emits a complete, runnable Next.js app', () => {
   const files = fileMap();
   for (const p of [

@@ -70,6 +70,7 @@ export ABX_DATA_DIR="$DATA_DIR"
 echo "▸ A/3  hot lane: deploy --onchain-image (bootstraps factory/renderer/chunk-store)"
 A_OUT="$(ABX_DEPLOYER_PK="$ANVIL_PK" pnpm -s abx deploy \
   --bootstrap-factory \
+  --banner-image https://example.com/banner.png --featured-image https://example.com/featured.png \
   --image "$SVG" --onchain-image --compress fastlz \
   --name "Hot OnChain" --symbol HOT 2>&1)" || { echo "$A_OUT"; fail "hot-lane onchain-image deploy failed (staging refactor regression)"; }
 CLONE_A="$(printf '%s\n' "$A_OUT" | grep -oiE 'deployed 0x[0-9a-f]{40}' | head -1 | grep -oiE '0x[0-9a-f]{40}')"
@@ -92,6 +93,22 @@ echo "       reuse via env → factory ${ABX_FACTORY:0:10}…  renderer ${ABX_RE
 A_URI="$(pnpm -s abx tokenuri "$CLONE_A" 2>&1)" || { echo "$A_URI"; fail "tokenuri read failed for hot clone"; }
 printf '%s\n' "$A_URI" | grep -qi 'decoded on-chain JSON' || { echo "$A_URI"; fail "hot clone did not resolve its tokenURI on-chain"; }
 echo "       ✓ hot-lane on-chain staging + deploy resolves on-chain"
+
+# Read-only launch surfaces must keep stdout machine-readable and never change ownership.
+COLLECTION_JSON="$(pnpm -s abx contracturi "$CLONE_A" --json)"
+printf '%s' "$COLLECTION_JSON" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const p=JSON.parse(s);if(p.banner_image!=="https://example.com/banner.png"||p.featured_image!=="https://example.com/featured.png")process.exit(1)'
+HANDOFF_JSON="$(pnpm -s abx set-admin "$CLONE_A" --to "$ANVIL_ACCT1" --unsigned --dry-run --json)"
+printf '%s' "$HANDOFF_JSON" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const p=JSON.parse(s);if(p.sent!==false||p.lane!=="unsigned"||!p.readiness)process.exit(1)'
+VIEW_JSON="$(pnpm -s abx view-url "$CLONE_A" --token 0 --base-url https://viewer.example/prefix --json)"
+printf '%s' "$VIEW_JSON" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const p=JSON.parse(s);if(p.viewerUrl!==`https://viewer.example/prefix/t/11155111/${p.contract.toLowerCase()}/0/data/image`)process.exit(1)'
+[ "$(cast call "$CLONE_A" 'owner()(address)' --rpc-url "$RPC" | tr 'A-F' 'a-f')" = "$(printf '%s' "$ANVIL_ACCT0" | tr 'A-F' 'a-f')" ] || fail "handoff dry run changed ownership"
+
+# The mint command has its own outer JSON envelope: carry the existing simulation through it.
+UNMINTED_JSON="$(ABX_DEPLOYER_PK="$ANVIL_PK" pnpm -s abx deploy --image "$SVG" --onchain-image --compress fastlz --name "Mint Preview" --symbol MP --no-mint --json)"
+UNMINTED="$(printf '%s' "$UNMINTED_JSON" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;console.log(JSON.parse(s).address)')"
+MINT_PREVIEW="$(ABX_DEPLOYER_PK="$ANVIL_PK" pnpm -s abx mint "$UNMINTED" --dry-run --json)"
+printf '%s' "$MINT_PREVIEW" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const p=JSON.parse(s);if(p.sent!==false||p.lane!=="send"||p.readiness.status!=="ready"||p.readiness.valueCompatibleWithSponsorship!==true||p.transactions.count!==1)process.exit(1)'
+if cast call "$UNMINTED" 'ownerOf(uint256)(address)' 0 --rpc-url "$RPC" >/dev/null 2>&1; then fail "mint preview issued a token"; fi
 
 # Capture the sign URL the way a backgrounding AGENT should: read the file the CLI writes the
 # instant the server is ready — no parsing stdout, no racing a one-shot monitor.

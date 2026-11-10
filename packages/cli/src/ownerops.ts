@@ -148,8 +148,12 @@ import {planOnChainScript} from './script-chunks.js';
 import {fetchServedTokenUri, servedOk} from './served.js';
 import {openWalletSession, type SignResult, type TxProvider, type WalletSession} from './signer.js';
 import {openSponsoredSession} from './creator-signer.js';
-import {gatedSend, laneFromFlags} from './riskgate.js';
+import {gatedSend, laneFromFlags, type DryRunSimulation} from './riskgate.js';
 import {withJson} from './jsonout.js';
+import {info} from './output.js';
+import {loadCollectionMetadata, validateCollectionMetadata} from './collection-metadata.js';
+import {currentSigningReadiness} from './riskgate.js';
+import {viewerSurface, tokenViewerUrl} from './view-url.js';
 import {controlPlaneClient, resolveRemote} from './remote.js';
 import {isDryRun, positionalArgs, unknownFlags, warnStrayFlags} from './flags.js';
 import {parseSchemaSpecs, describeParamAuthority, describeSchema, type ParsedSchema} from './schema.js';
@@ -283,11 +287,16 @@ function requireFlag(flags: Flags, name: string, usage: string): string {
  * choke point the deploy family's resumed-setup send routes through — so this is now just "gate,
  * then re-index if the project is known."
  */
-async function runWrite(address: Address, provider: TxProvider, flags: Flags, expectedSigner?: Address): Promise<SignResult | null> {
-  const result = await gatedSend(provider, flags, {chainKey: CHAIN, expectedSigner});
+async function runWrite(address: Address, provider: TxProvider, flags: Flags, expectedSigner?: Address, onSimulation?: (simulation: DryRunSimulation) => void): Promise<SignResult | null> {
+  const result = await gatedSend(provider, flags, {chainKey: CHAIN, expectedSigner, onSimulation});
   if (!result) return null; // dry run, or the cold lane — nothing broadcast
   await reindexIfKnown(address, flags);
   return result;
+}
+
+function writeNarration(flags: Flags, message: string): void {
+  if (flags.json !== undefined) process.stderr.write(`${message}\n`);
+  else console.log(message);
 }
 
 async function reindexIfKnown(address: Address, flags: Flags): Promise<void> {
@@ -992,6 +1001,19 @@ export function parseTokenIdRange(raw: string): bigint[] {
 // For an EDITION (OneOfOneEdition/EditionImage/EditionCode) this mints copies of ONE id:
 // --token-id (required unless the target is a 1/1-edition, whose id space is fixed to {0}) +
 // --amount (default 1). --count is the 721 Series primitive and is refused on an edition.
+async function mintViewerLinks(contract: Address, tokenIds: string[], code: boolean, flags: Flags): Promise<Array<{tokenId: string; viewerUrl: string}>> {
+  if (!tokenIds.length) return [];
+  try {
+    const surface = await viewerSurface(flags);
+    const links = tokenIds.map((tokenId) => ({tokenId, viewerUrl: tokenViewerUrl(surface, chainId(), contract, tokenId, code)}));
+    for (const link of links) console.log(dim(`  view #${link.tokenId}: ${link.viewerUrl}`));
+    return links;
+  } catch {
+    console.log(yellow(`  Mint confirmed; viewer discovery is unavailable. Retry abx view-url ${contract} --token ${tokenIds[0]} with the intended serving base.`));
+    return [];
+  }
+}
+
 export async function cmdMint(address: string | undefined, flags: Flags): Promise<void> {
   const usage = 'abx mint <address> [--to 0x…] [--count <n> | --token-id <id> --amount <n>] [--json] [--sign|--unsigned]';
   const contract = requireAddress(address, usage);
@@ -1001,6 +1023,8 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
   // re-reading `nextTokenId` afterwards — a concurrent mint would make that answer wrong, and a
   // number that is usually right is worse than no number.
   return withJson(flags, async () => {
+    let simulation: DryRunSimulation | undefined;
+    const receiveSimulation = (value: DryRunSimulation) => {simulation = value;};
     const publicClient = makePublicClient({chainKey: CHAIN});
     const kind = await detectTokenKind(publicClient, contract);
     const owner = await read<Address>(contract, 'owner');
@@ -1025,8 +1049,9 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       const amount = flags.amount !== undefined ? parseEditionCountFlag(flags.amount as string, 'amount') : 1n;
       console.log(dim(`  minting ${amount} cop${amount === 1n ? 'y' : 'ies'} of #${tokenId} → ${to}${flags.to ? '' : ' (owner — pass --to for a buyer)'}`));
       const tx = prepareEditionMint({contract, to, tokenId, amount, chainId: chainId()});
-      const result = await runWrite(contract, tx, flags, owner);
+      const result = await runWrite(contract, tx, flags, owner, receiveSimulation);
       if (result) console.log(`  ${green('✓')} minted ${amount} cop${amount === 1n ? 'y' : 'ies'} of ${bold('#' + tokenId)} → ${to}`);
+      const viewerUrls = result ? await mintViewerLinks(contract, [tokenId.toString()], kind.kind === 'edition-code', flags) : [];
       console.log(dim(`  next: \`abx refresh ${contract}\` so marketplaces pick up the change.`));
       return {
         contract,
@@ -1037,6 +1062,9 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
         blockNumber: result ? String(result.blockNumber) : null,
         tokenIds: [tokenId.toString()],
         amount: amount.toString(),
+        viewerUrls,
+        viewerUrl: viewerUrls[0]?.viewerUrl ?? null,
+        ...(isDryRun(flags) ? {lane: laneFromFlags(flags), readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
       };
     }
 
@@ -1060,8 +1088,9 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       console.log(dim(`  minting token → ${to}${flags.to ? '' : ' (owner — pass --to for a buyer)'}`));
       tx = prepareMint({contract, to, chainId: chainId()});
     }
-    const result = await runWrite(contract, tx, flags, owner);
+    const result = await runWrite(contract, tx, flags, owner, receiveSimulation);
     const tokenIds = result ? await mintedTokenIds(makePublicClient({chainKey: CHAIN}), contract, result.txHash) : [];
+    const viewerUrls = await mintViewerLinks(contract, tokenIds, kind.kind === 'code', flags);
     if (result && tokenIds.length) {
       console.log(`  ${green('✓')} minted token${tokenIds.length > 1 ? 's' : ''} ${bold(tokenIds.map((t) => '#' + t).join(', '))} → ${to}`);
     }
@@ -1076,7 +1105,10 @@ export async function cmdMint(address: string | undefined, flags: Flags): Promis
       txHash: result?.txHash ?? null,
       blockNumber: result ? String(result.blockNumber) : null,
       tokenIds,
+      viewerUrls,
+      viewerUrl: viewerUrls.length === 1 ? viewerUrls[0].viewerUrl : null,
       requestedCount: Number(count),
+      ...(isDryRun(flags) ? {lane: laneFromFlags(flags), readiness: currentSigningReadiness(laneFromFlags(flags), owner, simulation, BigInt(tx.value)), transactions: {count: 1, approvals: 1}} : {}),
     };
   });
 }
@@ -1225,7 +1257,9 @@ export async function cmdPause(address: string | undefined, flags: Flags): Promi
 export async function cmdUnpause(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(address, 'abx unpause <address> [--sign|--unsigned]');
   const owner = await read<Address>(contract, 'owner');
-  await runWrite(contract, prepareSetPaused({contract, paused: false, chainId: chainId()}), flags, owner);
+  writeNarration(flags, `Before opening a series/edition sale, prepare and check the collector page: abx mint-page ${contract} --static`);
+  const result = await runWrite(contract, prepareSetPaused({contract, paused: false, chainId: chainId()}), flags, owner);
+  if (result) writeNarration(flags, `Project unpaused. For a series/edition sale, share your collector page; scaffold one with abx mint-page ${contract} --static`);
 }
 
 // ── authorship + rights deploy fields (parity with --description / --external-url) ───────────
@@ -1239,14 +1273,22 @@ export const AUTHORSHIP_DEPLOY_FIELDS: ReadonlyArray<readonly [flag: string, fie
   ['display-notes', F.displayNotes],
   ['creator-links', F.creatorLinks],
   ['license', F.license],
+  ['banner-image', F.bannerImage],
+  ['featured-image', F.featuredImage],
 ];
 
 /** Build the on-chain (inline) collection fields for whichever authorship/rights deploy flags are
  *  set — pure, so a deploy path just spreads the result into its `contractFields`. */
 export function authorshipContractFields(flags: Flags): OnChainFieldInput[] {
-  return AUTHORSHIP_DEPLOY_FIELDS.flatMap(([flag, field]) =>
-    flags[flag] ? [{field: encodeTag(field), representation: encodeTag(R.inline), value: toHex(String(flags[flag]))}] : [],
-  );
+  return AUTHORSHIP_DEPLOY_FIELDS.flatMap(([flag, field]) => {
+    const value = flags[flag];
+    if (!value) return [];
+    const artwork = flag === 'banner-image' || flag === 'featured-image';
+    if (artwork && !/^(https?:\/\/|ipfs:\/\/|ar:\/\/|data:image\/)/i.test(value)) {
+      throw new Error(`--${flag} needs an image URI (https:, ipfs:, ar:, or data:image/)`);
+    }
+    return [{field: encodeTag(field), representation: encodeTag(artwork ? R.url : R.inline), value: toHex(value)}];
+  });
 }
 
 /** Collection identity supplied by deploy flags. `external_url` is the token-metadata key while
@@ -3184,6 +3226,14 @@ export async function cmdSetAdmin(address: string | undefined, flags: Flags): Pr
   const contract = requireAddress(address, 'abx set-admin <address> --to 0x… [--sign|--unsigned]');
   const newOwner = requireFlag(flags, 'to', 'abx set-admin <address> --to 0x…') as Address;
   const owner = await read<Address>(contract, 'owner');
+  writeNarration(flags, dim(`  Before admin handoff: abx contracturi ${contract} --validate marketplace. Ownership transfer removes your admin rights; marketplace ingestion is asynchronous.`));
+  try {
+    const uri = await read<string>(contract, 'contractURI');
+    const report = validateCollectionMetadata(await loadCollectionMetadata(uri));
+    if (!report.valid) writeNarration(flags, yellow(`  Collection metadata incomplete: missing [${report.missing.join(', ')}]; invalid [${report.invalid.join(', ')}]. Review before transferring admin.`));
+  } catch {
+    writeNarration(flags, yellow('  Could not verify collection metadata. Review contracturi before transferring admin.'));
+  }
   await runWrite(contract, prepareTransferOwnership({contract, newOwner, chainId: chainId()}), flags, owner);
 }
 
@@ -3457,6 +3507,7 @@ export async function cmdMinterConfigure(address: string | undefined, flags: Fla
 export async function cmdMinterShow(address: string | undefined, flags: Flags): Promise<void> {
   const usage = 'abx minter show <token> [--token-id <n> (editions)] [--minter-contract 0x…]';
   const token = requireAddress(address, usage);
+  info(`Collector page: abx mint-page ${token} --static (build and host before opening the sale)`);
   warnStrayFlags(flags, new Set(MINTER_SHOW_FLAGS), 'minter show');
   // Refuse a nonexistent contract like the sibling owner-ops (state/unpause/minter configure) do —
   // otherwise the minter singleton returns zero-config for the unconfigured token and we print a

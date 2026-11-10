@@ -324,6 +324,8 @@ export interface GatedSendOptions {
   /** Test-only seam: a pre-built client for the dry-run simulation, instead of one `simulateDryRun`
    *  would otherwise construct from `chainKey`. Every production caller omits this. */
   client?: PublicClient;
+  /** Reuse the same dry-run result in a command's outer JSON envelope. Never runs on a send. */
+  onSimulation?: (simulation: DryRunSimulation) => void;
 }
 
 /** Resolve the signer a preview should simulate from the same source the hot send will use.
@@ -358,6 +360,7 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
     const prepared = await resolveProvider(provider, expectedSigner ?? zeroAddress);
     if (flags.json !== undefined) {
       const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, false, opts.client, lane === 'sponsor');
+      opts.onSimulation?.(simulation);
       console.log(JSON.stringify({
         dryRun: true,
         sent: false,
@@ -369,10 +372,16 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
         // gas estimate — not a prediction of total cost. `simulation.estimatedGas`/`estimatedCostWei`
         // are the real numbers, from the same gas selection the send itself uses; trust those.
         simulation,
+        readiness: currentSigningReadiness(lane, expectedSigner, simulation, BigInt(prepared.value)),
+        transactions: {count: 1, approvals: 1},
       }, null, 2));
     } else {
       printDryRunPreview(prepared, expectedSigner);
-      await simulateDryRun(prepared, opts.chainKey, expectedSigner, true, opts.client, lane === 'sponsor');
+      const simulation = await simulateDryRun(prepared, opts.chainKey, expectedSigner, true, opts.client, lane === 'sponsor');
+      opts.onSimulation?.(simulation);
+      const readiness = currentSigningReadiness(lane, expectedSigner, simulation, BigInt(prepared.value));
+      console.log(`    signing lane: ${lane}; readiness: ${readiness.status}`);
+      for (const reason of [...readiness.missing, ...readiness.unchecked]) console.log(`    - ${reason}`);
       console.log(dim(`\n  Re-run without --dry-run to send (lane: ${lane}).\n`));
     }
     return null;
@@ -388,4 +397,48 @@ export async function gatedSend(provider: TxProvider, flags: Flags, opts: GatedS
     port: flags.port ? Number(flags.port) : undefined,
     signUrlFile: flags['sign-url-file'],
   });
+}
+
+export interface SigningReadiness {
+  ready: boolean;
+  status: 'ready' | 'blocked' | 'unknown';
+  missing: string[];
+  unchecked: string[];
+  valueCompatibleWithSponsorship: boolean | null;
+}
+
+/** Local prerequisites plus an already-computed simulation. No RPC, keychain access, grant
+ * refresh, network discovery or transaction submission is permitted here. */
+export function signingReadiness(lane: Lane, options: {
+  key?: string; apiKey?: string; expectedSigner?: string | null;
+  simulation?: DryRunSimulation; value?: bigint;
+}): SigningReadiness {
+  const missing: string[] = [];
+  const unchecked: string[] = [];
+  if (lane === 'send') {
+    if (!options.key) missing.push('local signing key');
+    else {
+      try {
+        const signer = privateKeyToAccount(options.key as `0x${string}`).address;
+        if (options.expectedSigner && signer.toLowerCase() !== options.expectedSigner.toLowerCase()) missing.push('local key does not match the required signer');
+      } catch {missing.push('valid local signing key');}
+    }
+  } else if (lane === 'sign') unchecked.push('browser wallet connection and explicit approval of each transaction');
+  else if (lane === 'unsigned') unchecked.push('external signature and broadcast');
+  else {
+    if (!options.apiKey) missing.push('ABX_SERVICES_API_KEY; run abx auth login');
+    unchecked.push('creator grant, account eligibility, payment mode and fee budget');
+    if (options.value !== undefined && options.value > 0n) unchecked.push('transaction value requires creator self-payment; sponsorship pays zero-value transactions only');
+  }
+  if (options.simulation?.status === 'would-revert') missing.push(options.simulation.reason ?? 'transaction simulation would revert');
+  else if (options.simulation?.status !== 'would-succeed') unchecked.push(options.simulation?.reason ?? 'transaction execution and balance including fees have not been verified');
+  const status = missing.length ? 'blocked' : unchecked.length ? 'unknown' : 'ready';
+  return {ready: status === 'ready', status, missing, unchecked,
+    valueCompatibleWithSponsorship: options.value === undefined ? null : options.value === 0n};
+}
+
+export function currentSigningReadiness(lane: Lane, expectedSigner?: string | null, simulation?: DryRunSimulation, value?: bigint): SigningReadiness {
+  let key: string | undefined;
+  if (lane === 'send') {try {key = envSigningKey();} catch {key = 'invalid';}}
+  return signingReadiness(lane, {key, apiKey: process.env.ABX_SERVICES_API_KEY, expectedSigner, simulation, value});
 }

@@ -105,6 +105,7 @@ import {
   cmdRender,
   cmdTokenUri,
   cmdTokens,
+  cmdViewUrl,
 } from './commands/reads.js';
 import {cmdStorage} from './commands/storage.js';
 import {
@@ -409,6 +410,7 @@ async function main() {
     case 'render': return cmdRender(rest[0] as Address | undefined, rest.slice(1), flags);
     case 'effects': return cmdEffects(flags);
     case 'tokenuri': return cmdTokenUri(rest[0] as Address | undefined, flags, rest.slice(1));
+    case 'view-url': return cmdViewUrl(rest[0] as Address | undefined, flags, rest.slice(1));
     case 'artifacts': return cmdArtifacts(rest[0] as Address | undefined, flags);
     case 'tokens': return cmdTokens(rest[0] as Address | undefined, flags);
     case 'contracturi': return cmdContractUri(rest[0] as Address | undefined, flags);
@@ -552,6 +554,7 @@ const COMMAND_HELP: Record<string, string> = {
     --description "<s>"   the creator's words, served in token metadata   --external-url <url>
     --description-onchain   store the description ON-CHAIN (durable, reconstructable from chain alone)
     --creator "<s>" · --license "<s>"   authorship + rights, ON-CHAIN collection fields served in contractURI (also --display-notes, --creator-links)
+    --banner-image <uri> · --featured-image <uri>   collection artwork URL fields; preserve token images
     --traits "K=V; K2=V2"   real OpenSea traits (the marketplace trait array)   --attributes <file.json>   (array or {name: value} map)
     --traits-onchain        store traits ON-CHAIN (inline JSON, lockable); else off-chain operator metadata (editable via ${g('abx add --traits')})
     ${g('--onchain-uri')}         resolve tokenURI/contractURI FULLY ON-CHAIN (renderer assembles JSON from fields;
@@ -618,6 +621,7 @@ const COMMAND_HELP: Record<string, string> = {
       --public-base-url <url>   hosted resolver (off-chain custody; you run a node) — for mutable metadata
     --description "<s>" · --external-url <url>   collection identity, served in the metadata (set them or the description is boilerplate)
     --creator "<s>" · --license "<s>"   authorship + rights, ON-CHAIN collection fields served in contractURI (also --display-notes, --creator-links)
+    --banner-image <uri> · --featured-image <uri>   collection artwork URL fields; preserve token images
     ${g('--attributes <file.json>')}   ${bold('per-token marketplace traits')} (written ON-CHAIN): a JSON ARRAY indexed by token id, OR an OBJECT
                           keyed by filename / token id — each value an attributes array or a ${dim('{name: value}')} map. Small/medium series;
                           a huge collection should set traits post-deploy via ${g('abx set-field')} under a gas budget.
@@ -713,6 +717,7 @@ const COMMAND_HELP: Record<string, string> = {
                           ${bold('a Select declares its options')}: ${g("'mood:Select[Calm|Wild|Chaotic]:TokenOwner'")} ${dim('(quote the whole value — zsh glob-expands the brackets otherwise)')}; ${bold('a Range takes bounds')}: ${g("'density:Uint256Range[0..100]:TokenOwner'")} (Int/Decimal/Timestamp too; bounds optional)
     --description "<s>" · --external-url <url>   collection identity, written as ON-CHAIN collection fields in the deploy tx
     --creator "<s>" · --license "<s>"   authorship + rights, ON-CHAIN collection fields served in contractURI (also --display-notes, --creator-links)
+    --banner-image <uri> · --featured-image <uri>   collection artwork URL fields; preserve token images
     ${g('--image-renderer 0x..')}   THE in-chain-renderer lane: bake the on-chain ${g('image')} to a Solidity IAbxFieldRenderer → the SVG is COMPUTED
                           on-chain from the token's seed + params (fork ${g('SeedSvgRenderer.sol')}). No ${g('--script')} needed; no bucket, no runner, no
                           resolver — the marketplace still lives in ${g('tokenURI')} itself. Mutually exclusive with ${g('--image-base')} (both set ${g('image')}).
@@ -982,6 +987,7 @@ const COMMAND_HELP: Record<string, string> = {
     home (ipfs/arweave/s3 — NOT fs for a hosted pair) and publishes a durable locator — or bytes — to the resolver.`,
   'mint-page': `
   ${bold('abx mint-page')} <token> ${dim('— scaffold a self-contained Next.js mint site for a collection (fixed-price minter). No tx.')}
+    --static             export HTML/CSS/JS to out/ at build time; host without a Node server
     --dir <path>          where to write it (default: mint-page/)
     --name "<s>"          collection display name (default: the token's on-chain name)
     --rpc <url>           PUBLIC, keyless read RPC to embed (default: a public endpoint for the chain)
@@ -1215,6 +1221,12 @@ const COMMAND_HELP: Record<string, string> = {
                           without parsing prose (a mismatch exits non-zero either way).
     ${dim('On-chain URI lane (a non-zero tokenURIRenderer / a generator-backed animation field): also eth_calls the generator')}
     ${dim(`${g('onChainStatus')} (branch · chain-complete · unresolved refs · URL budget) and decodes ${g('tokenURI')} straight from the contract.`)}`,
+  'view-url': `
+  ${bold('abx view-url')} <address> [--token <id>] [--json]
+    --remote <name|url>   discover the provider's public token API and isolated content origins
+    --base-url <url>      explicit serving base, including any path prefix; no discovery
+    Code tokens use their live application URL; image tokens use their image-content URL.
+    Without either flag, uses ABX_PUBLIC_BASE_URL or the local resolver. No browser is opened.`,
   tokenuri: `
   ${bold('abx tokenuri')} <address> [--token <id>] ${dim('— read tokenURI(id) straight from the contract on-chain + decode the JSON (read-only; no server).')}
     ${dim('The proof a fully on-chain token self-resolves: any RPC returns the renderer-assembled metadata. Default token 0.')}
@@ -1254,6 +1266,7 @@ const COMMAND_HELP: Record<string, string> = {
                           ${dim('address holds (the question supply/cap cannot answer). Refused on a 721, where the owner column already says it.')}`,
   contracturi: `
   ${bold('abx contracturi')} <address> ${dim('— read contractURI() (ERC-7572 collection metadata) from the contract, FOLLOW it, and decode (read-only).')}
+    --validate marketplace   report missing/invalid launch metadata; nonzero exit if incomplete
     ${g('--json')}               emit the resolved collection document as the only stdout payload (narration stays on stderr)
     ${dim('The collection-level counterpart of')} ${g('tokenuri')}${dim('. On-chain lane: decodes the data: URI. Off-chain lane: fetches the')}
     ${dim('URL the contract itself commits to and prints the JSON.')}

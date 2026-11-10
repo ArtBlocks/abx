@@ -27,7 +27,40 @@ Common token fields are `name`, `description`, `image`, `animation_url`, `extern
 Other field names appear in the token's [artifact manifest](/docs/protocol/data-plane). The generated
 keys `artifacts` and `abx_provenance` cannot be set as fields.
 
+All deploy families accept `--banner-image <uri>` and `--featured-image <uri>` alongside
+`--description` and `--external-url`. These write collection URL fields in the deployment transaction;
+dry runs name the artwork fields. The flags do not set collection `image` or override token art.
+The collection image continues to resolve from its existing image fields or representative token.
+
+Before handing over admin, inspect the actual collection document:
+
+```bash
+abx contracturi <address> --validate marketplace --json
+```
+
+The optional profile checks `name`, `description`, `image`, `external_link`, `banner_image`, and
+`featured_image`. It reports missing and malformed fields separately and exits unsuccessfully when
+the profile is incomplete. These are launch-readiness checks; some fields are optional in the
+underlying standard. Without `--validate`, the existing document output is unchanged.
+`set-admin` performs one bounded document check and warns before transferring ownership. HTTP reads
+have a 10-second timeout and 1 MiB body limit; no token enumeration or reindex is needed for this
+check. A passing document does not guarantee immediate marketplace ingestion.
+
 ## Resolver routes
+
+Print a browser URL without constructing routes yourself:
+
+```bash
+abx view-url <contract> --token 0 --remote abx --json
+abx view-url <contract> --token 0 --base-url https://resolver.example/prefix
+```
+
+The result has a dedicated `viewerUrl`: a live application URL for code collections, or image content
+for image collections. A selected provider's public descriptor supplies the token API base and
+isolated content template; custom bases preserve their path prefix. Without either flag, the CLI
+uses `ABX_PUBLIC_BASE_URL` or the local resolver. Successful mint output includes the same URLs,
+sharing one public discovery lookup across all minted IDs. A URL does not prove that indexing or
+rendering has finished, and it does not register a project or open a browser.
 
 Conforming resolvers expose token metadata at `/t/{chainId}/{contract}/{tokenId}`. Inline or computed
 field bytes use the stable `/t/{chainId}/{contract}/{tokenId}/data/{field}` route. Code projects also

@@ -141,7 +141,8 @@ import {
   warnSignWithoutFor,
 } from '../flags.js';
 import {isEditionContract} from '../kind.js';
-import {jsonSafe, withJson} from '../jsonout.js';
+import {jsonSafe, withJson as withPlainJson} from '../jsonout.js';
+import {currentSigningReadiness} from '../riskgate.js';
 import {planOnChainScript} from '../script-chunks.js';
 import {
   assertPortFree,
@@ -804,7 +805,14 @@ export function describeDeployField(label: string, value: string | undefined, on
 /** Readout lines for whichever authorship/rights fields a deploy will write (always on-chain,
  *  inline collection fields). Empty when none are set — so the readout stays quiet by default. */
 export function authorshipReadout(flags: Flags): string[] {
-  return AUTHORSHIP_DEPLOY_FIELDS.filter(([flag]) => flags[flag]).map(([flag]) => describeDeployField(flag, flags[flag], true));
+  return AUTHORSHIP_DEPLOY_FIELDS.filter(([flag]) => flags[flag] && !['banner-image', 'featured-image'].includes(flag)).map(([flag]) => describeDeployField(flag, flags[flag], true));
+}
+
+function reportCollectionArtwork(flags: Flags): void {
+  authorshipContractFields(flags); // validate before any content upload or signing
+  for (const [flag, field] of AUTHORSHIP_DEPLOY_FIELDS) {
+    if (['banner-image', 'featured-image'].includes(flag) && flags[flag]) info(`collection ${field}: ${flags[flag]} (on-chain URL field)`);
+  }
 }
 
 /** A readout line for creator traits — the exact traits written (and where), or that none are. */
@@ -815,7 +823,25 @@ export function describeTraits(traits: OpenSeaAttribute[], onchain: boolean): st
 }
 
 // ── deploy (+ optionally serve) ──────────────────────────────────────────────
+function withJson(flags: Flags, body: (emit: (payload: Record<string, unknown>) => void) => Promise<void>): Promise<void> {
+  return withPlainJson(flags, async (emit) => body((payload) => {
+    if (!isDryRun(flags)) {emit(payload); return;}
+    const plan = payload.plan as Record<string, unknown> | undefined;
+    if (!plan) {emit(payload); return;}
+    const signer = (plan.roles as {signer?: string} | undefined)?.signer;
+    const readiness = currentSigningReadiness(laneFromFlags(flags), signer);
+    if (flags.json === undefined) {
+      info(`signing lane: ${laneFromFlags(flags)}; readiness: ${readiness.status}`);
+      for (const reason of [...readiness.missing, ...readiness.unchecked]) info(`  ${reason}`);
+    }
+    emit({...payload, readiness});
+  }));
+}
+
 export async function cmdDeploy(flags: Flags, serveAfter: boolean) {
+  if (serveAfter && isDryRun(flags)) {
+    throw new Error('abx demo is a live deployment walkthrough; use `abx deploy --dry-run --for <address>` for a non-mutating preview');
+  }
   // `--copies <N|open>` routes to the ERC-1155 edition twin (OneOfOneEdition) — the flagship
   // edition product: a priced open/limited edition of ONE work. Checked before anything else
   // touches `flags`, so the 721 lane (`cmdDeployBody`) below is reached ONLY when `--copies` is
@@ -835,7 +861,8 @@ export async function cmdDeploy(flags: Flags, serveAfter: boolean) {
 }
 
 export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p: Record<string, unknown>) => void) {
-  beginPlanWarnings(); // see the collector's own module note, above the DIMENSIONS block
+  beginPlanWarnings();
+  reportCollectionArtwork(flags); // see the collector's own module note, above the DIMENSIONS block
   refuseStrayFlags(flags, DEPLOY_FLAGS, 'deploy');
   warnSignWithoutFor(flags);
   const dimension = resolveDimension(flags.type ?? '1of1');
@@ -1611,6 +1638,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
 
 export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Record<string, unknown>) => void): Promise<void> {
   beginPlanWarnings();
+  reportCollectionArtwork(flags);
   refuseStrayFlags(flags, DEPLOY_EDITION_FLAGS, 'deploy');
   warnSignWithoutFor(flags);
   // `--type` is the 721 lane's OWN dimension seam (cmdDeployBody redirects `--type series` to
@@ -2100,6 +2128,7 @@ export async function cmdDeploySeries(flags: Flags) {
 
 export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string, unknown>) => void) {
   beginPlanWarnings();
+  reportCollectionArtwork(flags);
   refuseStrayFlags(flags, DEPLOY_SERIES_FLAGS, 'deploy-series');
   warnSignWithoutFor(flags);
   const name = flags.name ?? 'ABX Series';
@@ -2769,6 +2798,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
 
 export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<string, unknown>) => void): Promise<void> {
   beginPlanWarnings();
+  reportCollectionArtwork(flags);
   refuseStrayFlags(flags, DEPLOY_SERIES_EDITION_FLAGS, 'deploy-series');
   warnSignWithoutFor(flags);
   const editionSize = parseCopies(flags.copies);
@@ -3745,6 +3775,7 @@ export async function cmdDeployCode(flags: Flags) {
 
 export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, unknown>) => void) {
   beginPlanWarnings();
+  reportCollectionArtwork(flags);
   const usage =
     'abx deploy-code (--script <file> | --code-dir <dir>) --name "Title" --symbol SYM ' +
     '(--public-base-url https://your.resolver.domain | --onchain-uri) ' +
@@ -5244,6 +5275,7 @@ export const DEPLOY_CODE_EDITION_FLAGS = new Set<string>([
 
 export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<string, unknown>) => void): Promise<void> {
   beginPlanWarnings();
+  reportCollectionArtwork(flags);
   const usage =
     'abx deploy-code --copies <n|open> (--script <file> | --code-dir <dir>) --name "Title" --symbol SYM (--public-base-url https://your.resolver.domain | --onchain-uri) ' +
     '[--description "<s>"] [--external-url <url>] [--max N] [--mint-count N | --mint-all] [--mint-amount N] ' +
