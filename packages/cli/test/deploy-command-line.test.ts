@@ -3,10 +3,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {deployCodeCommandLine, deployCommandLine, deploySeriesCommandLine} from '../src/commands/deploy.js';
+import {cmdDeploy, deployCodeCommandLine, deployCommandLine, deploySeriesCommandLine} from '../src/commands/deploy.js';
 import {AUTHORSHIP_DEPLOY_FIELDS} from '../src/ownerops.js';
 
 const SALT = '0x' + '11'.repeat(32);
+test('demo refuses a dry-run flag before entering its live walkthrough', async () => {
+  await assert.rejects(cmdDeploy({'dry-run': 'true'}, true), /use `abx deploy --dry-run/);
+});
 // Spaces, an apostrophe and a `$` so the values only survive if the line is quoted correctly.
 const authorship: Record<string, string> = {
   creator: "Jo O'Neil",

@@ -839,6 +839,9 @@ function withJson(flags: Flags, body: (emit: (payload: Record<string, unknown>) 
 }
 
 export async function cmdDeploy(flags: Flags, serveAfter: boolean) {
+  if (serveAfter && isDryRun(flags)) {
+    throw new Error('abx demo is a live deployment walkthrough; use `abx deploy --dry-run --for <address>` for a non-mutating preview');
+  }
   // `--copies <N|open>` routes to the ERC-1155 edition twin (OneOfOneEdition) — the flagship
   // edition product: a priced open/limited edition of ONE work. Checked before anything else
   // touches `flags`, so the 721 lane (`cmdDeployBody`) below is reached ONLY when `--copies` is

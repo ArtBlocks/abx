@@ -1255,9 +1255,9 @@ export async function cmdPause(address: string | undefined, flags: Flags): Promi
 export async function cmdUnpause(address: string | undefined, flags: Flags): Promise<void> {
   const contract = requireAddress(address, 'abx unpause <address> [--sign|--unsigned]');
   const owner = await read<Address>(contract, 'owner');
-  writeNarration(flags, `Before opening the sale, prepare and check the collector page: abx mint-page ${contract} --static`);
+  writeNarration(flags, `Before opening a series/edition sale, prepare and check the collector page: abx mint-page ${contract} --static`);
   const result = await runWrite(contract, prepareSetPaused({contract, paused: false, chainId: chainId()}), flags, owner);
-  if (result) writeNarration(flags, `Sale unpaused. Share your collector mint page; scaffold one with abx mint-page ${contract} --static`);
+  if (result) writeNarration(flags, `Project unpaused. For a series/edition sale, share your collector page; scaffold one with abx mint-page ${contract} --static`);
 }
 
 // ── authorship + rights deploy fields (parity with --description / --external-url) ───────────
