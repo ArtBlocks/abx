@@ -52,6 +52,27 @@ ready. A bounded `render.captureDelay` can cover slow initialization, but cannot
 features available. A current artifact confirms that bytes were published for the current state; it
 does not prove the image is visually correct.
 
+## Publishing externally rendered outputs
+
+A creator may render images and traits on their own infrastructure and publish them to ABX Services
+through the authenticated `POST /v1/effect-artifacts` route. The project must be registered to the
+publishing account. This applies to supported mainnet and testnet chains, including projects whose
+capture needs hardware acceleration unavailable in the managed renderer.
+
+Publish `render/image` as a public `locator` and `render/traits` as JSON in `bytes_base64` (at most
+64 KiB). Include the chain, collection, token ID, and the `inputsHash` computed from the complete
+settled token data. The producer retains custody of image bytes; the resolver holds the bound traits.
+
+ABX Services stores separate input-state versions so a stale publication cannot replace a current
+one. Explicit republishing can replace the output at the same hash. Managed captures preserve an
+existing publication at that hash. An explicit on-chain image field together with current published
+traits satisfies both outputs without requiring another managed capture. Retained artifacts are
+service data, not an archival guarantee; keep source inputs and copies of externally produced output.
+
+Data-backed parameters require successful RPC reads of their bytes. Hosted rendering refuses an
+incomplete or commitment-mismatched input, and hosted read routes return a retryable error when they
+cannot establish currency rather than declaring a hash-only fallback current.
+
 ## Checking currency directly
 
 `abx artifacts <address> --token <id>` reads a token's artifact set without fetching and parsing the
