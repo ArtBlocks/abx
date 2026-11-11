@@ -11,7 +11,7 @@ installed CLI help and deployment registry before composing its commands.
 compression. Its optional project layer is itself built on ABX: a project token controls publishing,
 versions and tags. An ABX collection can use FS content without becoming that FS project. Prefer the
 official `@artblocks/abxfs-cli` or `@artblocks/abxfs-sdk`; consult [its docs](https://docs.fs.abx.io) for
-operations, native reader interfaces, and current limits. Do not copy its upload, compression, CID,
+operations, native reader interfaces, and read requirements. Do not copy its upload, compression, CID,
 pinning, or gateway implementation into an ABX project.
 
 Consider FS for a static dapp or collector website, project/NFT assets, documentation, and archives.
@@ -20,8 +20,10 @@ own deliberate design. A content hash alone does not preserve the bytes stored e
 
 Choose from the creator's reliability and mutability needs:
 
-- For suitable small self-contained media or HTML, use the FS tooling's Auto preview to select
-  embedded presentation. Confirm the decoded animation works without fetching project assets.
+- For suitable self-contained media or HTML, use the FS tooling's Auto preview to select
+  embedded presentation. Auto is a one-time tooling decision that saves a concrete method; it is
+  not a persistent contract mode. Inspect the complete token metadata read, then confirm the
+  decoded animation works without fetching project assets.
   JavaScript dependency scanning is a heuristic; inspect actual runtime requests as well.
 - For a normal multi-file site or larger content, the chain gateway is the simple default. The
   bytes remain on-chain; the HTTP endpoint remains a delivery dependency. Keep it replaceable.
@@ -33,15 +35,30 @@ A data URI is one resource, without a directory origin for sibling assets. Exist
 can produce self-contained HTML; do not prescribe a new bundler or a special output-folder name.
 Browser execution is still off-chain even when every required byte comes from an on-chain read.
 
+Presentation controls `animation_url`, which is commonly used by marketplaces. Inspect the displayed
+file/entrypoint: a file root names itself; a directory can select `index.html` or another file.
+Without a suitable displayed file, Auto selects the gateway, which serves `index.html` or a navigable
+directory listing. Explicit Embedded does not silently fall back to HTTP. The current renderer has
+no product byte ceiling; gas, memory and RPC execution limits still apply. Inspect the installed
+generation rather than assuming an older or retired renderer has the same behavior.
+
+New projects and first publication into an empty token can use Auto or an explicit method. Later
+updates preserve the saved source, method and endpoints unless the creator explicitly changes them.
+Review the file diff: a whole-project replacement removes omitted paths, while draft/overlay operations
+preserve untouched files. Follow the utility's structured publication and presentation-recovery result;
+do not mint or publish again to repair an incomplete presentation step.
+
 New presentation-capable orgs can change delivery and independently lock displayed content,
 the delivery method, or gateway endpoints. A content lock fixes a concrete root and entrypoint,
 not a mutable tag name; publishing history can continue. Fixed content with replaceable delivery
-is often the useful guarantee. Inspect the actual generation, exact lock preview, owner authority,
+is often the useful guarantee. These are one-way freezes: freezing displayed content pins the
+`animation_url` source, while later versions, tags and other metadata can still change. Inspect the
+actual generation, exact lock preview, owner authority,
 and remaining dependencies. Existing orgs retain their original renderer; installing newer tooling
 does not upgrade their NFTs. Never freeze a provider-controlled endpoint as a default permanence step.
 
 FS has its own chain selection and signer configuration. ABX's `ABX_CHAIN`, `--sign`, and
-`--embedded` are not automatically FS settings. Resolve older orgs through their own generation;
+`--embedded` are not automatically FS settings. Resolve supported older orgs through their own generation;
 use current-generation defaults for new projects. Verify that the installed utility and selected
 network actually expose the requested reader/presentation capability.
 
