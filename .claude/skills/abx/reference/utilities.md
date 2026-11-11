@@ -37,6 +37,9 @@ Browser execution is still off-chain even when every required byte comes from an
 
 Presentation controls `animation_url`, which is commonly used by marketplaces. Inspect the displayed
 file/entrypoint: a file root names itself; a directory can select `index.html` or another file.
+For Embedded, a blank directory path reads its `index.html`; if absent, the result is inert text,
+not a directory listing. See the [native read interface](https://docs.fs.abx.io/docs/reference/presentation)
+for direct Solidity reads and the fixed ABX adapter.
 Without a suitable displayed file, Auto selects the gateway, which serves `index.html` or a navigable
 directory listing. Explicit Embedded does not silently fall back to HTTP. The current renderer has
 no product byte ceiling; gas, memory and RPC execution limits still apply. Inspect the installed

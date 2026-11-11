@@ -58,8 +58,11 @@ Auto does not select a paid provider or create pins.
 
 Presentation controls `animation_url`, which is commonly used by marketplaces. Auto is a one-time
 tooling choice that saves Embedded or ChainGateway; it does not become an on-chain mode. Inspect
-the selected file or entrypoint. A directory may display `index.html` or another selected file;
-otherwise the gateway can show a navigable directory listing. Explicit Embedded does not silently
+the selected file or entrypoint. A directory may display `index.html` or another selected file.
+For Embedded, a blank directory path reads its `index.html`; without it, the result is inert text,
+not a directory listing. The [FS native read interface](https://docs.fs.abx.io/docs/reference/presentation)
+documents direct Solidity reads and the fixed ABX adapter. Auto selects the gateway when there is no
+suitable displayed file, and the gateway can show a navigable directory listing. Explicit Embedded does not silently
 switch to HTTP when reading fails.
 
 The current presentation renderer imposes no product byte ceiling. Large content can still exceed
