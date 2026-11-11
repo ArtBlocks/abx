@@ -174,6 +174,10 @@ dedicated gateway or Arweave). `--code-dir` works with `--copies` too (EditionCo
 the same on-chain `code` field, the same gateway rules — `--script` and `--code-dir` remain mutually
 exclusive on both lanes.
 
+The directory resolver carries token parameters in a gateway URL with an 8KB transport budget;
+`abx verify` reports `urlOverBudget`. Prefer template mode, a smaller parameter surface, or locator
+parameters for larger values. This URL budget is separate from FS Embedded presentation.
+
 ## Plan Solidity field renderers
 
 `--image-renderer <address>` stores an `IAbxFieldRenderer` pointer for the metadata image field;

@@ -42,7 +42,7 @@ choice:
 
 | Experience | Preferred route |
 | --- | --- |
-| Suitable small self-contained media or HTML | Auto selects an embedded data URI after inspection |
+| Suitable self-contained media or HTML | Auto selects an embedded data URI after inspection |
 | Multi-file website or larger content | A chain gateway serves the preserved bytes over HTTP |
 | Creator explicitly maintains IPFS availability | Opt-in IPFS presentation with creator-managed pins |
 
@@ -56,15 +56,37 @@ off-chain delivery dependency, even though its content can be reconstructed from
 content-derived distribution address, with continuing pinning and gateway availability requirements;
 Auto does not select a paid provider or create pins.
 
+Presentation controls `animation_url`, which is commonly used by marketplaces. Auto is a one-time
+tooling choice that saves Embedded or ChainGateway; it does not become an on-chain mode. Inspect
+the selected file or entrypoint. A directory may display `index.html` or another selected file.
+For Embedded, a blank directory path reads its `index.html`; without it, the result is inert text,
+not a directory listing. The [FS native read interface](https://docs.fs.abx.io/docs/reference/presentation)
+documents direct Solidity reads and the fixed ABX adapter. Auto selects the gateway when there is no
+suitable displayed file, and the gateway can show a navigable directory listing. Explicit Embedded does not silently
+switch to HTTP when reading fails.
+
+The current presentation renderer imposes no product byte ceiling. Large content can still exceed
+the gas, memory or time budget of an EVM/RPC read. Inspect the complete `tokenURI` result rather
+than assuming a successful file read proves that every consumer can resolve the metadata.
+Auto's size and dependency recommendations belong to the utility tooling and can evolve.
+
+New uploads and first publication into an empty token can use Auto or an explicit method. Updates
+preserve the saved presentation unless a change is requested. Review whether an update replaces the
+whole project or applies draft/overlay operations: replacement removes omitted paths; an overlay
+preserves untouched files. A presentation-only failure after publication needs presentation recovery,
+not another mint or publish.
+
 Presentation-capable project generations support changing methods and independent irreversible locks
 on displayed content, delivery method, and endpoint configuration. Locking content fixes its concrete
-root and entrypoint; project publishing can continue. This makes fixed content with replaceable delivery
+root and entrypoint; later publications and tag movements do not change that displayed source.
+Other project metadata and publishing history can still change. Freezes are one-way and survive
+ownership transfers. This makes fixed content with replaceable delivery
 possible. Endpoint locks do not guarantee endpoint availability. Review the exact lock and its scope
 before signing, and preserve endpoint flexibility unless a creator deliberately chooses otherwise.
 
-Existing orgs keep the factory and renderer they were created with. The FS registry retains earlier
-generations, while new-project defaults use the current factory. Inspect the particular org's
-capabilities; a software update does not upgrade an existing token.
+Existing orgs keep the factory and renderer they were created with. Inspect the FS registry and
+deployment documentation for supported generations and any explicitly retired test generation.
+New-project defaults use the current factory; a software update does not upgrade an existing token.
 
 ## Connect FS content to an ABX project
 
