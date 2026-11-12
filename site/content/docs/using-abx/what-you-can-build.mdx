@@ -44,55 +44,74 @@ write, so whatever a contract can do onchain, a hook can do.
 
 Here's some of what people have shipped so far. Plenty of it is generative art. Plenty of it isn't.
 
-**Objects that hold money**
+**Money that moves**
 
 - [Position Cards](https://arbiscan.io/address/0x6dd8e2d3ea605d6cc61f84896f967de476294b2e) (Arbitrum):
-  a card with its own wallet and its own Aave loan. The art shakes harder as the loan's health factor
-  falls. Survive a near-liquidation and the card keeps a crack for good.
+  a card with its own wallet and its own Aave loan. The art shakes harder as the loan nears
+  liquidation. Survive a close call and the card keeps a crack for good.
 - [HODL](https://hodl.ryley.studio) (Ethereum): lock ETH or an NFT until a date you pick. The
-  certificate can't be sold or moved until then, and nobody holds your funds, the creator included.
+  certificate can't move until then, and nobody holds your funds, the creator included.
 - [AB5D](https://ab5d.xyz/spot/) (Ethereum): an art exchange desk. Givers traded an AB[500] work for a
-  Debit and a Spot, or left the Debit for the next giver and held a Perp, an open position that
-  settled in turn.
+  Debit and a Spot, or left the Debit for the next giver and held a Perp that settled in turn.
 
-**Clocks, puzzles, and live feeds**
+**Games and live things**
 
-- [Marfa Light](https://etherscan.io/address/0x4504570d25b710942bee78b7ff5720950c1fc02d) (Ethereum):
-  every token is a working clock for Marfa, Texas, with the sun, moon, and stars computed for the
-  minute you're looking.
+- [Marfa Run Cards](https://marfa-run.vercel.app) (Base): an NES-style runner. Every run you mint is a
+  card holding the course and every jump. The top score holds a soulbound crown that moves to whoever
+  beats it.
+- [Mio](https://basescan.org/address/0x5ccb2df3acafc9a8f59290540298de8facde2500) (Base): creatures that
+  grow with every click.
 - [ABXdoku](https://github.com/ArtBlocks/ABXdoku) (Base): a new Sudoku every day, with no server.
+- [Marfa Light](https://etherscan.io/address/0x4504570d25b710942bee78b7ff5720950c1fc02d) (Ethereum):
+  every token is a working clock for Marfa, Texas, with the real sun, moon, and stars.
 - [Bird Sightings](https://arbiscan.io/address/0x73903c55c814e33762acf53dac72f75a82c83724) (Arbitrum):
-  birds photographed live and identified by an agent, each logged onchain with its eBird species code
-  and the agent's confidence.
+  birds photographed live and identified by an agent, each logged onchain with its species code.
 
-**People and places**
+**Sites, radio, and social**
 
-- [hollerith](https://thebenmeadows.com/marfa) (Ethereum): one IBM 029 punch card for every person
-  TheBenMeadows met in Marfa, Texas.
-- [Sprite Party](https://www.spriteparty.com/) (Base): an event guestbook where every guest shows up as
-  a pixel sprite.
-- [GenArt Foundation donor mural](https://www.genartfoundation.org/donors) (Base): a generative tile for
-  every $100 given, set into a mural that grows with each gift.
-- [Grid No. 1](https://smint.xyz) (Ethereum): Vermeer's *Girl with a Pearl Earring* cut into 400
-  squares. Picks stay sealed until the board closes, and each square's edition size is the number of
-  people who picked it.
-
-**Sites and communities**
-
-- [coinspace](https://coinspace.social) (Base): a community where you make a page and own it.
+- [Lantern Radio](https://8453-ab025e1f9f469ae55e5f193ecdddaa1e0f4e2ff6-0.abxfs.app/) (Base, ABX FS): a
+  live station with no server and no audio files. Everyone hears the same music at the same moment,
+  with a chime at the top of the hour. Collectors mint tracks, poems, and cover art.
+- [ABX Explorer](https://8453-6cb8206e55cf52e069fd3ed3d75b5d391934693c-1.abxfs.app/) (Base, ABX FS): an
+  independent explorer for every ABX collection, itself stored onchain.
+- [CoinSpace](https://coinspace.social) (Base): a retro social network. Each profile is a page with its
+  own wallet and equippable widgets, and chat rooms open only to holders of a given token.
 - [cc0py site](https://etherscan.io/address/0x36a34158ad7ead3b8502585136e7add92e4fb8d3) (Ethereum):
   cc0py's site for minting, browsing, and trading, published as an ABX project.
 
+**People, places, and promises**
+
+- [Sprite Party](https://www.spriteparty.com/) (Base): an event guestbook where every guest shows up as
+  a pixel sprite.
+- [GenArt Foundation donor tiles](https://www.genartfoundation.org/donors) (Base): a generative tile for
+  every $100 given. Together they make the donor mural.
+- [hollerith](https://thebenmeadows.com/marfa) (Ethereum): one IBM 029 punch card for every person
+  TheBenMeadows met in Marfa, Texas.
+- [Motivate Vows](https://basescan.org/address/0x53113a64144b5e4910b3fe9a0bb5b1f9d45001d9) (Base): a vow,
+  drawn onchain. The circle closes if you kept it.
+- [Desert Syntax](https://basescan.org/address/0xc4b6048ee69d445dcb63795b89121b40f085738a) (Base): a
+  performance score written by a community, one page per word.
+- [Grid No. 1](https://smint.xyz) (Ethereum): Vermeer's *Girl with a Pearl Earring* cut into 400
+  squares. Picks stay sealed until the board closes, and each square's edition size is how many
+  people picked it.
+
+**Art by agents**
+
+- Self-portraits minted by AI agents, including
+  [Claude](https://basescan.org/address/0xf98a9e4ba5dbc5723fd21bb00f93524932b89276) and
+  [Morgan](https://basescan.org/address/0xf8344172f735a5cd58c8a564880d801f13ed1114), "an agent who runs
+  things" (Base).
+
 **And yes, art**
 
-- [Under the Influence](https://www.gifs.shop) (Ethereum): 10,000 animated GIFs from the squiggle mill,
-  each drawn from its token's hash by a program stored onchain.
-- [Marfa Project](https://marfa-project.grimble.xyz/1984/) (Ethereum): CGA faces, Kid Pix on an
-  emulated Macintosh, and a 1997 screensaver synced to music.
-- [Squeegee](https://etherscan.io/address/0x27b1f8ea02775e29ce6a12a9c91141b3282e55ed) by Bryan
+- [Under the Influence](https://www.gifs.shop) (Ethereum), [Marfa Project](https://marfa-project.grimble.xyz/1984/)
+  (Ethereum), [VOIDKA](https://voidka.art) (Base), [Polyphony](https://burntsoup.art) (Base),
+  [Ninety](https://ninetyart.xyz) (Base), *The garden in spring* with Hafez's poetry (Base), and
+  [Squeegee](https://etherscan.io/address/0x27b1f8ea02775e29ce6a12a9c91141b3282e55ed) by Bryan
   Brinkman (Ethereum).
 
-That's the list so far. The best ABX idea hasn't been thought of yet.
+That's the list so far. [ABX Explorer](https://8453-6cb8206e55cf52e069fd3ed3d75b5d391934693c-1.abxfs.app/)
+shows everything. The best ABX idea hasn't been thought of yet.
 
 ## Prompts to steal
 
