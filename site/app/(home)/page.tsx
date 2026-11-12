@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {ArrowRight} from '@phosphor-icons/react/ssr';
 import {PromptCard} from '@/components/prompt-card';
-import {ABX_SUMMARY} from '@/lib/about';
+import {ABX_SUMMARY, WHAT_YOU_CAN_BUILD_PATH} from '@/lib/about';
 import {QUICKSTART_PROMPT} from '@/lib/quickstart';
 import styles from './home.module.css';
 
@@ -20,6 +20,9 @@ export default function HomePage() {
             <div className={styles.actions}>
               <Link href="/docs/using-abx/quickstart" className={styles.primaryAction}>
                 Quickstart <ArrowRight aria-hidden weight="regular" />
+              </Link>
+              <Link href={WHAT_YOU_CAN_BUILD_PATH} className={styles.secondaryAction}>
+                Use cases
               </Link>
               <a href="https://github.com/ArtBlocks/abx" className={styles.secondaryAction}>
                 View source

@@ -2,6 +2,7 @@
   "title": "Use ABX",
   "icon": "Terminal",
   "pages": [
+    "what-you-can-build",
     "quickstart",
     "installation",
     "agent-and-skill",
