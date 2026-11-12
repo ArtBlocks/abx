@@ -1,5 +1,15 @@
 # @artblocks/abx-cli
 
+## 0.11.2
+
+### Patch Changes
+
+- 9dd736b: Describe ABX projects in the bundled skill as programmable, durable digital objects built on standard
+  ERC-721 and ERC-1155 contracts, matching the public documentation.
+- 09d8c5c: Teach the bundled skill that ABX objects can act on other protocols, not only read them: hooks and
+  custom minters can launch tokens, trade, or call other contracts as side effects of a mint, transfer,
+  burn, or setting change. Agents now offer acting designs alongside read-driven ones during ideation.
+
 ## 0.11.1
 
 ### Patch Changes
