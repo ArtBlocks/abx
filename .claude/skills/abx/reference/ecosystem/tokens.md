@@ -36,6 +36,9 @@ fallbacks should keep the NFT usable if reads fail. A gate's fallback must prese
 ## Companion token creation — Clanker as one starting reference
 
 ABX creates its NFT collections; fungible token launch and management belong to a separate protocol.
+The launch can be a one-time operation with that protocol's tools, or an ABX hook can call the
+protocol's on-chain factory as a side effect of a mint or setting change, where the protocol allows
+contract callers. Verify that before proposing it.
 [Clanker's official SDK](https://github.com/clanker-devco/clanker-sdk) and
 [official agent skill](https://github.com/clanker-devco/clanker-sdk/blob/main/.cursor/skills/use-clanker-sdk/SKILL.md)
 provide one reusable route for creation, liquidity, and post-launch operations. Prefer these over
@@ -59,5 +62,6 @@ provider: a creator/agent may choose another protocol using the same verificatio
   transaction review. No companion-token deployment, approval, or funding is implied by ideation.
 
 For a proposal, record the token's chain and official identity, input field and provenance, ABX seam,
-live versus captured behavior, resilience, new accounts/credentials, and runtime dependencies. Keep
-token launch and ABX NFT deployment as separately reviewed operations, using each protocol's official tools.
+live versus captured behavior, resilience, new accounts/credentials, and runtime dependencies. Review
+the token launch terms and the ABX NFT deployment separately, using each protocol's official tools, even
+when a hook will perform the launch later.

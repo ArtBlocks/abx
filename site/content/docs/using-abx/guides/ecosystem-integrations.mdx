@@ -3,10 +3,34 @@ title: "Ecosystem integrations"
 description: "Choose ecosystem integrations that fit an object's purpose, lifespan, and dependencies."
 ---
 
-An ABX object can hold data, govern interactions, relate to a community, or respond to a pool's
-state. Start with its purpose and behavior; its appearance is one part of the design. On-chain,
+An ABX object can hold data, govern interactions, relate to a community, respond to a pool's state,
+or trade in that pool itself. Start with its purpose and behavior; its appearance is one part of the
+design. On-chain,
 off-chain, and hybrid approaches are possible. For long-lived, self-contained output, prefer
 same-chain EVM reads and usable fallbacks that survive loss of a website or third-party API.
+
+## Read the chain, or act on it
+
+Integration runs both ways. An ABX object can **read** other contracts: a renderer or augment hook
+pulls a pool's price, a treasury's balance, or a community token's supply into what it shows. It can
+also **act**: a configure hook, transfer hook, or custom minter runs contract calls as a side effect
+of a mint, a transfer, a burn, or a setting change.
+
+| When this happens | The object can | For example |
+| --- | --- | --- |
+| A token is minted | Run any contract call from the minter or transfer hook | Swap part of the mint price into a community token, or mint a companion piece from another collection |
+| A holder changes a setting | Run calls before the new value is saved, or reject it | Launch an ERC-20 through a protocol's factory, stake, or vote from the object's own funds |
+| A token changes hands | Run calls in the same transaction, or block the move | Pay a treasury, settle a position, or update a shared resource |
+| Anything reads the token | Pull live state from same-chain contracts | Change color with a pool's price or grow with a treasury |
+
+Hooks are contracts you write and attach to a code project (`abx deploy-code`), so whatever a contract
+can do onchain, a hook can do. Side effects are
+atomic: if one fails, the mint, transfer, or edit reverts with it. A hook never gets the holder's
+wallet. Give it its own funds and approvals, authenticate the calling token, bound what it can spend,
+and test every path on a fork first. [Custom mechanics](/docs/using-abx/guides/custom-mechanics)
+covers the details.
+
+## Use official tools
 
 ABX handles its collection and parameters. Use each provider's official skills, MCP servers, CLIs,
 SDKs, APIs, or contract interfaces for that provider's workflow. Separate tools used to research or
@@ -78,9 +102,11 @@ verified. Native and bridged assets differ; liquid tokens and locked voting posi
 Balance alone does not prove sustained ownership or governance participation.
 
 A companion token is optional. ABX creates the NFT collection; an external protocol creates and
-manages the ERC-20. Clanker is a general starting reference with official launch and management
-tools, not a required provider. Agents can use another protocol's official tooling where it fits.
-Keep token launch, liquidity configuration, and ABX deployment as separate reviewed operations.
+manages the ERC-20. Launch it once with the protocol's own tools, or have a hook call the protocol's
+onchain factory as a side effect, so a mint or a setting change launches a token. Clanker is a general
+starting reference with official launch and management tools, not a required provider. Agents can use
+another protocol's official tooling where it fits. Review the token's launch terms, liquidity, and
+fees on their own, separately from the ABX deployment, even when a hook performs the launch later.
 
 ## Keep track of setup
 

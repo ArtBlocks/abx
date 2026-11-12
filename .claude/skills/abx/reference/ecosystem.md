@@ -4,6 +4,30 @@ Use this reference when a creator wants ideas involving existing protocols, comm
 For public context, see [Ecosystem integrations](https://docs.abx.io/docs/using-abx/guides/ecosystem-integrations).
 These are discovery routes, not tested ABX adapters or a promise of third-party compatibility.
 
+## Contents
+
+- [Objects can act, not only read](#objects-can-act-not-only-read)
+- [Load by chain set and intent](#load-by-chain-set-and-intent)
+- [Turn an idea into a bounded plan](#turn-an-idea-into-a-bounded-plan)
+- [Input provenance and ABX execution](#input-provenance-and-abx-execution)
+- [Account and dependency footprint](#account-and-dependency-footprint)
+- [Integration boundaries to resolve](#integration-boundaries-to-resolve)
+
+## Objects can act, not only read
+
+Integration runs both ways. Reads (renderers, augment hooks) let an object reflect same-chain state.
+Actions let it change the chain: configure hooks, transfer hooks, and custom minters can execute any
+contract call as a side effect of a mint, transfer, burn, or governed parameter write. That includes
+launching a token through a protocol's on-chain factory, swapping through an official router, minting
+from another collection, paying a treasury, staking, voting, or settling a position. Offer acting
+designs alongside read-driven ones during ideation; do not reduce an integration to a data input.
+
+Design constraints for actions: hooks exist only on code projects; the hook must hold or be granted
+the funds and approvals it spends (it never receives the holder's wallet); authenticate the calling
+token; bound spend and slippage; guard reentrancy and repeated triggers; remember that a revert rolls
+back the whole mint, transfer, or edit. Test every lifecycle path on a fork. See
+[Custom mechanics](https://docs.abx.io/docs/using-abx/guides/custom-mechanics).
+
 ## Load by chain set and intent
 
 Read the selected chain's context, then only the topic/provider relevant to the idea. Shared
