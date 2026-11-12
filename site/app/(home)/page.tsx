@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {ArrowRight} from '@phosphor-icons/react/ssr';
 import {PromptCard} from '@/components/prompt-card';
+import {ABX_SUMMARY} from '@/lib/about';
 import {QUICKSTART_PROMPT} from '@/lib/quickstart';
 import styles from './home.module.css';
 
@@ -12,9 +13,7 @@ export default function HomePage() {
           <div className={styles.heroCopy}>
             <p className={styles.eyebrow}>ABX Docs</p>
             <h1>Start building.</h1>
-            <p className={styles.lede}>
-              Guides and reference for the ABX protocol, CLI, agent skill, and SDK.
-            </p>
+            <p className={styles.lede}>{ABX_SUMMARY}</p>
 
             <PromptCard prompt={QUICKSTART_PROMPT} variant="hero" />
 

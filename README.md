@@ -1,8 +1,21 @@
 # ABX
 
-ABX is an open protocol and toolkit for creating, operating, and serving NFTs. This monorepo contains
-the Solidity contracts, TypeScript SDK, command-line interface, reference services, agent skill, and
-public documentation.
+ABX is an open protocol and toolkit for programmable, durable digital objects on the blockchain.
+An ABX project can be artwork, a shared resource, a record, or a financial or community mechanism:
+anything whose data, state, permissions, and behavior matter as much as how it looks.
+
+ABX is built for coding agents. Describe what you want to make, and the ABX skill teaches your agent
+to plan, deploy, host, and operate it with the `abx` CLI, showing each plan and waiting for your
+approval before anything is written onchain. The CLI and SDK work without an agent too.
+
+Under the hood, ABX projects are standard ERC-721 and ERC-1155 contracts, so they work with existing
+wallets, marketplaces, and indexers. ABX adds what those standards leave out: content stored onchain
+or offchain, metadata computed by Solidity renderers or locked in place, typed parameters that can
+change after mint, hooks that run contract actions, shared sale contracts, and an event log that
+anyone can replay to rebuild a project.
+
+This monorepo contains the Solidity contracts, TypeScript SDK, command-line interface, reference
+services, agent skill, and public documentation.
 
 ABX is adding EVM networks. See the current
 [network table](https://docs.abx.io/docs/reference/deployments) before deploying.

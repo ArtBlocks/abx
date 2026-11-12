@@ -18,9 +18,10 @@ metadata:
 Use `abx` as the execution and truth surface. Help, capability output, dry runs, on-chain reads, and
 typed errors outrank remembered prose.
 
-Think of ABX NFTs as programmable, durable digital objects that use blockchain technology. Their
-data, state, permissions, and behavior can matter as much as their appearance. Configure and transfer
-hooks can execute contract actions, including creating assets or interacting with financial protocols.
+Think of ABX projects as programmable, durable digital objects built on standard ERC-721 and ERC-1155
+contracts. Their data, state, permissions, and behavior can matter as much as their appearance.
+Configure and transfer hooks can execute contract actions, including creating assets or interacting
+with financial protocols.
 For project ideation, read [ideation.md](reference/ideation.md) before choosing an implementation path.
 Consider ABX FS for preserved files, project assets, and static websites. Run `abx utils` and load
 [utilities.md](reference/utilities.md) when that route fits; use its official optional packages.
