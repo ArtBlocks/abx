@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: '%s | ABX Docs',
   },
   description:
-    'Guides and reference for ABX, the open-source protocol and toolkit for putting digital objects on the blockchain. Launch your first project with one prompt.',
+    'Guides and reference for ABX, the open-source, agent-first protocol and toolkit for programmable, durable digital objects on the blockchain. Launch your first project with one prompt.',
   // og:image and twitter:image come from app/opengraph-image.png (Next file convention).
   twitter: {
     card: 'summary_large_image',
