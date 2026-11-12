@@ -2,8 +2,9 @@
 
 ABX is an open protocol and toolkit for programmable, durable digital objects on the blockchain.
 An ABX project can be artwork, a shared resource, a record, or a financial or community mechanism:
-anything whose data, state, permissions, and behavior matter as much as how it looks. ABX is not only
-for generative art; see [what you can build](https://docs.abx.io/docs/using-abx/what-you-can-build).
+anything whose data, state, permissions, and behavior matter as much as how it looks. ABX objects can
+also act: a mint, transfer, or setting change can launch a token, trade, or call any other contract.
+The X is for anything; see [what you can build](https://docs.abx.io/docs/using-abx/what-you-can-build).
 
 ABX is built for coding agents. Describe what you want to make, and the ABX skill teaches your agent
 to plan, deploy, host, and operate it with the `abx` CLI, showing each plan and waiting for your

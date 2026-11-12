@@ -1,59 +1,122 @@
 ---
 title: "What you can build"
-description: "Websites, apps, games, communities, records, onchain mechanisms, and art on ABX."
+description: "Websites, games, clocks, vaults, guestbooks, token launchers, and art. The X in ABX is for anything."
 ---
 
-ABX is not only for generative art. Art is one use among many. An ABX project can also be a website,
-a game, a community space, a record, or a mechanism that acts on other onchain protocols.
+**ABX: the X is for anything.**
 
-Every ABX project is a standard ERC-721 or ERC-1155 contract on an EVM chain, so wallets,
-marketplaces, and indexers already understand it. What makes it programmable is what the contract can
-hold and do: files and code, typed values that change over time, rules that run when a value changes
-or a token moves, and reads from other contracts on the same chain.
+Generative art got here first. It won't be the last thing. An ABX project is a programmable object that
+lives onchain. It can host a website, run a game, keep time, lock up money, remember who showed up, and
+fire off transactions of its own.
+
+Every ABX project is a standard ERC-721 or ERC-1155 contract, so wallets, marketplaces, and indexers
+already know what to do with it. What it holds, what it does, and who gets to change it is up to you.
+
+## Objects that act
+
+Most NFTs just sit there. An ABX object can do things. Attach a hook to a code project, and every mint,
+transfer, burn, or setting change can set off onchain actions in the same transaction:
+
+- Launch a token through a protocol's factory.
+- Swap into or out of a pool.
+- Mint a piece from another collection.
+- Pay a treasury, stake, vote, or settle a position.
+- Say no, and block the action, when the rules aren't met.
+
+If a side effect fails, the whole action rolls back. Nothing half-happens. A hook is a contract you
+write, so whatever a contract can do onchain, a hook can do.
+[Custom mechanics](/docs/using-abx/guides/custom-mechanics) shows how.
 
 ## Starting points
 
-| Build | How ABX supports it | Read more |
+| Build | How ABX does it | Read more |
 | --- | --- | --- |
-| Websites, archives, and preserved files | ABX FS stores files and whole directories onchain, with publishing history and owner-controlled locks. A token can present a static site, a dapp, or an archive. | [ABX utilities](/docs/using-abx/guides/utilities) |
-| Interactive apps and games | A code project stores a program onchain or points to one. Each token runs it with its own seed and current values. | [Code projects](/docs/protocol/code-projects) |
-| Objects with state and rules | Typed parameters hold values that the creator, the token's holder, or a named address may change. Hooks can reject an edit, allow a value only to increase, or make a token non-transferable. | [Parameters](/docs/protocol/params) |
-| Onchain actions | A parameter edit or a transfer can trigger contract calls: swap through an AMM router, create another asset, or settle an obligation. | [Custom mechanics](/docs/using-abx/guides/custom-mechanics) |
-| Protocol and community integrations | Solidity renderers and augment hooks read same-chain state, such as a pool, a treasury balance, or a community token. A companion ERC-20 can be launched with another protocol's tools. | [Ecosystem integrations](/docs/using-abx/guides/ecosystem-integrations) |
-| Records, claims, and provenance | Metadata fields can be stored, computed, or committed by hash, then locked. Every change emits an event that anyone can replay. | [Metadata](/docs/protocol/metadata), [Events](/docs/protocol/event-spine) |
-| Datasets, models, and source files | A token can anchor named files beyond its marketplace image, such as source files, print exports, models, datasets, or audio stems. | [Artifacts](/docs/protocol/data-plane) |
-| Art, including generative art | 1/1s, image series, editions, and code projects, with onchain or offchain storage. | [Choose a project](/docs/using-abx/guides/deploy-a-digital-asset) |
+| Websites and archives | ABX FS puts whole folders onchain, with version history and locks you control. Publish a site, a dapp, or an archive whose files live onchain. | [ABX utilities](/docs/using-abx/guides/utilities) |
+| Apps and games | Store a program onchain. Every token runs it with its own seed and live settings. | [Code projects](/docs/protocol/code-projects) |
+| Objects with rules | Give tokens values that holders can change, then decide who changes what: a level that only goes up, or a pass that can't be sold. | [Parameters](/docs/protocol/params) |
+| Objects that act | Mints, transfers, and edits trigger contract calls. Launch a token, trade, pay out, or settle. | [Custom mechanics](/docs/using-abx/guides/custom-mechanics) |
+| Protocol mashups | Read a pool, a treasury, or a community token, and act on them too. | [Ecosystem integrations](/docs/using-abx/guides/ecosystem-integrations) |
+| Records and receipts | Store, compute, or hash-commit fields, then lock them. Every change leaves a public trail anyone can replay. | [Metadata](/docs/protocol/metadata), [Events](/docs/protocol/event-spine) |
+| Data, models, and source files | Attach source files, print exports, 3D models, datasets, or audio stems to a token. | [Artifacts](/docs/protocol/data-plane) |
+| Art, generative and otherwise | 1/1s, series, editions, and code-based work, onchain or off. | [Choose a project](/docs/using-abx/guides/deploy-a-digital-asset) |
 
-## Projects built on ABX
+## Live on ABX
 
-- [ABXdoku](https://github.com/ArtBlocks/ABXdoku) is a fully onchain daily Sudoku. Every token turns
-  over to a new puzzle each UTC day with no transaction, scheduler, or server. Its source is a
-  complete reference project.
-- [coinspace](https://coinspace.social) is a community where you make a page and own it.
-- [Sprite Party](https://www.spriteparty.com/) by Generative Goods is an event guestbook where every
-  guest shows up as a pixel sprite.
+Here's some of what people have shipped so far. Plenty of it is generative art. Plenty of it isn't.
 
-## Start with the idea
+**Objects that hold money**
 
-Describe what the object is for, who takes part, what changes over time, and who may change it.
-Appearance and deployment shape come later. The [ABX skill](/docs/using-abx/agent-and-skill) has the
-agent explore concepts with you and wait until you choose one before building.
+- [Position Cards](https://arbiscan.io/address/0x6dd8e2d3ea605d6cc61f84896f967de476294b2e) (Arbitrum):
+  a card with its own wallet and its own Aave loan. The art shakes harder as the loan's health factor
+  falls. Survive a near-liquidation and the card keeps a crack for good.
+- [HODL](https://hodl.ryley.studio) (Ethereum): lock ETH or an NFT until a date you pick. The
+  certificate can't be sold or moved until then, and nobody holds your funds, the creator included.
+- [AB5D](https://ab5d.xyz/spot/) (Ethereum): an art exchange desk. Givers traded an AB[500] work for a
+  Debit and a Spot, or left the Debit for the next giver and held a Perp, an open position that
+  settled in turn.
 
-Some prompts to adapt:
+**Clocks, puzzles, and live feeds**
 
-- "Help me publish my project's documentation site onchain with ABX FS."
+- [Marfa Light](https://etherscan.io/address/0x4504570d25b710942bee78b7ff5720950c1fc02d) (Ethereum):
+  every token is a working clock for Marfa, Texas, with the sun, moon, and stars computed for the
+  minute you're looking.
+- [ABXdoku](https://github.com/ArtBlocks/ABXdoku) (Base): a new Sudoku every day, with no server.
+- [Bird Sightings](https://arbiscan.io/address/0x73903c55c814e33762acf53dac72f75a82c83724) (Arbitrum):
+  birds photographed live and identified by an agent, each logged onchain with its eBird species code
+  and the agent's confidence.
+
+**People and places**
+
+- [hollerith](https://thebenmeadows.com/marfa) (Ethereum): one IBM 029 punch card for every person
+  TheBenMeadows met in Marfa, Texas.
+- [Sprite Party](https://www.spriteparty.com/) (Base): an event guestbook where every guest shows up as
+  a pixel sprite.
+- [GenArt Foundation donor mural](https://www.genartfoundation.org/donors) (Base): a generative tile for
+  every $100 given, set into a mural that grows with each gift.
+- [Grid No. 1](https://smint.xyz) (Ethereum): Vermeer's *Girl with a Pearl Earring* cut into 400
+  squares. Picks stay sealed until the board closes, and each square's edition size is the number of
+  people who picked it.
+
+**Sites and communities**
+
+- [coinspace](https://coinspace.social) (Base): a community where you make a page and own it.
+- [cc0py site](https://etherscan.io/address/0x36a34158ad7ead3b8502585136e7add92e4fb8d3) (Ethereum):
+  cc0py's site for minting, browsing, and trading, published as an ABX project.
+
+**And yes, art**
+
+- [Under the Influence](https://www.gifs.shop) (Ethereum): 10,000 animated GIFs from the squiggle mill,
+  each drawn from its token's hash by a program stored onchain.
+- [Marfa Project](https://marfa-project.grimble.xyz/1984/) (Ethereum): CGA faces, Kid Pix on an
+  emulated Macintosh, and a 1997 screensaver synced to music.
+- [Squeegee](https://etherscan.io/address/0x27b1f8ea02775e29ce6a12a9c91141b3282e55ed) by Bryan
+  Brinkman (Ethereum).
+
+That's the list so far. The best ABX idea hasn't been thought of yet.
+
+## Prompts to steal
+
+Paste one into your agent and change it until it's yours:
+
+- "Help me put my band's website onchain and sell the album as an edition."
+- "Help me make a clock for my hometown that shows the real sky."
 - "Help me make a guestbook for my event where every guest gets a token."
-- "Help me design a membership pass whose level can only go up and that cannot be transferred."
+- "Help me make a vault that locks ETH until a date, with a certificate that counts down."
+- "Help me make a membership pass whose level only goes up and that can't be sold."
+- "Help me make a ticket that swaps part of its mint price into our community token."
+- "Help me make a pass that launches a token for its holder when they flip a switch."
 - "Help me make a daily puzzle that changes at midnight UTC without a server."
-- "Help me make an object whose look follows our community treasury's balance."
 
-## Know the limits
+Tell the agent what the thing is for, who uses it, what changes over time, and who gets to change it.
+Looks come later. With the [ABX skill](/docs/using-abx/agent-and-skill), the agent explores ideas with
+you and waits for you to pick one before it builds anything.
 
-- These are patterns, not ready-made features. Custom rules and onchain actions run in a controller
-  contract you write and test on a testnet or fork.
-- Parameters and hooks exist only on code projects created with `abx deploy-code`. An image series
-  cannot add them later.
-- A token can represent rights or a financial instrument, but real-world rights, custody, and
-  enforcement need their own legal and operational design.
-- Storing a program onchain does not preserve the services it calls. Each runtime dependency needs
-  its own plan.
+## Before you build
+
+- These are patterns, not buttons. Rules and side effects live in a contract you write and test on a
+  fork or testnet.
+- Hooks attach to code projects created with `abx deploy-code`. An image series can't add them later.
+- A hook spends its own funds and approvals. It never gets the holder's wallet.
+- A token can stand for rights or money, but real-world rights, custody, and enforcement need their own
+  legal design.
+- Putting code onchain doesn't put the services it calls onchain. Plan for each one.
