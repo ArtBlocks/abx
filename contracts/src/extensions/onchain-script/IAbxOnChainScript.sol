@@ -18,6 +18,8 @@ interface IAbxOnChainScript {
     error ScriptIndexOutOfRange();
     /// @notice A script chunk carried no bytes.
     error EmptyScriptChunk();
+    /// @notice A script chunk exceeds what one SSTORE2 contract can hold (24,575 bytes); split it.
+    error ScriptChunkTooLarge(uint256 length);
 
     /// @notice The chunk at `index` was written or removed — re-read just that chunk.
     event ScriptUpdated(uint256 index);

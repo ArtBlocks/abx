@@ -106,6 +106,17 @@ contract RevertingTransferHook {
 }
 
 /// @dev Minimal delegate.xyz v2 stand-in: explicit (delegate, vault, tokenId) grants.
+/// A registry that authorizes anyone — the shape an owner-controlled registry could take.
+contract YesDelegateRegistry {
+    function checkDelegateForERC721(address, address, address, uint256, bytes32)
+        external
+        pure
+        returns (bool)
+    {
+        return true;
+    }
+}
+
 contract MockDelegateRegistry {
     mapping(bytes32 => bool) internal grants;
 
@@ -657,9 +668,9 @@ contract SeriesCodeTest is Test {
         uint256 id = nft.mint(collector);
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
-        MockDelegateRegistry registry = new MockDelegateRegistry();
-        vm.prank(owner);
-        nft.setDelegateRegistry(address(registry));
+        // The token already points at the canonical registry (the default); put a recording
+        // registry's code there, since only the canonical address (or none) can be configured.
+        MockDelegateRegistry registry = _canonicalRegistry();
         registry.allow(stranger, collector, id); // collector's vault delegates to `stranger`
 
         vm.prank(stranger);
@@ -673,9 +684,7 @@ contract SeriesCodeTest is Test {
         uint256 id = nft.mint(collector);
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
-        MockDelegateRegistry registry = new MockDelegateRegistry();
-        vm.prank(owner);
-        nft.setDelegateRegistry(address(registry)); // no grant for `stranger`
+        _canonicalRegistry(); // no grant for `stranger`
 
         vm.prank(stranger);
         vm.expectRevert(
@@ -720,6 +729,62 @@ contract SeriesCodeTest is Test {
         p.disableTokenOwnerDelegation = true;
         SeriesCode noDelegation = SeriesCode(factory.deploy(p));
         assertEq(noDelegation.delegateRegistry(), address(0));
+    }
+
+    /// The canonical-address mock: `vm.etch` its code at the delegate.xyz v2 address.
+    function _canonicalRegistry() internal returns (MockDelegateRegistry r) {
+        r = MockDelegateRegistry(0x00000000000000447e69651d841bD8D104Bed493);
+        vm.etch(address(r), address(new MockDelegateRegistry()).code);
+    }
+
+    /// The registry is an authority source, so the owner may only switch between the canonical
+    /// registry and none — never point it at a contract they control.
+    function test_OwnerCannotPointRegistryElsewhere() public {
+        address custom = address(new MockDelegateRegistry());
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.InvalidDelegateRegistry.selector, custom)
+        );
+        nft.setDelegateRegistry(custom);
+
+        vm.startPrank(owner);
+        nft.setDelegateRegistry(address(0));
+        nft.setDelegateRegistry(0x00000000000000447e69651d841bD8D104Bed493);
+        vm.stopPrank();
+        assertEq(nft.delegateRegistry(), 0x00000000000000447e69651d841bD8D104Bed493);
+    }
+
+    /// Regression: a TokenOwner-only seed schema keeps the creator out. Before, the owner could
+    /// point the registry at one that answers `true` for anyone and rewrite a collector's settled
+    /// seed as their "delegate".
+    function test_OwnerCannotRewriteSettledSeedThroughRegistry() public {
+        vm.prank(owner);
+        nft.setParamSchema(
+            SEED,
+            IAbxConfigurableParams.ParamType.Uint256Range,
+            IAbxConfigurableParams.AuthOption.TokenOwner,
+            address(0),
+            0,
+            bytes32(0),
+            bytes32(0),
+            new string[](0)
+        );
+        vm.prank(owner);
+        uint256 id = nft.mint(collector);
+        (bytes32 settled,,) = nft.tokenParam(id, SEED);
+
+        address yes = address(new YesDelegateRegistry());
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.InvalidDelegateRegistry.selector, yes)
+        );
+        nft.setDelegateRegistry(yes);
+
+        vm.prank(owner);
+        vm.expectRevert();
+        nft.configureTokenParam(id, SEED, bytes32(uint256(42)));
+        (bytes32 still,,) = nft.tokenParam(id, SEED);
+        assertEq(still, settled);
     }
 
     function test_OwnerRepointsOrDisablesRegistry() public {

@@ -39,6 +39,10 @@ specific right does not qualify. On an ERC-1155 edition, `TokenOwner` means any 
 ID, and delegation is not consulted. All holders edit one shared value, not a value attached to each
 copy.
 
+From core v4 the owner can only switch delegation between the canonical delegate.xyz v2 registry and
+off. A registry the owner controlled could approve the owner as any holder's delegate, so any other
+address is refused with `InvalidDelegateRegistry`.
+
 The onchain enum is zero-indexed in this exact order:
 
 | Value | Authority |

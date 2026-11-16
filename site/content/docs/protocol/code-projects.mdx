@@ -19,7 +19,9 @@ ABX supports two forms:
 | Template | Onchain script chunks and dependencies | Assembled by `AbxGenerator` |
 
 A directory project stores a locator in its `code` collection field. A template project stores script
-chunks through the code extensions. Dependency index 0 is the runtime by convention.
+chunks through the code extensions. Dependency index 0 is the runtime by convention. Each chunk holds
+at most 24,575 bytes, the most one SSTORE2 data contract can store; from core v4 a larger chunk is
+refused with `ScriptChunkTooLarge`. The CLI splits scripts well below that.
 
 ## Token data
 

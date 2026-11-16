@@ -102,8 +102,8 @@ contract OneOfOneImage is
         _initTokenURI(p.tokenURIBase, p.tokenURIRenderer);
         _initCollectionMetadata(p.name, p.symbol);
 
-        // discovery beacon → extensions (royalty, burn, creator-token, on-chain metadata) →
-        // contract-URI strategy.
+        // discovery beacon → extensions (royalty, burn, on-chain metadata) → contract-URI strategy;
+        // the creator-token extension comes last, below.
         // Order: AbxDeployed → AbxExtensionVersionSet(royalty) → MaxRoyaltyBpsUpdated →
         // RoyaltyChangedForAll → BurnConfigured → AbxExtensionVersionSet(onchain-metadata) →
         // TokenFieldSet*/ContractFieldSet* → ContractURIUpdated →

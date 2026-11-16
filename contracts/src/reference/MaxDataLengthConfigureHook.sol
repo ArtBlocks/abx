@@ -15,6 +15,7 @@ contract MaxDataLengthConfigureHook is IAbxConfigureHook {
     uint256 public immutable maxDataLength;
 
     constructor(address token_, uint256 maxDataLength_) {
+        if (token_ == address(0)) revert OnlyToken();
         token = token_;
         maxDataLength = maxDataLength_;
     }

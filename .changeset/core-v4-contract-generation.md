@@ -7,7 +7,8 @@ Ship the ABX core v4 contract generation's ABIs and bytecode, and gate new deplo
 `ABX_CORE_VERSION = 4`. Parameter errors now carry their key and context (`NotParamAuthorized`
 names the token, caller, and the authority that was enforced) and decode against every code token's
 own ABI. The parameter write path refuses codeless hooks, oversized blobs, tokenData coordinate keys,
-unenforced schema bounds and malformed `Select` labels. A `OneOfOneImage` mints at most once, so a
+unenforced schema bounds and malformed `Select` labels; script chunks are bounded the same way, and the
+delegate registry can only be switched between the canonical delegate.xyz v2 registry and off. A `OneOfOneImage` mints at most once, so a
 burned 1/1 stays burned. Existing v3 and v2 collections are unchanged and remain supported.
 
 **ABI change for integrators:** the exported token and library ABIs now carry the v4 parameter-error

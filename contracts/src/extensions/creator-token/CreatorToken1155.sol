@@ -22,9 +22,11 @@ import {AbxEditionLib} from "../../libraries/AbxEditionLib.sol";
 ///      override (Solady's ERC1155 hook is always batch-shaped — a single transfer arrives as a
 ///      1-element array). Same stock semantics as `CreatorToken`: mints and burns
 ///      (`from`/`to == address(0)`) are never validated; a transfer initiated by the validator
-///      itself skips the check; every other transferred `(id, amount)` pair calls
-///      `validateTransfer` on the validator (there is no batch validator entrypoint in the
-///      ecosystem standard — a batch transfer loops, one call per id); a policy violation reverts
+///      itself skips the check; every other transferred `(id, amount)` pair with a non-zero
+///      amount calls `validateTransfer` on the validator (there is no batch validator entrypoint
+///      in the ecosystem standard — a batch transfer loops, one call per id). Unlike stock
+///      ERC1155C, a zero-amount pair is not sent to the validator: it moves nothing, and anyone
+///      may submit one. A policy violation reverts
 ///      and bubbles for the whole batch. Every non-zero validator (init or re-point) must have
 ///      code on this chain. Storage is the SAME `TransferValidatorStorage` library `CreatorToken`
 ///      uses — a plain ERC-7201 layout with no ERC-721 coupling, safe to share since a given
@@ -46,7 +48,8 @@ abstract contract CreatorToken1155 is AbxBeaconCore, Ownable, ICreatorToken {
 
     /// @inheritdoc ICreatorToken
     /// @dev Always `validateTransfer(address,address,address,uint256,uint256)` (0x1854b241), NOT
-    ///      a view — the call {_validateTransfer1155} makes, once per `(id, amount)` pair.
+    ///      a view — the call {_validateTransfer1155} makes, once per `(id, amount)` pair with a
+    ///      non-zero amount.
     function getTransferValidationFunction()
         external
         pure

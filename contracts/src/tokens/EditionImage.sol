@@ -27,13 +27,13 @@ import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMet
 /// @dev **Ids are caller-named, not a sequential cursor.** Unlike {SeriesImage} (`mint(to)` picks
 ///      the next id automatically), {IAbxEditionMint}'s `mint(to, id, amount)` lets a minter
 ///      target any `id < maxInvocations` in any order — a collector buys copies of the specific
-///      work they want. That breaks the 721 twins' "totalSupply() IS the floor" shortcut for
-///      lowering `maxInvocations`: there's no natural "tokens minted so far" cursor here. Instead
+///      work they want. So there is no sequential issuance cursor to floor `maxInvocations` on, as
+///      the 721 twins do with `nextTokenId`. Instead
 ///      this token maintains its own monotonic **id high-water mark**
 ///      (`Erc1155SupplyStorage.idWatermark` — the highest id + 1 ever minted, never decremented
 ///      even by a full burn) and uses it as {MaxInvocations}'s floor, so the owner can never lower
 ///      the id-space cap below a work that has ever had a copy minted (the same
-///      no-stranding promise the 721 twin protects via `totalSupply()`, generalized to
+///      no-stranding promise the 721 twin protects via its issuance cursor, generalized to
 ///      non-sequential id assignment).
 contract EditionImage is
     AbxErc1155Base,

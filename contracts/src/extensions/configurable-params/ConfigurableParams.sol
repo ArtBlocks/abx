@@ -24,8 +24,10 @@ import {AbxParamsLib} from "../../libraries/AbxParamsLib.sol";
 ///      delegatecalled — see {Params}). Storage is ERC-7201 (`ConfigurableParamsStorage`).
 ///      Self-registers in `_initConfigurableParams`.
 abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
-    /// @dev keccak256("abx.extension.configurable-params") — permanent extension id.
-    bytes32 private constant ID =
+    /// @dev keccak256("abx.extension.configurable-params") — permanent extension id. Named, not the
+    ///      usual private `ID`/`VERSION`, because this mixin inherits {Params}, which declares its
+    ///      own; distinct names keep the two from reading as shadowed.
+    bytes32 private constant CONFIGURABLE_PARAMS_ID =
         0x0245d8eeb976653d00fd45d239be9beef9164b46f7e4864bb70910530da6fb35;
 
     /// @dev Current implemented version (bumps when the interface or semantics change).
@@ -38,12 +40,8 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
     ///      {IAbxConfigurableParams}), a non-zero hook must have code, re-pointing the augment hook
     ///      pings ERC-4906, and a schema may not carry bounds its type ignores or a malformed
     ///      `Select` label.
-    uint16 private constant VERSION = 4;
+    uint16 private constant CONFIGURABLE_PARAMS_VERSION = 4;
 
-    /// @dev The canonical delegate.xyz v2 registry — the same CREATE2 address on every chain.
-    ///      The TokenOwner-leg default; opt-out at deploy, re-pointable by the owner.
-    address private constant DEFAULT_DELEGATE_REGISTRY =
-        0x00000000000000447e69651d841bD8D104Bed493;
 
 
     // ── schema + hooks (owner) ──────────────────────────────────────────────--
@@ -92,7 +90,10 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
         _delegateParamsWrite();
     }
 
-    /// @notice Owner re-points (or zeroes = disables) the TokenOwner-leg delegation resolver.
+    /// @notice Owner switches TokenOwner-leg delegation between the canonical delegate.xyz v2
+    ///         registry and off (`address(0)`). Any other address reverts
+    ///         `InvalidDelegateRegistry`: the registry is an authority source, so it may not be one the
+    ///         owner controls. On an ERC-1155 edition the registry is stored but never consulted.
     function setDelegateRegistry(address /* registry */ ) external {
         _delegateParamsWrite();
     }
@@ -241,11 +242,13 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
     ///      opts out. Emits `DelegateRegistrySet` only for the non-default (opt-out) state —
     ///      absence of the event ⇒ the canonical default. Call at initialize.
     function _initConfigurableParams(bool disableTokenOwnerDelegation) internal {
-        _setExtensionVersion(ID, VERSION);
+        _setExtensionVersion(CONFIGURABLE_PARAMS_ID, CONFIGURABLE_PARAMS_VERSION);
         if (disableTokenOwnerDelegation) {
             AbxParamsLib.initDelegateRegistry(address(0));
         } else {
-            ConfigurableParamsStorage.layout().delegateRegistry = DEFAULT_DELEGATE_REGISTRY;
+            // The canonical delegate.xyz v2 registry: the TokenOwner-leg default, opt-out at deploy.
+            ConfigurableParamsStorage.layout().delegateRegistry =
+                AbxParamsLib.CANONICAL_DELEGATE_REGISTRY;
         }
     }
 
@@ -262,7 +265,7 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
     ///      (unlike the `disableTokenOwnerDelegation = true` path above), because that helper
     ///      unconditionally emits `DelegateRegistrySet` — a config event with nothing configured.
     function _initConfigurableParamsForEdition() internal {
-        _setExtensionVersion(ID, VERSION);
+        _setExtensionVersion(CONFIGURABLE_PARAMS_ID, CONFIGURABLE_PARAMS_VERSION);
     }
 
     /// @notice ERC-165: the Params chain + this extension's read interface.

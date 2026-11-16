@@ -45,6 +45,10 @@ library AbxCodeLib {
         OnChainScriptStorage.Layout storage l = OnChainScriptStorage.layout();
         if (l.locked) revert IAbxOnChainScript.ScriptIsLocked();
         if (chunk.length == 0) revert IAbxOnChainScript.EmptyScriptChunk();
+        // The same bound as a param blob ({AbxParamsLib}): one SSTORE2 contract holds at most
+        // 24,575 bytes (EIP-170's 24,576 minus the STOP prefix). Refused up front rather than left
+        // to fail inside SSTORE2's CREATE, which burns the gas forwarded to it where EIP-170 applies.
+        if (chunk.length > 24_575) revert IAbxOnChainScript.ScriptChunkTooLarge(chunk.length);
         if (index > l.chunks.length) revert IAbxOnChainScript.ScriptIndexOutOfRange();
         address ptr = SSTORE2.write(chunk);
         if (index == l.chunks.length) l.chunks.push(ptr);

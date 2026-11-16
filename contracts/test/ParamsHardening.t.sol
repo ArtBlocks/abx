@@ -8,6 +8,7 @@ import {SeriesCodeFactory} from "../src/factories/SeriesCodeFactory.sol";
 import {IAbxParams} from "../src/extensions/params/IAbxParams.sol";
 import {IAbxConfigurableParams} from
     "../src/extensions/configurable-params/IAbxConfigurableParams.sol";
+import {IAbxOnChainScript} from "../src/extensions/onchain-script/IAbxOnChainScript.sol";
 
 /// @dev An augment hook with code, for the "re-pointing the augment hook refreshes metadata" case.
 contract StubHook {
@@ -154,6 +155,55 @@ contract ParamsHardeningTest is Test {
             )
         );
         nft.setContractParamData("sprite", big);
+    }
+
+    /// The holder-reachable governed path is bounded too, and refuses before it writes the blob.
+    function test_OversizedGovernedBlobIsRefused() public {
+        _schema(
+            "sprite",
+            IAbxConfigurableParams.ParamType.Bytes,
+            IAbxConfigurableParams.AuthOption.TokenOwner,
+            address(0),
+            0,
+            0,
+            new string[](0)
+        );
+        vm.prank(collector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxParams.ParamDataTooLarge.selector, bytes32("sprite"), uint256(24_576)
+            )
+        );
+        nft.configureTokenParamData(0, "sprite", new bytes(24_576));
+    }
+
+    /// A script chunk has the same SSTORE2 bound as a param blob.
+    function test_OversizedScriptChunkIsRefused() public {
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxOnChainScript.ScriptChunkTooLarge.selector, uint256(24_576))
+        );
+        nft.setScriptChunk(0, new bytes(24_576));
+
+        vm.prank(owner);
+        nft.setScriptChunk(0, new bytes(24_575));
+        assertEq(nft.scriptChunkCount(), 1);
+    }
+
+    /// A schema cannot be declared for a tokenData coordinate name either.
+    function test_SchemaForCoordinateKeyIsRefused() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(IAbxParams.InvalidParamKey.selector, bytes32("tokenId")));
+        nft.setParamSchema(
+            "tokenId",
+            IAbxConfigurableParams.ParamType.Uint256Range,
+            IAbxConfigurableParams.AuthOption.Creator,
+            address(0),
+            0,
+            bytes32(0),
+            bytes32(0),
+            new string[](0)
+        );
     }
 
     /// The ceiling itself fits.

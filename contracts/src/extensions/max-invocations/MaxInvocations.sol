@@ -75,7 +75,8 @@ abstract contract MaxInvocations is AbxBeaconCore, Ownable, IAbxMaxInvocations {
     }
 
     /// @dev Mint-time guard: revert unless `id` is within the cap (ids are 0-indexed, so a valid
-    ///      id is strictly less than the cap). Callers mint sequential ids 0..maxInvocations-1.
+    ///      id is strictly less than the cap). Series callers mint ids 0..maxInvocations-1 in
+    ///      order; edition callers mint any id below the cap, in any order.
     function _requireWithinMax(uint256 id) internal view {
         if (id >= MaxInvocationsStorage.layout().maxInvocations) revert MaxInvocationsReached();
     }

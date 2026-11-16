@@ -75,7 +75,7 @@ abstract contract AbxErc721Base is ERC721, AbxBeaconCore, Ownable, Initializable
         return CollectionMetadataLib.layout().symbol;
     }
 
-    /// @dev Set the ERC-721 collection identity at initialize. No event (set once at mint).
+    /// @dev Set the ERC-721 collection identity at initialize. No event (set once, at deploy).
     function _initCollectionMetadata(string calldata name_, string calldata symbol_) internal {
         CollectionMetadataLib.Layout storage m = CollectionMetadataLib.layout();
         m.name = name_;

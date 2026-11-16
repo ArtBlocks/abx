@@ -78,6 +78,9 @@ interface IAbxConfigurableParams {
     error SchemaGoverned(bytes32 key);
     /// @notice The hook set is frozen — `setParamHooks` is closed forever on this collection.
     error ParamHooksLocked();
+    /// @notice `setDelegateRegistry` accepts only the canonical delegate.xyz v2 registry or
+    ///         `address(0)`; an owner-chosen registry could authorize the owner as anyone's delegate.
+    error InvalidDelegateRegistry(address registry);
     /// @notice A non-zero hook address has no code. A codeless configure or transfer hook makes
     ///         every call to it revert with no reason — every mint and transfer, for a transfer
     ///         hook — and a codeless augment hook is silently ignored by readers; `lockParamHooks`
@@ -111,8 +114,10 @@ interface IAbxConfigurableParams {
     ///         whether that can still change. Mirrors `scriptLocked()` / `dependenciesLocked()`.
     function paramHooksLocked() external view returns (bool);
 
-    /// @notice The TokenOwner-leg delegation resolver was set (zero = delegation disabled).
-    ///         Absence of the event ⇒ the default: the canonical delegate.xyz v2 registry.
+    /// @notice The TokenOwner-leg delegation resolver was set (zero = delegation disabled). On an
+    ///         ERC-721 code token, absence of the event ⇒ the default: the canonical delegate.xyz
+    ///         v2 registry. An ERC-1155 edition stores zero, emits nothing at deploy, and never
+    ///         consults a registry (`TokenOwner` there means any current holder).
     event DelegateRegistrySet(address indexed registry);
 
     /// @notice A schema's fixed-size head plus its option COUNT — the hot-read-path shape.

@@ -16,6 +16,7 @@ contract TransferCounterHook is IAbxTransferHook {
     mapping(uint256 tokenId => uint256 copiesTransferred) public transferCount;
 
     constructor(address token_) {
+        if (token_ == address(0)) revert OnlyToken();
         token = token_;
     }
 

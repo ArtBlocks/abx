@@ -60,6 +60,12 @@ library AbxParamsLib {
     ///      the one-byte STOP prefix SSTORE2 places before the data.
     uint256 private constant MAX_BLOB_BYTES = 24_575;
 
+    /// @dev The canonical delegate.xyz v2 registry — the same CREATE2 address on every chain, and
+    ///      ownerless: delegations in it are made by the holders themselves. The only registry the
+    ///      TokenOwner leg may consult (or none). {ConfigurableParams} reads this constant too.
+    address internal constant CANONICAL_DELEGATE_REGISTRY =
+        0x00000000000000447e69651d841bD8D104Bed493;
+
     // ── event mirrors (identical signatures ⇒ identical topics) ────────────────
     event ContractParamConfigured(
         bytes32 indexed key, bytes32 value, bool valueIsHash, address indexed updatedBy
@@ -302,9 +308,11 @@ library AbxParamsLib {
     ///      - a seed is a 32-byte literal, never a blob: a data-backed `seed` would publish the
     ///        content *hash* as the seed and split one token into two works depending on which
     ///        surface read it;
-    ///      - a non-empty value that fits one SSTORE2 contract. Past {MAX_BLOB_BYTES} the CREATE
-    ///        inside `SSTORE2.write` exceeds EIP-170 and fails by exceptional halt, which burns the
-    ///        gas forwarded to it before reverting with an error no token ABI declares.
+    ///      - a non-empty value that fits one SSTORE2 contract. Past {MAX_BLOB_BYTES}, on a chain
+    ///        that enforces EIP-170's 24,576-byte limit, the CREATE inside `SSTORE2.write` fails by
+    ///        exceptional halt, which burns the gas forwarded to it before reverting with an error
+    ///        no token ABI declares. The bound applies on every chain, so a blob that writes on one
+    ///        supported chain writes on all of them.
     function _requireBlobbableKey(bytes32 key, uint256 length) private pure {
         _requireCanonicalKey(key);
         if (key == SEED_KEY) revert IAbxParams.SeedSettled();
@@ -674,10 +682,21 @@ library AbxParamsLib {
         return true;
     }
 
-    /// @dev The TokenOwner-leg delegation resolver (see `_isAuthorized`). Zero disables.
-    ///      Owner-gated front door for the external passthrough.
+    /// @dev The TokenOwner-leg delegation resolver (see `_isAuthorized`). Owner-gated front door
+    ///      for the external passthrough, and limited to the two values `initialize` can choose:
+    ///      the canonical registry, or zero (delegation off).
+    ///
+    ///      Not an arbitrary address, because the registry IS an authority source: `_isDelegated`
+    ///      trusts whatever it answers. An owner able to point it at a contract that always answers
+    ///      `true` would pass the TokenOwner leg as a "delegate" of every holder — writing any
+    ///      TokenOwner-only key, and rewriting a settled `seed` under a TokenOwner-only seed schema,
+    ///      which the seed latch exists to rule out — with no schema event to show for it. The
+    ///      canonical registry is ownerless, so only holders can grant delegations in it.
     function setDelegateRegistry(address registry) public {
         _requireOwner();
+        if (registry != address(0) && registry != CANONICAL_DELEGATE_REGISTRY) {
+            revert IAbxConfigurableParams.InvalidDelegateRegistry(registry);
+        }
         initDelegateRegistry(registry);
     }
 

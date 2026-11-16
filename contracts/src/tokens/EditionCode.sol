@@ -94,7 +94,8 @@ contract EditionCode is
     /// @param primaryPayee Primary-sale payout destination (`address(0)` = none).
     /// @param minter Initial authorized minter (`address(0)` = owner-only).
     /// @param paused Initial mint-pause state (usually deployed paused).
-    /// @param seedSource IAbxSeedSource the token calls at each id's FIRST mint (`address(0)` = no
+    /// @param seedSource IAbxSeedSource the token calls once per id, at a mint that finds the id
+    ///        unseeded with no live copies — in practice its first mint (`address(0)` = no
     ///        mint-time seed — post-mint schemas, curated seeds, or non-generative code).
     /// @param mintTo Recipient for the deploy-time mint (`address(0)` = defer all minting).
     /// @param mintCount Distinct works to mint at deploy, ids `[0, mintCount)`; `<= maxInvocations`.
@@ -223,8 +224,8 @@ contract EditionCode is
         _mintEditionId(to, id, amount);
     }
 
-    /// @dev The single choke point for all mint paths: guards → id high-water mark → seed (on the
-    ///      id's FIRST mint only) → mint. The seed is drawn *before* `_mint` so a transfer hook
+    /// @dev The single choke point for all mint paths: guards → id high-water mark → seed (once
+    ///      per id, when the id is unseeded with no live copies) → mint. The seed is drawn *before* `_mint` so a transfer hook
     ///      observes it; a pre-set (creator-curated) seed wins over the source — the source fills
     ///      gaps, never overwrites. The watermark bump + seed draw is delegated to
     ///      {AbxEditionLib-advanceWatermarkAndDrawSeed} (EIP-170 relief; identical semantics) —

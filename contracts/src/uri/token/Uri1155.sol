@@ -43,7 +43,9 @@ import {AbxEditionLib} from "../../libraries/AbxEditionLib.sol";
 ///      The native `URI` signal is kept as well, and its shape is deliberately NOT a copy of
 ///      `TokenURI`'s 721 pattern:
 ///        - `setTokenURIOverride(id, ...)` — ONE id changed → one `URI(uri(id), id)`, automatic,
-///          O(1) (trivial — exactly one id can ever be affected by a per-id override).
+///          O(1) (trivial — exactly one id can ever be affected by a per-id override), unless an
+///          on-chain renderer is set: then `uri(id)` would render the whole document into log
+///          data, so only the ERC-4906 `MetadataUpdate(id)` fires.
 ///        - `setTokenURIBase` / `setTokenURIRenderer` — contract-wide (every id without an
 ///          override may have changed). `TokenURI`'s 721 twin expresses this as a SINGLE O(1)
 ///          `BatchMetadataUpdate(0, type(uint256).max)` event, because ERC-4906 has a *range*
