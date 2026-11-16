@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {SSTORE2} from "solady/utils/SSTORE2.sol";
 
 import {ParamsStorage} from "./ParamsStorage.sol";
+import {IAbxParams} from "../extensions/params/IAbxParams.sol";
 import {ConfigurableParamsStorage} from "./ConfigurableParamsStorage.sol";
 import {IAbxConfigurableParams} from
     "../extensions/configurable-params/IAbxConfigurableParams.sol";
@@ -21,15 +22,24 @@ import {IDelegateRegistry} from "../interfaces/IDelegateRegistry.sol";
 ///         events log **from the token address** — the spine is byte-identical to an inlined
 ///         implementation.
 /// @dev `msg.sender` inside these functions is the token's original caller (delegatecall
-///      preserves it), so schema auth reads it directly; the `creator` (the token's `owner()`)
-///      is passed in by the mixin. Access control stays in the mixins (`onlyOwner`, the
-///      `_checkParamWrite` guard chain) — this library assumes its caller already gated.
+///      preserves it), so every check here reads it directly. **Access control lives in this
+///      library, at two kinds of entry point.** The *front doors* share a selector with a token
+///      function and are the only ones a token forwards to: owner writes gate on
+///      {_requireOwner} (+ {_requireUngoverned} for schema'd keys), `configureTokenParam*` gates
+///      on the key's schema auth, and the hook/registry setters gate on {_requireOwner}. The
+///      *internal bodies* carry no check of their own. Most are `private`; four stay `public`
+///      because token code reaches them by a typed library call, and none shares a selector with
+///      any token function: the 5-arg `setTokenParam` (the mint-time seed write),
+///      `latchSeedAssignment` (the mint path), `initDelegateRegistry` (initialize), and
+///      `setParamSchema`, whose `onlyOwner` gate stays on the {ConfigurableParams} shell because
+///      its enum parameters give the library function a different selector from the token's.
 ///      Event declarations here duplicate the extension interfaces' — same signatures, same
 ///      topics; Solidity requires local declarations to emit.
-/// @dev **The key lists are maintained here, and only here.** These four functions
-///      (`setTokenParam` / `setContractParam` / `clearTokenParam` / `clearContractParam`) are
+/// @dev **The key lists are maintained here, and only here.** These four bodies
+///      (`setTokenParam` / `_setContractParam` / `_clearTokenParam` / `_clearContractParam`) are
 ///      the choke points every write funnels through — raw owner setters, the data variants,
-///      the governed `configureTokenParam*` path, mint-time seeds, hook-driven writes — so no
+///      the governed `configureTokenParam*` path (which a hook contract also uses, under the
+///      key's schema auth like any other caller), and mint-time seeds — so no
 ///      caller can forget to keep `ParamsStorage`'s enumeration in step with the map. Measured
 ///      cost on top of the value write: **~+45k gas** the first time a key is set (its list
 ///      element and its index-mapping slot, both zero→nonzero), or **~+67k for the first key in
@@ -45,6 +55,10 @@ library AbxParamsLib {
     ///      listing it would charge every seeded mint the first-write cost above for nothing.
     ///      Its clear path needs no special case — `index == 0` already no-ops (see `_unindex`).
     bytes32 private constant SEED_KEY = "seed";
+
+    /// @dev The largest value one SSTORE2 blob holds: EIP-170's 24,576-byte runtime ceiling minus
+    ///      the one-byte STOP prefix SSTORE2 places before the data.
+    uint256 private constant MAX_BLOB_BYTES = 24_575;
 
     // ── event mirrors (identical signatures ⇒ identical topics) ────────────────
     event ContractParamConfigured(
@@ -75,38 +89,15 @@ library AbxParamsLib {
     event MetadataUpdate(uint256 _tokenId); // ERC-4906
     event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId); // ERC-4906
 
-    error ParamNotSet();
-    error EmptyParamValue();
-    error NoParamSchema();
-    error NotParamAuthorized();
-    error ParamLockExpired();
-    /// @notice A param's `lockAfter` deadline may only be brought FORWARD, never pushed back and
-    ///         never cleared. Retiring a param is meant to be permanent; a re-openable lock is not
-    ///         a lock.
-    error ParamLockNotExtendable();
-    error InvalidParamValue();
-    error InvalidParamSchema();
-    error WrongValuePath();
-    /// @notice A param key must be readable ASCII with only trailing zero padding. A key carrying an
-    ///         INTERIOR zero renders as its truncated prefix (`keyToString` stops at the first zero)
-    ///         while comparing unequal as a 32-byte word — so `"seed\0<junk>"` slipped past every
-    ///         reserved-key guard and then serialized as `"seed"`.
-    error InvalidParamKey();
-    /// @notice The hook set is frozen — `setParamHooks` is closed forever on this collection.
-    error ParamHooksLocked();
-    /// @notice `seed` is assigned and settled — no path may rewrite or clear it, and it is never
-    ///         data-backed. Declared here because this library is the single choke point every
-    ///         external write passes through; the composing tokens re-declare it for their ABI,
-    ///         and the selector is identical either way.
-    error SeedSettled();
+    // Errors are declared on {IAbxParams} / {IAbxConfigurableParams} and raised here by qualified
+    // name: one declaration, so the selector this library reverts with is, by construction, the
+    // one the token's ABI decodes. (They used to be declared here too, and most never reached the
+    // token ABI at all.) The one local declaration is `Unauthorized`, which mirrors Solady.
+
     /// @notice The caller is not the token owner. Mirrors Solady `Ownable.Unauthorized()` (same
     ///         selector 0x82b42900), so the extracted owner-gated write path is byte-indistinguishable
     ///         from the former `onlyOwner` mixin shell to every caller, indexer, and test.
     error Unauthorized();
-    /// @notice The key has a schema, so it is governed: raw owner setters are closed for it and the
-    ///         write must go through `configureTokenParam*`. Mirrors {ConfigurableParams} (same
-    ///         selector) — the former `_checkParamWrite` guard, now enforced here at the choke point.
-    error SchemaGoverned();
 
     /// @dev Solady `Ownable`'s owner storage slot. Under delegatecall `address(this)` is the token,
     ///      so `sload(OWNER_SLOT)` reads the token owner — the extracted equivalent of `onlyOwner`.
@@ -127,12 +118,13 @@ library AbxParamsLib {
         if (msg.sender != _owner()) revert Unauthorized();
     }
 
-    /// @dev The extracted `_checkParamWrite`: a schema'd key is governed, so a raw owner write is
-    ///      refused (its value moves only through `configureTokenParam*`). Both code tokens that
-    ///      compose these params also compose `ConfigurableParams`, so this schema check is always
-    ///      the active guard — exactly as the overridden mixin `_checkParamWrite` was.
+    /// @dev A schema'd key is governed, so a raw owner write is refused (its value moves only
+    ///      through `configureTokenParam*`). Both code tokens that compose these params also compose
+    ///      `ConfigurableParams`, so this check applies on every token that reaches it.
     function _requireUngoverned(bytes32 key) private view {
-        if (ConfigurableParamsStorage.layout().schemas[key].exists) revert SchemaGoverned();
+        if (ConfigurableParamsStorage.layout().schemas[key].exists) {
+            revert IAbxConfigurableParams.SchemaGoverned(key);
+        }
     }
 
     // ── owner-gated write front doors (the extracted mixin shells) ─────────────────────────────
@@ -141,9 +133,9 @@ library AbxParamsLib {
     // (identical mechanism to the read passthroughs). They gate — owner, plus schema-governance
     // where the shell did — then delegate to the internal write body of the same name below.
     // `msg.sender` is the original external caller (delegatecall preserves it); the owner is read
-    // from storage. The bodies these call (the 4-/5-arg overloads, and `configureTokenParam*`'s
-    // `creator` form) stay as the privileged internal write path — reachable from mint-time/hook
-    // writers and from these front doors, never routed to from a token's external ABI.
+    // from storage. The bodies these call are `private` — reachable only from these front doors —
+    // except the 5-arg {setTokenParam}, which stays `public` because the token's own mint-time
+    // seed write reaches it by a typed library call. No token selector routes to it.
 
     function setTokenParam(uint256 tokenId, bytes32 key, bytes32 value) public {
         _requireOwner();
@@ -154,25 +146,25 @@ library AbxParamsLib {
     function setTokenParamData(uint256 tokenId, bytes32 key, bytes calldata data) public {
         _requireOwner();
         _requireUngoverned(key);
-        setTokenParamData(tokenId, key, data, msg.sender);
+        _setTokenParamData(tokenId, key, data, msg.sender);
     }
 
     function clearTokenParam(uint256 tokenId, bytes32 key) public {
         _requireOwner();
         _requireUngoverned(key);
-        clearTokenParam(tokenId, key, msg.sender);
+        _clearTokenParam(tokenId, key, msg.sender);
     }
 
     function setContractParam(bytes32 key, bytes32 value) public {
         _requireOwner();
         _requireUngoverned(key);
-        setContractParam(key, value, false, msg.sender);
+        _setContractParam(key, value, false, msg.sender);
     }
 
     function setContractParamData(bytes32 key, bytes calldata data) public {
         _requireOwner();
         _requireUngoverned(key);
-        setContractParamData(key, data, msg.sender);
+        _setContractParamData(key, data, msg.sender);
     }
 
     /// @dev NO governance check, matching the mixin's documented exception: a governed key whose
@@ -180,17 +172,17 @@ library AbxParamsLib {
     ///      cannot forge a value or bypass a schema's auth on any token-scope write).
     function clearContractParam(bytes32 key) public {
         _requireOwner();
-        clearContractParam(key, msg.sender);
+        _clearContractParam(key, msg.sender);
     }
 
     /// @dev NOT owner-gated — governed by the key's schema auth, checked in the `creator` body. The
     ///      owner is read here and passed as `creator`, exactly as the mixin passed `owner()`.
     function configureTokenParam(uint256 tokenId, bytes32 key, bytes32 value) public {
-        configureTokenParam(tokenId, key, value, _owner());
+        _configureTokenParam(tokenId, key, value, _owner());
     }
 
     function configureTokenParamData(uint256 tokenId, bytes32 key, bytes calldata data) public {
-        configureTokenParamData(tokenId, key, data, _owner());
+        _configureTokenParamData(tokenId, key, data, _owner());
     }
 
     /// @dev Reject a key with an interior zero byte. This is the class fix for a bypass that three
@@ -203,14 +195,19 @@ library AbxParamsLib {
     ///      every future one; rejecting the malformed shape at the write choke points closes all of
     ///      them at once, and aligns with the off-chain decoder, which already refuses these keys.
     function _requireCanonicalKey(bytes32 key) private pure {
-        if (key == bytes32(0)) revert InvalidParamKey(); // an empty key has no readable name
+        // an empty key has no readable name; the three coordinates are written by every renderer
+        // from the token itself and skipped when params are emitted, so a param under one of
+        // these names would be stored, paid for, and silently never read.
+        if (
+            key == bytes32(0) || key == "chainId" || key == "contractAddress" || key == "tokenId"
+        ) revert IAbxParams.InvalidParamKey(key);
         bool seenZero;
         for (uint256 i; i < 32; ++i) {
             bytes1 c = key[i];
             if (c == 0) {
                 seenZero = true;
             } else if (seenZero) {
-                revert InvalidParamKey(); // interior NUL: two keys would render the same name
+                revert IAbxParams.InvalidParamKey(key); // interior NUL: two keys, one name
             } else if (c < 0x20 || c > 0x7E) {
                 // The other half of the "readable ASCII" rule this error has always promised, and
                 // the unswept sibling of the renderer's `_repName` fix. A key is rendered into JSON
@@ -218,7 +215,7 @@ library AbxParamsLib {
                 // one contract-scope write with a high byte makes EVERY `tokenURI` in the collection
                 // invalid UTF-8, rejected outright by strict decoders. Once a schema is attached to
                 // such a key there is no clean way back, so it has to be refused at the door.
-                revert InvalidParamKey();
+                revert IAbxParams.InvalidParamKey(key);
             }
         }
     }
@@ -251,7 +248,9 @@ library AbxParamsLib {
         bool valueIsHash,
         address updatedBy
     ) public {
-        _requireCanonicalKey(key);
+        // `seed` is a constant and canonical by construction; skipping the 32-byte scan keeps it
+        // off every seeded mint.
+        if (key != SEED_KEY) _requireCanonicalKey(key);
         ParamsStorage.Layout storage l = ParamsStorage.layout();
         // The settled-seed promise, enforced structurally at the one choke point every external
         // write funnels through — the owner's raw setter, the governed `configureTokenParam*`
@@ -268,7 +267,9 @@ library AbxParamsLib {
         // declared once any seed exists (see {setParamSchema}), so the choice is a pre-sale
         // commitment a buyer can read rather than something retrofitted after the money moved.
         if (key == SEED_KEY) {
-            if (l.tokenParams[tokenId][key].isSet && !hasSchema(SEED_KEY)) revert SeedSettled();
+            if (l.tokenParams[tokenId][key].isSet && !hasSchema(SEED_KEY)) {
+                revert IAbxParams.SeedSettled();
+            }
             l.anySeedAssigned = true; // freezes the seed's governance model from here on
         }
         if (!valueIsHash && l.tokenData[tokenId][key] != address(0)) {
@@ -284,20 +285,31 @@ library AbxParamsLib {
         emit MetadataUpdate(tokenId);
     }
 
-    function setTokenParamData(uint256 tokenId, bytes32 key, bytes calldata data, address updatedBy)
-        public
-    {
-        if (data.length == 0) revert EmptyParamValue();
-        _requireBlobbableKey(key);
+    function _setTokenParamData(
+        uint256 tokenId,
+        bytes32 key,
+        bytes calldata data,
+        address updatedBy
+    ) private {
+        _requireBlobbableKey(key, data.length);
         _persistTokenBlob(tokenId, key, SSTORE2.write(data), keccak256(data), updatedBy);
     }
 
-    /// @dev A seed is a 32-byte literal, never a blob: a data-backed `seed` would publish the content
-    ///      *hash* as the seed and split one token into two works depending on which surface read it.
-    ///      Refuse the shape outright rather than define that away. Shared by both blob paths and
-    ///      checked BEFORE either writes, so a doomed write never pays ~200 gas/byte first.
-    function _requireBlobbableKey(bytes32 key) private pure {
-        if (key == SEED_KEY) revert SeedSettled();
+    /// @dev Every check a blob write must pass, run BEFORE the SSTORE2 write so a doomed write never
+    ///      pays ~200 gas/byte first. Shared by all three blob paths (token raw, token governed,
+    ///      contract raw):
+    ///      - the key shape (otherwise only checked after the blob exists);
+    ///      - a seed is a 32-byte literal, never a blob: a data-backed `seed` would publish the
+    ///        content *hash* as the seed and split one token into two works depending on which
+    ///        surface read it;
+    ///      - a non-empty value that fits one SSTORE2 contract. Past {MAX_BLOB_BYTES} the CREATE
+    ///        inside `SSTORE2.write` exceeds EIP-170 and fails by exceptional halt, which burns the
+    ///        gas forwarded to it before reverting with an error no token ABI declares.
+    function _requireBlobbableKey(bytes32 key, uint256 length) private pure {
+        _requireCanonicalKey(key);
+        if (key == SEED_KEY) revert IAbxParams.SeedSettled();
+        if (length == 0) revert IAbxParams.EmptyParamValue(key);
+        if (length > MAX_BLOB_BYTES) revert IAbxParams.ParamDataTooLarge(key, length);
     }
 
     /// @dev Store an ALREADY-WRITTEN blob pointer and its hash. Factored out because two paths reach
@@ -316,10 +328,11 @@ library AbxParamsLib {
         setTokenParam(tokenId, key, hash, true, updatedBy);
     }
 
-    function clearTokenParam(uint256 tokenId, bytes32 key, address updatedBy) public {
+    function _clearTokenParam(uint256 tokenId, bytes32 key, address updatedBy) private {
         ParamsStorage.Layout storage l = ParamsStorage.layout();
-        if (!l.tokenParams[tokenId][key].isSet) revert ParamNotSet();
-        if (key == SEED_KEY) revert SeedSettled(); // settled means settled — clearing is a rewrite
+        if (!l.tokenParams[tokenId][key].isSet) revert IAbxParams.ParamNotSet(key);
+        // settled means settled — clearing is a rewrite
+        if (key == SEED_KEY) revert IAbxParams.SeedSettled();
         delete l.tokenParams[tokenId][key];
         delete l.tokenData[tokenId][key]; // abandoned SSTORE2 pointers are inert
         _unindex(l.tokenParamKeyList[tokenId], l.tokenParamKeyIndex[tokenId], key);
@@ -327,8 +340,8 @@ library AbxParamsLib {
         emit MetadataUpdate(tokenId);
     }
 
-    function setContractParam(bytes32 key, bytes32 value, bool valueIsHash, address updatedBy)
-        public
+    function _setContractParam(bytes32 key, bytes32 value, bool valueIsHash, address updatedBy)
+        private
     {
         _requireCanonicalKey(key);
         ParamsStorage.Layout storage l = ParamsStorage.layout();
@@ -341,15 +354,17 @@ library AbxParamsLib {
         emit BatchMetadataUpdate(0, type(uint256).max);
     }
 
-    function setContractParamData(bytes32 key, bytes calldata data, address updatedBy) public {
-        if (data.length == 0) revert EmptyParamValue();
+    /// @dev Contract scope runs the same blob checks as token scope. A contract-scope `seed` stays
+    ///      writable as a literal by design (it is no token's seed), but never as a blob.
+    function _setContractParamData(bytes32 key, bytes calldata data, address updatedBy) private {
+        _requireBlobbableKey(key, data.length);
         ParamsStorage.layout().contractData[key] = SSTORE2.write(data);
-        setContractParam(key, keccak256(data), true, updatedBy);
+        _setContractParam(key, keccak256(data), true, updatedBy);
     }
 
-    function clearContractParam(bytes32 key, address updatedBy) public {
+    function _clearContractParam(bytes32 key, address updatedBy) private {
         ParamsStorage.Layout storage l = ParamsStorage.layout();
-        if (!l.contractParams[key].isSet) revert ParamNotSet();
+        if (!l.contractParams[key].isSet) revert IAbxParams.ParamNotSet(key);
         delete l.contractParams[key];
         delete l.contractData[key];
         _unindex(l.contractParamKeyList, l.contractParamKeyIndex, key);
@@ -378,7 +393,7 @@ library AbxParamsLib {
             // and by whom, must be declared before any seed exists, so a buyer can read it and
             // price it. Once the first seeded mint lands, this key is closed — declaring or
             // re-pointing a `seed` schema afterwards would change what a collector already bought.
-            if (ParamsStorage.layout().anySeedAssigned) revert SeedSettled();
+            if (ParamsStorage.layout().anySeedAssigned) revert IAbxParams.SeedSettled();
             // A `String`/`Bytes` seed schema is unusable: those types write through the data path,
             // and a seed is never data-backed, so both write paths would refuse it. Reject it at
             // declaration instead of accepting a schema that can never be used — and note this is
@@ -386,32 +401,52 @@ library AbxParamsLib {
             if (
                 paramType == IAbxConfigurableParams.ParamType.String
                     || paramType == IAbxConfigurableParams.ParamType.Bytes
-            ) revert InvalidParamSchema();
-        } else if (
-            key == "chainId" || key == "contractAddress" || key == "tokenId"
-        ) {
-            // The other three tokenData coordinates. Both renderers skip them when emitting params,
-            // so a schema here produces values that are silently dropped at read — paid for, then
-            // ignored. The specs already claimed tooling rejects this; now the contract does, which
-            // is the only place it cannot be bypassed.
-            revert InvalidParamSchema();
+            ) revert IAbxConfigurableParams.InvalidParamSchema(key);
         }
+        // The other three tokenData coordinates (`chainId`, `contractAddress`, `tokenId`) are
+        // refused by `_requireCanonicalKey` above, at every write path, not only here.
+
         // structural validation — a schema any frontend can trust to build UI from
         if (paramType == IAbxConfigurableParams.ParamType.Select) {
-            if (selectOptions.length == 0) revert InvalidParamSchema();
+            if (selectOptions.length == 0) revert IAbxConfigurableParams.InvalidParamSchema(key);
+            // Option labels are rendered verbatim into tokenData and `tokenURI` through a
+            // byte-level JSON escape, so one malformed UTF-8 label makes the document of every token
+            // that selects it undecodable to a strict parser — the same failure already refused for
+            // keys and `String` values. A bitten `lockAfter` would make it permanent. An empty label
+            // renders as nothing and is indistinguishable from `selectOption`'s out-of-range "".
+            for (uint256 i; i < selectOptions.length; ++i) {
+                bytes calldata label = bytes(selectOptions[i]);
+                if (label.length == 0 || !_isValidUtf8(label)) {
+                    revert IAbxConfigurableParams.InvalidParamSchema(key);
+                }
+            }
         } else if (selectOptions.length != 0) {
-            revert InvalidParamSchema();
+            revert IAbxConfigurableParams.InvalidParamSchema(key);
         }
         if (paramType == IAbxConfigurableParams.ParamType.Int256Range) {
-            if (int256(uint256(min)) > int256(uint256(max))) revert InvalidParamSchema();
-        } else if (uint256(max) != 0 && uint256(min) > uint256(max)) {
-            revert InvalidParamSchema();
+            if (int256(uint256(min)) > int256(uint256(max))) {
+                revert IAbxConfigurableParams.InvalidParamSchema(key);
+            }
+        } else if (
+            paramType == IAbxConfigurableParams.ParamType.Uint256Range
+                || paramType == IAbxConfigurableParams.ParamType.DecimalRange
+                || paramType == IAbxConfigurableParams.ParamType.Timestamp
+        ) {
+            if (uint256(max) != 0 && uint256(min) > uint256(max)) {
+                revert IAbxConfigurableParams.InvalidParamSchema(key);
+            }
+        } else if (min != 0 || max != 0) {
+            // Bool, Select, HexColor, String and Bytes are not bounded by `min`/`max`, so a
+            // non-zero bound would be stored, emitted and shown by a UI, but never enforced.
+            revert IAbxConfigurableParams.InvalidParamSchema(key);
         }
         bool usesAddress = auth == IAbxConfigurableParams.AuthOption.Address
             || auth == IAbxConfigurableParams.AuthOption.CreatorOrAddress
             || auth == IAbxConfigurableParams.AuthOption.TokenOwnerOrAddress
             || auth == IAbxConfigurableParams.AuthOption.CreatorOrTokenOwnerOrAddress;
-        if (usesAddress != (authAddress != address(0))) revert InvalidParamSchema();
+        if (usesAddress != (authAddress != address(0))) {
+            revert IAbxConfigurableParams.InvalidParamSchema(key);
+        }
 
         ConfigurableParamsStorage.Layout storage cl = ConfigurableParamsStorage.layout();
         ConfigurableParamsStorage.Schema storage s = cl.schemas[key];
@@ -424,7 +459,9 @@ library AbxParamsLib {
         // Checked here, before the first field is assigned. A revert would unwind those writes
         // anyway, but a guard that runs after the effects it guards is one refactor away from
         // being wrong, and `s.lockAfter` must be read while it still holds the OLD deadline.
-        if (s.lockAfter != 0 && block.timestamp > s.lockAfter) revert ParamLockExpired();
+        if (s.lockAfter != 0 && block.timestamp > s.lockAfter) {
+            revert IAbxConfigurableParams.ParamLockExpired(key, s.lockAfter);
+        }
         if (!s.exists) {
             // first declaration → enumerable. Append-only: updating a schema re-types it in
             // place and a schema is never deleted, so the list never needs a removal path.
@@ -441,7 +478,7 @@ library AbxParamsLib {
         // prescribes `:lock=now` as the way to *weld* a param, which only means something if the
         // weld holds. A deadline a project can push back is a deadline collectors cannot price.
         if (s.lockAfter != 0 && (lockAfter == 0 || lockAfter > s.lockAfter)) {
-            revert ParamLockNotExtendable();
+            revert IAbxConfigurableParams.ParamLockNotExtendable(key);
         }
         s.lockAfter = lockAfter;
         s.min = min;
@@ -480,11 +517,33 @@ library AbxParamsLib {
     {
         _requireOwner();
         ConfigurableParamsStorage.Layout storage l = ConfigurableParamsStorage.layout();
-        if (l.hooksLocked) revert ParamHooksLocked();
+        if (l.hooksLocked) revert IAbxConfigurableParams.ParamHooksLocked();
+        _requireHookCode(configureHook);
+        _requireHookCode(augmentHook);
+        _requireHookCode(transferHook);
+        // The augment hook contributes entries to every token's tokenData, which is output, so
+        // re-pointing it changes every token's metadata, as re-typing a schema does. The other two
+        // hooks act on writes and transfers, not on what renders.
+        bool outputChanged = augmentHook != l.augmentHook;
         l.configureHook = configureHook;
         l.augmentHook = augmentHook;
         l.transferHook = transferHook;
         emit HooksConfigured(configureHook, augmentHook, transferHook);
+        if (outputChanged) emit BatchMetadataUpdate(0, type(uint256).max);
+    }
+
+    /// @dev A non-zero hook must have code. The configure and transfer hooks return nothing, so
+    ///      Solidity's pre-call code-size check reverts on a codeless target, with empty revert
+    ///      data: a mistyped transfer hook would make every mint, transfer and burn revert with no
+    ///      reason, and `lockParamHooks` would make that permanent. A codeless augment hook fails
+    ///      the other way — its readers call it under try/catch, so it is silently ignored — and is
+    ///      refused for the same reason: the configured hook would not be the one that runs.
+    ///      {CreatorToken-_requireHasCode} applies the same rule to transfer validators. A hook
+    ///      cannot be set to a counterfactual address before it is deployed.
+    function _requireHookCode(address hook) private view {
+        if (hook != address(0) && hook.code.length == 0) {
+            revert IAbxConfigurableParams.InvalidParamHook(hook);
+        }
     }
 
     /// @dev Freeze the hook set forever. One-way by design: the point is to be un-take-backable, so
@@ -507,15 +566,17 @@ library AbxParamsLib {
 
     /// @dev The governed literal write. `creator` = the token's `owner()`; `msg.sender` is the
     ///      original external caller (delegatecall preserves it).
-    function configureTokenParam(uint256 tokenId, bytes32 key, bytes32 value, address creator)
-        public
+    function _configureTokenParam(uint256 tokenId, bytes32 key, bytes32 value, address creator)
+        private
     {
         ConfigurableParamsStorage.Schema storage s = _requireConfigurable(tokenId, key, creator);
         if (
             s.paramType == IAbxConfigurableParams.ParamType.String
                 || s.paramType == IAbxConfigurableParams.ParamType.Bytes
-        ) revert WrongValuePath();
-        _validateLiteral(s, value);
+        ) revert IAbxConfigurableParams.WrongValuePath(key, s.paramType);
+        if (!_isValidLiteral(s, value)) {
+            revert IAbxConfigurableParams.InvalidParamValue(key, tokenId);
+        }
         // Scalar path: the whole value fits in `value`, so the blob arguments are zero. `dataLength`
         // is the discriminator a hook reads — and it can never be 0 on the blob path (an empty value
         // is refused there), so zero here is unambiguous rather than merely conventional.
@@ -524,18 +585,20 @@ library AbxParamsLib {
     }
 
     /// @dev The governed data write (`String`/`Bytes`): one blob, hash as the evented value.
-    function configureTokenParamData(
+    function _configureTokenParamData(
         uint256 tokenId,
         bytes32 key,
         bytes calldata data,
         address creator
-    ) public {
+    ) private {
         ConfigurableParamsStorage.Schema storage s = _requireConfigurable(tokenId, key, creator);
         if (
             s.paramType != IAbxConfigurableParams.ParamType.String
                 && s.paramType != IAbxConfigurableParams.ParamType.Bytes
-        ) revert WrongValuePath();
-        if (data.length == 0) revert InvalidParamValue();
+        ) revert IAbxConfigurableParams.WrongValuePath(key, s.paramType);
+        // Emptiness and size first: the per-byte UTF-8 scan below should never run on a value that
+        // could not be stored anyway.
+        _requireBlobbableKey(key, data.length);
         // A `String` value is the ONE byte source in this protocol that a non-owner writes and that
         // lands in the rendered document. Everything else raw is owner-controlled, where "the owner
         // can already ruin their own project" answers it — that argument does not reach here.
@@ -553,9 +616,8 @@ library AbxParamsLib {
         // times where the owner was the one causing it. Refusing it here too, at the write, keeps
         // the read path's "never reverts" property intact.
         if (s.paramType == IAbxConfigurableParams.ParamType.String && !_isValidUtf8(data)) {
-            revert InvalidParamValue();
+            revert IAbxConfigurableParams.InvalidParamValue(key, tokenId);
         }
-        _requireBlobbableKey(key);
         // WRITE BEFORE THE HOOK, deliberately. The hook receives the blob's address so it can inspect
         // content without the bytes being copied into every configure call — and an address is only
         // meaningful once the contract behind it exists. Handing over a not-yet-written pointer would
@@ -722,11 +784,12 @@ library AbxParamsLib {
         return options[index];
     }
 
-    /// @dev Whether `key` has a schema (the mixins' composing guards read this).
     function paramHooksLocked() public view returns (bool) {
         return ConfigurableParamsStorage.layout().hooksLocked;
     }
 
+    /// @dev Whether `key` has a schema. Read internally by the settled-seed rule; not part of any
+    ///      token's ABI.
     function hasSchema(bytes32 key) public view returns (bool) {
         return ConfigurableParamsStorage.layout().schemas[key].exists;
     }
@@ -821,18 +884,24 @@ library AbxParamsLib {
         returns (ConfigurableParamsStorage.Schema storage s)
     {
         s = ConfigurableParamsStorage.layout().schemas[key];
-        if (!s.exists) revert NoParamSchema();
+        if (!s.exists) revert IAbxConfigurableParams.NoParamSchema(key);
         uint48 lockAfter = s.lockAfter;
-        if (lockAfter != 0 && block.timestamp > lockAfter) revert ParamLockExpired();
-        if (!_isAuthorized(s, tokenId, creator)) revert NotParamAuthorized();
+        if (lockAfter != 0 && block.timestamp > lockAfter) {
+            revert IAbxConfigurableParams.ParamLockExpired(key, lockAfter);
+        }
+        if (!_isAuthorized(s, tokenId, creator)) {
+            revert IAbxConfigurableParams.NotParamAuthorized(
+                key, tokenId, msg.sender, s.auth, s.authAddress
+            );
+        }
     }
 
     /// @dev OR-semantics over the schema's named parties. `Creator` = the contract owner; the
     ///      token-owner leg **generalizes to 721-owner OR 1155-any-holder** — see
     ///      {_isAuthorizedOwnerLeg} — and honors **delegate.xyz** on the 721 side (the configured
     ///      registry): a wallet the token owner delegated to (all-wallet, per-contract, or
-    ///      per-token; rights-agnostic) configures as the owner, so vaulted tokens configure from
-    ///      a hot wallet.
+    ///      per-token, as a FULL delegation — see {_isDelegated}) configures as the owner, so
+    ///      vaulted tokens configure from a hot wallet.
     function _isAuthorized(
         ConfigurableParamsStorage.Schema storage s,
         uint256 tokenId,
@@ -911,8 +980,10 @@ library AbxParamsLib {
     }
 
     /// @dev Fail-closed delegate.xyz check: a missing/odd registry (no code, bad return) is
-    ///      simply "not delegated" — the direct-owner path is never affected. Rights-agnostic
-    ///      (`bytes32(0)`), matching the AB PostParams integration.
+    ///      simply "not delegated" — the direct-owner path is never affected. Queried with
+    ///      `rights == bytes32(0)`, matching the AB PostParams integration: delegate.xyz v2 then
+    ///      honors only FULL delegations (made with no rights scope). A delegation scoped to a
+    ///      specific right does not authorize a param write.
     function _isDelegated(address delegate, address vault, uint256 tokenId)
         private
         view
@@ -939,31 +1010,27 @@ library AbxParamsLib {
         return ok && word == 1;
     }
 
-    function _validateLiteral(ConfigurableParamsStorage.Schema storage s, bytes32 value)
+    /// @dev Whether a literal satisfies its schema. Returns rather than reverts so the caller raises
+    ///      one {IAbxConfigurableParams-InvalidParamValue} carrying the key and token.
+    function _isValidLiteral(ConfigurableParamsStorage.Schema storage s, bytes32 value)
         private
         view
+        returns (bool)
     {
         IAbxConfigurableParams.ParamType t = s.paramType;
         uint256 v = uint256(value);
-        if (t == IAbxConfigurableParams.ParamType.Bool) {
-            if (v > 1) revert InvalidParamValue();
-        } else if (t == IAbxConfigurableParams.ParamType.Select) {
-            if (v >= s.selectOptions.length) revert InvalidParamValue();
-        } else if (t == IAbxConfigurableParams.ParamType.HexColor) {
-            if (v > 0xFFFFFF) revert InvalidParamValue();
-        } else if (t == IAbxConfigurableParams.ParamType.Int256Range) {
+        if (t == IAbxConfigurableParams.ParamType.Bool) return v <= 1;
+        if (t == IAbxConfigurableParams.ParamType.Select) return v < s.selectOptions.length;
+        if (t == IAbxConfigurableParams.ParamType.HexColor) return v <= 0xFFFFFF;
+        if (t == IAbxConfigurableParams.ParamType.Int256Range) {
             // reinterpreting the bytes32 as two's-complement signed is the type's encoding.
             // forge-lint: disable-next-line(unsafe-typecast)
             int256 sv = int256(v);
-            if (sv < int256(uint256(s.min)) || sv > int256(uint256(s.max))) {
-                revert InvalidParamValue();
-            }
-        } else {
-            // Uint256Range · DecimalRange · Timestamp — unsigned bounds; max = 0 ⇒ unbounded above
-            if (v < uint256(s.min)) revert InvalidParamValue();
-            uint256 hi = uint256(s.max);
-            if (hi != 0 && v > hi) revert InvalidParamValue();
+            return sv >= int256(uint256(s.min)) && sv <= int256(uint256(s.max));
         }
+        // Uint256Range · DecimalRange · Timestamp — unsigned bounds; max = 0 ⇒ unbounded above
+        uint256 hi = uint256(s.max);
+        return v >= uint256(s.min) && (hi == 0 || v <= hi);
     }
 
     /// @dev The write-time veto: a configured hook's revert bubbles (the validator slot).

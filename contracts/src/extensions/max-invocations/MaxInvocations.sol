@@ -47,8 +47,11 @@ abstract contract MaxInvocations is AbxBeaconCore, Ownable, IAbxMaxInvocations {
         // Zero is a state every `initialize` explicitly forbids, and the setter used to be able to
         // reach it — permanently, since the cap is monotonically non-increasing and so can never
         // come back up. That is a bricked project reachable by one ordinary owner call with a
-        // plausible intent ("close the edition"). Closing an edition early is
-        // `setMaxInvocations(totalSupply())`, which the floor already permits.
+        // plausible intent ("close the edition"). Closing early is `setMaxInvocations(floor)`,
+        // where the floor is what the composing token reports: the issuance cursor
+        // (`nextTokenId()`) on a series, the id high-water mark on an edition — not
+        // `totalSupply()`, which falls on burn. Pause first, or a mint that lands before the close
+        // raises the floor and the close reverts.
         if (newMax == 0) revert InvalidMaxInvocations();
         if (newMax > l.maxInvocations) revert MaxInvocationsIncreaseForbidden();
         if (newMax < _maxInvocationsFloor()) revert MaxInvocationsBelowFloor();
@@ -64,8 +67,9 @@ abstract contract MaxInvocations is AbxBeaconCore, Ownable, IAbxMaxInvocations {
         emit MaxInvocationsUpdated(max);
     }
 
-    /// @dev The lowest the cap may be lowered to. Default 0; a composing token overrides this to
-    ///      the live minted count (`totalSupply()`) so a decrease can't strand minted tokens.
+    /// @dev The lowest the cap may be lowered to. Default 0; a composing token overrides this with
+    ///      a quantity that never decreases — the series issuance cursor, or the edition id
+    ///      high-water mark — so a decrease can never strand an id that was already issued.
     function _maxInvocationsFloor() internal view virtual returns (uint256) {
         return 0;
     }

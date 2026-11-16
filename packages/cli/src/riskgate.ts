@@ -24,10 +24,13 @@ import {
   makePublicClient,
   pinGas,
   seriesCodeAbi,
+  editionCodeAbi,
+  abxCoreV3ErrorsAbi,
   GasEstimateBelowFloorError,
   type Address,
   type PreparedTx,
 } from '@artblocks/abx-sdk';
+import {abxCodeLibAbi, abxParamsLibAbi} from '@artblocks/abx-sdk/abi';
 import {signTx, type Lane, type SignResult, type TxProvider} from './signer.js';
 import {isDryRun, type Flags} from './flags.js';
 import {ANSI as C, ansiBold as bold, ansiDim as dim} from './ansi.js';
@@ -143,12 +146,28 @@ export interface DryRunSimulation {
  * `execution reverted` and no data at all. So the no-data case says *that*, rather than implying we
  * looked at a reason and couldn't read it.
  */
+/**
+ * Every error an ABX token can revert with. The parameter and code-custody write paths run in
+ * delegatecalled libraries, and their errors (`NotParamAuthorized`, `ScriptIsLocked`, …) are not in
+ * the token ABIs, so decoding against a token ABI alone left them as raw selectors. The edition ABI
+ * adds the edition-only errors (`EditionSupplyReached`, …). From core v4 the token ABIs declare the
+ * library errors themselves, with new signatures; `abxCoreV3ErrorsAbi` keeps v3 collections'
+ * argument-less shapes decodable.
+ */
+const REVERT_ERRORS_ABI = [
+  ...seriesCodeAbi,
+  ...editionCodeAbi,
+  ...abxParamsLibAbi,
+  ...abxCodeLibAbi,
+  ...abxCoreV3ErrorsAbi,
+].filter((f) => f.type === 'error');
+
 export function revertReason(err: unknown): string {
   const data = (err as {data?: unknown; cause?: {data?: unknown}})?.data ?? (err as {cause?: {data?: unknown}})?.cause?.data;
   const hex = typeof data === 'string' ? data : (data as {data?: string} | undefined)?.data;
   if (typeof hex === 'string' && hex.length >= 10) {
     try {
-      const decoded = decodeErrorResult({abi: seriesCodeAbi, data: hex as `0x${string}`});
+      const decoded = decodeErrorResult({abi: REVERT_ERRORS_ABI, data: hex as `0x${string}`});
       return `${decoded.errorName}(${(decoded.args ?? []).join(', ')})`;
     } catch {
       /* not one of ours — fall through to the message */

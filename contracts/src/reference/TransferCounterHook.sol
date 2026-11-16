@@ -4,8 +4,11 @@ pragma solidity 0.8.28;
 import {IAbxTransferHook} from "../extensions/configurable-params/IAbxParamHooks.sol";
 
 /// @title TransferCounterHook — reference transfer lifecycle observer
-/// @notice Counts copies moved between non-zero addresses. Mint and burn are intentionally excluded.
-///         For ERC-1155 this is an aggregate per id, not an invented single-owner concept.
+/// @notice Counts copies moved between two different non-zero addresses. Mint and burn are
+///         intentionally excluded, and so are self-transfers: an ERC-721 token reports them to its
+///         transfer hook (an ERC-1155 token does not), and counting them would let a holder raise
+///         the rendered count just by paying gas. For ERC-1155 this is an aggregate per id, not an
+///         invented single-owner concept.
 contract TransferCounterHook is IAbxTransferHook {
     error OnlyToken();
 
@@ -20,6 +23,6 @@ contract TransferCounterHook is IAbxTransferHook {
         external
     {
         if (msg.sender != token) revert OnlyToken();
-        if (from != address(0) && to != address(0)) transferCount[tokenId] += amount;
+        if (from != address(0) && to != address(0) && from != to) transferCount[tokenId] += amount;
     }
 }

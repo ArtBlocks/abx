@@ -43,6 +43,12 @@ import {Erc1155SupplyStorage} from "../libraries/Erc1155SupplyStorage.sol";
 ///      security-invariant writeup — identical here: `delegatecall`-to-self preserves
 ///      `msg.sender`, so no authority amplification; atomic; no `msg.value` double-spend; never
 ///      combined with ERC-2771).
+///
+///      **Inherited `payable` functions.** Solady marks its ownership functions `payable` to save
+///      gas (`transferOwnership`, `renounceOwnership`, `requestOwnershipHandover`,
+///      `cancelOwnershipHandover`, `completeOwnershipHandover`); Solady's ERC-1155 transfer
+///      functions are not. No ABX token has a withdrawal path, so ETH sent with any of them is
+///      unrecoverable — accepted for the same reason as on {AbxErc721Base}.
 abstract contract AbxErc1155Base is ERC1155, AbxBeaconCore, Ownable, Initializable, Multicallable {
 
     /// @notice A collection cannot be created without an owner.
@@ -86,7 +92,7 @@ abstract contract AbxErc1155Base is ERC1155, AbxBeaconCore, Ownable, Initializab
     ///      transfer policy, and had nobody who could ever suspend it. Renouncing later is still
     ///      permitted — on an enrolled creator token that is safe because suspension becomes
     ///      permissionless once `owner() == address(0)` (see
-    ///      {CreatorToken-_requireValidatorAuth}), so an abandoned collection can always be moved
+    ///      {CreatorToken1155-setTransferValidator}), so an abandoned collection can always be moved
     ///      back toward transferability. This refuses only *starting* ownerless, which no
     ///      legitimate deploy needs and which no later recovery can undo.
     function _initOwner(address owner_) internal {
@@ -102,7 +108,7 @@ abstract contract AbxErc1155Base is ERC1155, AbxBeaconCore, Ownable, Initializab
         return CollectionMetadataLib.layout().symbol;
     }
 
-    /// @dev Set the collection identity at initialize. No event (set once at mint).
+    /// @dev Set the collection identity at initialize. No event (set once, at deploy).
     function _initCollectionMetadata(string calldata name_, string calldata symbol_) internal {
         CollectionMetadataLib.Layout storage m = CollectionMetadataLib.layout();
         m.name = name_;

@@ -23,15 +23,18 @@ interface IAbxConfigurableParams {
         DecimalRange, // as Uint256Range; fixed-point, 10 decimals — canonical decode ÷ 1e10 (PMP-compatible)
         HexColor, // value ≤ 0xFFFFFF; canonical decode → "#rrggbb"
         Timestamp, // as Uint256Range; canonical decode → unix seconds
-        String, // UTF-8 bytes via the data path (hash + chunks); no literal form
-        Bytes // raw bytes via the data path (hash + chunks); canonical decode → base64
+        String, // well-formed UTF-8 via the data path (one blob + its hash); no literal form
+        Bytes // raw bytes via the data path (one blob + its hash); canonical decode → base64
     }
 
     /// @notice Who may set a key's value (OR semantics — any listed party). `Creator` = the
     ///         contract owner (ABX has no separate creator role; one project per contract).
-    ///         `TokenOwner` honors **delegate.xyz**: a wallet the owner delegated to (via the
-    ///         configured registry — default the canonical v2 deployment; opt-out at deploy)
-    ///         configures as the owner, so vaulted tokens configure from a hot wallet.
+    ///         `TokenOwner` on an ERC-721 honors **delegate.xyz v2** full delegations (all-wallet,
+    ///         per-contract or per-token, created with `rights == 0`; rights-scoped delegations
+    ///         do not qualify) via the configured registry — default the canonical v2 deployment;
+    ///         opt-out at deploy — so vaulted tokens configure from a hot wallet. On an ERC-1155
+    ///         edition `TokenOwner` means any current holder of the id, and delegation is not
+    ///         consulted.
     enum AuthOption {
         Creator,
         TokenOwner,
@@ -41,6 +44,45 @@ interface IAbxConfigurableParams {
         TokenOwnerOrAddress,
         CreatorOrTokenOwnerOrAddress
     }
+
+    // ── errors (declared here so they decode against the token's ABI; see {IAbxParams}) ────────
+
+    /// @notice A governed write named a key that has no schema.
+    error NoParamSchema(bytes32 key);
+    /// @notice The caller does not satisfy the key's schema auth for this token. Carries the auth
+    ///         that was enforced, so the reason is readable without a second (possibly racing)
+    ///         read: `auth` is the schema's {AuthOption} and `authAddress` its named address
+    ///         (zero unless the option has an Address leg). `TokenOwner` means the token's current
+    ///         ERC-721 owner or a full delegate.xyz delegate of it, or on an edition any current
+    ///         holder of the id.
+    error NotParamAuthorized(
+        bytes32 key, uint256 tokenId, address caller, AuthOption auth, address authAddress
+    );
+    /// @notice The key's `lockAfter` deadline has passed: its value and its schema are final.
+    error ParamLockExpired(bytes32 key, uint48 lockAfter);
+    /// @notice A `lockAfter` deadline may only be brought FORWARD, never pushed back and never
+    ///         cleared. Retiring a param is meant to be permanent; a re-openable lock is not a lock.
+    error ParamLockNotExtendable(bytes32 key);
+    /// @notice The value does not satisfy the key's schema (range, option index, color, or
+    ///         well-formed UTF-8 for a `String`).
+    error InvalidParamValue(bytes32 key, uint256 tokenId);
+    /// @notice The schema is malformed for its type: options on a non-`Select`, an empty or
+    ///         non-UTF-8 option label, bounds on a type that does not use them, inverted bounds,
+    ///         an auth address that does not match the auth option, or a `String`/`Bytes` type
+    ///         for `seed` (a seed is never data-backed).
+    error InvalidParamSchema(bytes32 key);
+    /// @notice The write used the literal path for a data type (`String`/`Bytes`) or vice versa.
+    error WrongValuePath(bytes32 key, ParamType paramType);
+    /// @notice The key has a schema, so it is governed: raw owner setters are closed for it and the
+    ///         write must go through `configureTokenParam*`.
+    error SchemaGoverned(bytes32 key);
+    /// @notice The hook set is frozen — `setParamHooks` is closed forever on this collection.
+    error ParamHooksLocked();
+    /// @notice A non-zero hook address has no code. A codeless configure or transfer hook makes
+    ///         every call to it revert with no reason — every mint and transfer, for a transfer
+    ///         hook — and a codeless augment hook is silently ignored by readers; `lockParamHooks`
+    ///         would make either permanent.
+    error InvalidParamHook(address hook);
 
     /// @notice A key's schema was set or changed — emitted in full (the inline rule).
     event ParamSchemaConfigured(
@@ -73,7 +115,6 @@ interface IAbxConfigurableParams {
     ///         Absence of the event ⇒ the default: the canonical delegate.xyz v2 registry.
     event DelegateRegistrySet(address indexed registry);
 
-    /// @notice A key's full schema. `exists` = false ⇒ the key is ungoverned (plain param).
     /// @notice A schema's fixed-size head plus its option COUNT — the hot-read-path shape.
     /// @dev Use with {selectOption} rather than `paramSchema` when resolving one selected value: the
     ///      full getter copies the entire option table on every call, so a large owner-created table
@@ -95,6 +136,7 @@ interface IAbxConfigurableParams {
     /// @notice One option from a `Select` schema's table. Empty string when out of range.
     function selectOption(bytes32 key, uint256 index) external view returns (string memory);
 
+    /// @notice A key's full schema. `exists` = false ⇒ the key is ungoverned (plain param).
     function paramSchema(bytes32 key)
         external
         view

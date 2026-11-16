@@ -361,9 +361,9 @@ contract OneOfOneImageTest is Test {
     }
 
     function test_Mint_CannotMintTwice() public {
-        // The 1/1 invariant: minting again reverts (token id 0 already exists).
+        // The 1/1 invariant: minting again reverts (token id 0 was already minted).
         vm.prank(owner);
-        vm.expectRevert(bytes4(keccak256("TokenAlreadyExists()")));
+        vm.expectRevert(OneOfOneImage.AlreadyMinted.selector);
         nft.mint(owner); // nft already minted at deploy in setUp
     }
 

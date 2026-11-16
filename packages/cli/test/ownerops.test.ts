@@ -209,13 +209,22 @@ test('every other representation carries raw bytes and is passed through untouch
 // the node sent none when it isn't (never "we couldn't read it").
 import {revertReason} from '../src/riskgate.js';
 import {encodeErrorResult} from 'viem';
-import {seriesCodeAbi} from '@artblocks/abx-sdk';
+import {abxCoreV3ErrorsAbi, seriesCodeAbi} from '@artblocks/abx-sdk';
 
 test('revertReason: an ABX custom error decodes to its own name', () => {
   const data = encodeErrorResult({abi: seriesCodeAbi, errorName: 'RoyaltyTooHigh'});
   assert.match(revertReason({data}), /^RoyaltyTooHigh\(\)$/);
   // viem nests the payload one level down on a CallExecutionError
   assert.match(revertReason({cause: {data}}), /^RoyaltyTooHigh\(\)$/);
+});
+
+test('revertReason: param errors decode for both the current and the v3 generation', () => {
+  const key = `0x${Buffer.from('palette').toString('hex').padEnd(64, '0')}` as const;
+  const v4 = encodeErrorResult({abi: seriesCodeAbi, errorName: 'SchemaGoverned', args: [key]});
+  assert.match(revertReason({data: v4}), /^SchemaGoverned\(0x70616c65747465/);
+  // A v3 collection reverts with the argument-less shape — a different selector.
+  const v3 = encodeErrorResult({abi: abxCoreV3ErrorsAbi, errorName: 'NotParamAuthorized'});
+  assert.match(revertReason({data: v3}), /^NotParamAuthorized\(\)$/);
 });
 
 test('revertReason: a node that sends NO revert data says so, rather than blaming the decode', () => {

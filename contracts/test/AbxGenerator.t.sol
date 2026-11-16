@@ -18,6 +18,8 @@ import {IAbxConfigurableParams} from
     "../src/extensions/configurable-params/IAbxConfigurableParams.sol";
 import {OnChainMetadata} from "../src/extensions/onchain-metadata/OnChainMetadata.sol";
 import {DynamicBuffer} from "../src/libraries/DynamicBuffer.sol";
+import {ParamsStorage} from "../src/libraries/ParamsStorage.sol";
+import {IAbxParams} from "../src/extensions/params/IAbxParams.sol";
 import {IAbxOnChainMetadata} from "../src/extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @dev Deterministic seed source so tokenData bytes are assertable.
@@ -965,7 +967,7 @@ contract AbxGeneratorTest is Test {
             address(0),
             0,
             bytes32(0),
-            bytes32(uint256(0xFFFFFF)),
+            bytes32(0), // HexColor is bounded by its type, never by min/max
             new string[](0)
         );
         nft.configureTokenParam(0, "palette", bytes32(uint256(0x0E1A40)));
@@ -1067,20 +1069,40 @@ contract AbxGeneratorTest is Test {
         );
     }
 
+    /// The coordinate names are refused at every write path in this generation, at both scopes.
+    function test_ReservedCoordinateKeysRefusedAtWrite() public {
+        SeriesCode nft = _deployTemplate();
+        bytes32[3] memory coords = [bytes32("chainId"), "contractAddress", "tokenId"];
+        vm.startPrank(owner);
+        for (uint256 i; i < coords.length; ++i) {
+            bytes memory err = abi.encodeWithSelector(IAbxParams.InvalidParamKey.selector, coords[i]);
+            vm.expectRevert(err);
+            nft.setContractParam(coords[i], bytes32(uint256(1)));
+            vm.expectRevert(err);
+            nft.setTokenParam(0, coords[i], bytes32(uint256(1)));
+            vm.expectRevert(err);
+            nft.setContractParamData(coords[i], bytes("x"));
+            vm.expectRevert(err);
+            nft.setTokenParamData(0, coords[i], bytes("x"));
+        }
+        vm.stopPrank();
+    }
+
+    /// The generator still skips coordinate keys defensively: a previous token generation accepted
+    /// them as ordinary params, and this singleton serves those collections too. The state is
+    /// planted directly, since the current token refuses to produce it.
     function test_Enumerated_ReservedCoordinateKeysSkipped() public {
         SeriesCode nft = _deployTemplate();
-        vm.startPrank(owner);
+        vm.prank(owner);
         // forge-lint: disable-next-line(unsafe-typecast)
         nft.setContractParam("mode", bytes32("dark"));
-        // reserved coordinate NAMES are settable params (only `seed` is unlistable) — the
-        // generator skips them defensively so the coordinates can never be overridden
         // forge-lint: disable-next-line(unsafe-typecast)
-        nft.setContractParam("chainId", bytes32("nope"));
+        _plantContractParam(address(nft), "chainId", bytes32("nope"));
         // forge-lint: disable-next-line(unsafe-typecast)
-        nft.setContractParam("contractAddress", bytes32("nope"));
+        _plantContractParam(address(nft), "contractAddress", bytes32("nope"));
         // forge-lint: disable-next-line(unsafe-typecast)
-        nft.setTokenParam(0, "tokenId", bytes32("nope"));
-        vm.stopPrank();
+        _plantTokenParam(address(nft), 0, "tokenId", bytes32("nope"));
+        assertEq(nft.contractParamKeys().length, 3, "planted keys are enumerated");
 
         string memory json = gen.tokenDataJson(address(nft), 0);
         assertTrue(LibString.contains(json, '"mode":"dark"'), "the real key rides");
@@ -1141,7 +1163,7 @@ contract AbxGeneratorTest is Test {
             address(0),
             0,
             bytes32(0),
-            bytes32(uint256(1)),
+            bytes32(0), // a Select is bounded by its option count, never by min/max
             options
         );
         nft.setParamSchema(
@@ -1333,6 +1355,40 @@ contract AbxGeneratorTest is Test {
             out[i] = ch;
         }
         return string(out);
+    }
+
+    // ── storage planting: params a previous generation could hold but this one refuses ──────────
+
+    uint256 private constant PARAMS_SLOT = uint256(ParamsStorage.STORAGE_SLOT);
+
+    /// `Param` occupies two slots: `value`, then `(valueIsHash, isSet)` packed low-order first.
+    function _plantParam(address token, bytes32 paramSlot, bytes32 value) private {
+        vm.store(token, paramSlot, value);
+        vm.store(token, bytes32(uint256(paramSlot) + 1), bytes32(uint256(1) << 8)); // isSet
+    }
+
+    /// Append `key` to a key list (`bytes32[]` at `listSlot`) and record its 1-based index.
+    function _plantListed(address token, uint256 listSlot, bytes32 indexSlot, bytes32 key) private {
+        uint256 len = uint256(vm.load(token, bytes32(listSlot)));
+        vm.store(token, bytes32(listSlot), bytes32(len + 1));
+        vm.store(token, bytes32(uint256(keccak256(abi.encode(listSlot))) + len), key);
+        vm.store(token, indexSlot, bytes32(len + 1));
+    }
+
+    function _plantContractParam(address token, bytes32 key, bytes32 value) private {
+        // Layout fields: 1 contractParams, 6 contractParamKeyList, 7 contractParamKeyIndex
+        _plantParam(token, keccak256(abi.encode(key, PARAMS_SLOT + 1)), value);
+        _plantListed(token, PARAMS_SLOT + 6, keccak256(abi.encode(key, PARAMS_SLOT + 7)), key);
+    }
+
+    function _plantTokenParam(address token, uint256 tokenId, bytes32 key, bytes32 value) private {
+        // Layout fields: 0 tokenParams, 4 tokenParamKeyList, 5 tokenParamKeyIndex
+        bytes32 inner = keccak256(abi.encode(tokenId, PARAMS_SLOT));
+        _plantParam(token, keccak256(abi.encode(key, inner)), value);
+        uint256 list = uint256(keccak256(abi.encode(tokenId, PARAMS_SLOT + 4)));
+        bytes32 index =
+            keccak256(abi.encode(key, keccak256(abi.encode(tokenId, PARAMS_SLOT + 5))));
+        _plantListed(token, list, index, key);
     }
 
     function _countOccurrences(string memory subject, string memory needle)

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {IAbxParams} from "../src/extensions/params/IAbxParams.sol";
 
 import {SeriesCode} from "../src/tokens/SeriesCode.sol";
 import {SeriesCodeFactory} from "../src/factories/SeriesCodeFactory.sol";
@@ -272,7 +273,7 @@ contract ParamsEnumerationTest is Test {
         vm.prank(owner);
         uint256 id = nft.mint(collector);
         vm.prank(owner);
-        vm.expectRevert(SeriesCode.SeedSettled.selector);
+        vm.expectRevert(IAbxParams.SeedSettled.selector);
         nft.clearTokenParam(id, SEED);
     }
 
@@ -531,7 +532,9 @@ contract ParamsEnumerationTest is Test {
         // the raw clear is closed for a governed key, so the value cannot leave — but the point
         // stands: the schema list is a declaration record, independent of any value's lifetime.
         vm.prank(owner);
-        vm.expectRevert(ConfigurableParams.SchemaGoverned.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.SchemaGoverned.selector, bytes32("palette"))
+        );
         nft.clearTokenParam(id, "palette");
         assertEq(nft.paramSchemaKeys().length, 1);
     }

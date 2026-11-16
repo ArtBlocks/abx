@@ -39,6 +39,7 @@ abstract contract RoyaltyExtension is AbxBeaconCore, ERC2981, Ownable, IAbxRoyal
     /// @dev The absolute ceiling the owner-chosen cap may not exceed: 100%.
     uint16 private constant ABSOLUTE_MAX_BPS = 10_000;
 
+    /// @notice The royalty exceeds the collection's current royalty cap (`maxRoyaltyBps`).
     error RoyaltyTooHigh();
     /// @notice The requested initial cap exceeds 100% (10000 bps).
     error RoyaltyCapAboveMax();

@@ -3,10 +3,8 @@ pragma solidity 0.8.28;
 
 import {ERC1155} from "solady/tokens/ERC1155.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
-import {LibString} from "solady/utils/LibString.sol";
 
 import {TokenURIStorage} from "../../libraries/TokenURIStorage.sol";
-import {IAbxMetadataRenderer} from "../IAbxMetadataRenderer.sol";
 import {IERC4906} from "../../interfaces/IERC4906.sol";
 import {AbxEditionLib} from "../../libraries/AbxEditionLib.sol";
 
@@ -69,9 +67,6 @@ import {AbxEditionLib} from "../../libraries/AbxEditionLib.sol";
 ///          mixin matches: no `URI` companion, just `TokenURIFrozen()`.
 ///      Storage is ERC-7201 (`TokenURIStorage`, shared verbatim with `TokenURI`).
 abstract contract Uri1155 is ERC1155, Ownable, IERC4906 {
-    using LibString for uint256;
-    using LibString for address;
-
     error TokenURIConfigLocked();
 
     /// @notice The resolver base was re-pointed (every id without an override may have changed).
@@ -95,10 +90,15 @@ abstract contract Uri1155 is ERC1155, Ownable, IERC4906 {
     ///      typed shell** — same shape and same reason as {Params-_delegateParamsRead}: decoding a
     ///      dynamic `string` return here and re-encoding it costs more than the extracted body saves.
     ///
-    ///      The ladder used to live here AND in the library, with all three edition tokens overriding
-    ///      to reach the library copy — so this mixin's version was dead, and each token carried its
-    ///      own ~40-line copy of the assembly below. Three copies of a passthrough, in front of a
-    ///      body nothing called. Not `virtual`: an override is how the split came back last time.
+    ///      Not `virtual`: an override is how a split between this and the library body came back
+    ///      before.
+    ///
+    ///      **Only ever the entry point of an external call.** The passthrough forwards THIS call's
+    ///      calldata and ends the frame with the library's returndata, so it is correct only when
+    ///      `uri(uint256)` is the selector being executed. An internal call to `uri(id)` from any
+    ///      other function would forward that function's calldata instead and end its frame. Solady
+    ///      declares `uri` `public`, so the compiler cannot forbid the internal call; nothing in this
+    ///      codebase makes one, and nothing may.
     function uri(uint256 /* id */ ) public view override returns (string memory) {
         _delegateEditionUriRead();
         revert(); // unreachable — the passthrough always `return`s or `revert`s the frame
@@ -128,44 +128,32 @@ abstract contract Uri1155 is ERC1155, Ownable, IERC4906 {
     }
 
     /// @notice Owner re-points the resolver base (affects every id without an override). Emits
-    ///         ONLY `TokenURIBaseSet` — the contract-wide re-point signal; see the class-level
-    ///         dev note on why this does not loop-emit native `URI` for every id, and use
-    ///         {pingURI} afterward if that re-emission is wanted.
-    function setTokenURIBase(string calldata base) external virtual onlyOwner {
-        // ONE implementation. This body used to live here AND in {AbxEditionLib}, with every
-        // concrete edition token overriding to pick the library copy — so the mixin's copy was
-        // unreachable, and three separate fixes landed in it instead of in the code that runs.
-        // The mixin now delegates, and the tokens carry no override at all.
+    ///         `TokenURIBaseSet` and the ERC-4906 range `BatchMetadataUpdate(0, max)`, but not the
+    ///         native `URI` per id — see the class-level dev note on why it is not loop-emitted, and
+    ///         use {pingURI} afterward if that re-emission is wanted. The body is in {AbxEditionLib}.
+    function setTokenURIBase(string calldata base) external onlyOwner {
         AbxEditionLib.setTokenURIBase(base);
     }
 
     /// @notice Owner sets (or clears, with an empty string) a per-id full-URI override.
-    function setTokenURIOverride(uint256 id, string calldata uri_) external virtual onlyOwner {
-        // ONE implementation. This body used to live here AND in {AbxEditionLib}, with every
-        // concrete edition token overriding to pick the library copy — so the mixin's copy was
-        // unreachable, and three separate fixes landed in it instead of in the code that runs.
-        // The mixin now delegates, and the tokens carry no override at all.
+    function setTokenURIOverride(uint256 id, string calldata uri_) external onlyOwner {
         AbxEditionLib.setTokenURIOverride(id, uri_);
     }
 
     /// @notice Owner sets the on-chain renderer (non-zero ⇒ resolve on-chain; zero ⇒ off-chain).
-    ///         Emits ONLY `TokenURIRendererSet` — see {setTokenURIBase}'s note; use {pingURI}
-    ///         afterward for the native `URI` re-emission.
-    function setTokenURIRenderer(address renderer) external virtual onlyOwner {
-        // ONE implementation. This body used to live here AND in {AbxEditionLib}, with every
-        // concrete edition token overriding to pick the library copy — so the mixin's copy was
-        // unreachable, and three separate fixes landed in it instead of in the code that runs.
-        // The mixin now delegates, and the tokens carry no override at all.
+    ///         Emits `TokenURIRendererSet` and `BatchMetadataUpdate(0, max)` — see
+    ///         {setTokenURIBase}'s note; use {pingURI} afterward for the native `URI` re-emission.
+    ///         The address is not checked for code: a codeless non-zero renderer makes every
+    ///         `uri(id)` revert, and {lockTokenURI} would make that permanent.
+    function setTokenURIRenderer(address renderer) external onlyOwner {
         AbxEditionLib.setTokenURIRenderer(renderer);
     }
 
     /// @notice Owner freezes the token-URI config (base + renderer + all overrides) forever.
-    ///         With the id's fields also locked, the resolved metadata is provably immutable.
-    function lockTokenURI() external virtual onlyOwner {
-        // ONE implementation. This body used to live here AND in {AbxEditionLib}, with every
-        // concrete edition token overriding to pick the library copy — so the mixin's copy was
-        // unreachable, and three separate fixes landed in it instead of in the code that runs.
-        // The mixin now delegates, and the tokens carry no override at all.
+    /// @dev This freezes POINTERS. With the id's fields also locked, every input the token stores
+    ///      is fixed; the resolved metadata is fixed only if the renderer and anything it reads are
+    ///      themselves immutable.
+    function lockTokenURI() external onlyOwner {
         AbxEditionLib.lockTokenURI();
     }
 
@@ -192,28 +180,17 @@ abstract contract Uri1155 is ERC1155, Ownable, IERC4906 {
     /// @notice Owner-only, chunkable re-emission helper: emits `MetadataUpdate(id)` for each id in
     ///         `ids` — plus the native `URI(uri(id), id)` when no on-chain renderer is configured —
     ///         in the CALLER's chosen batch.
-    /// @dev It was permissionless, on the reasoning that it emits only already-public truth and the
-    ///      gas is the caller's to spend. That reasoning misses who pays the OTHER side: with an
-    ///      on-chain renderer, the caller pays event gas while an event-driven indexer may perform
-    ///      an expensive `uri(id)` per id, for arbitrary, duplicate, or nonexistent ids it did not
-    ///      choose. Owner-only matches what the verb is actually for — an owner's follow-up to a
-    ///      re-point — and removes the asymmetry at no cost to anyone who needs it.
     /// @dev The intended use is operational, not automatic: after a contract-wide re-point
     ///      (`setTokenURIBase`/`setTokenURIRenderer` emit the ERC-4906 range form; see the
-    ///      class-level dev note), an operator who wants marketplaces/indexers
-    ///      that only honor the native `URI` event to re-index calls this in chunks sized to fit
-    ///      comfortably under a block gas limit, covering as much or as little of the id space as
-    ///      they choose. No id-space introspection is attempted here — the caller names the ids.
-    /// @dev Owner-only, which matches what it is FOR: the follow-up an owner runs after re-pointing
-    ///      a URI. It was permissionless, and with an on-chain renderer that is asymmetric — the
-    ///      caller pays event gas while an event-driven indexer may perform an expensive `uri(id)`
-    ///      per id, for arbitrary, duplicate, or nonexistent ids. Robust indexers coalesce refreshes
-    ///      anyway; removing the primitive costs nothing an owner needs.
-    function pingURI(uint256[] calldata ids) external virtual onlyOwner {
-        // ONE implementation. This body used to live here AND in {AbxEditionLib}, with every
-        // concrete edition token overriding to pick the library copy — so the mixin's copy was
-        // unreachable, and three separate fixes landed in it instead of in the code that runs.
-        // The mixin now delegates, and the tokens carry no override at all.
+    ///      class-level dev note), an operator who wants marketplaces/indexers that only honor the
+    ///      native `URI` event to re-index calls this in chunks sized to fit under a block gas
+    ///      limit, covering as much or as little of the id space as they choose. The caller names the
+    ///      ids; nothing checks that an id was ever minted.
+    ///
+    ///      Owner-only, which matches what it is for. A permissionless version is asymmetric: with an
+    ///      on-chain renderer the caller pays event gas while an event-driven indexer may perform an
+    ///      expensive `uri(id)` per id, for arbitrary, duplicate or nonexistent ids.
+    function pingURI(uint256[] calldata ids) external onlyOwner {
         AbxEditionLib.pingURI(ids);
     }
 }

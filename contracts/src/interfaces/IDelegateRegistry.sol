@@ -9,7 +9,8 @@ pragma solidity 0.8.28;
 ///         `0x00000000000000447e69651d841bD8D104Bed493`.
 interface IDelegateRegistry {
     /// @notice Whether `to` is a delegate of `from` for `contract_` / `tokenId` under `rights`
-    ///         (`bytes32(0)` = rights-agnostic — matches unscoped delegations).
+    ///         (`bytes32(0)` matches only full delegations — those made with no rights scope; a
+    ///         rights-scoped delegation does not satisfy it).
     function checkDelegateForERC721(
         address to,
         address from,

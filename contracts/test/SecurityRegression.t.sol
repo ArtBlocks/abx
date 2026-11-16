@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {IAbxParams} from "../src/extensions/params/IAbxParams.sol";
 import {Base64} from "solady/utils/Base64.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
@@ -232,7 +233,7 @@ contract SecurityRegressionTest is Test {
         (bool existedBefore,,,,,,,) = token.paramSchema("seed");
         assertFalse(existedBefore, "the buyer-visible pre-mint state has no seed schema");
 
-        vm.expectRevert(AbxParamsLib.SeedSettled.selector);
+        vm.expectRevert(IAbxParams.SeedSettled.selector);
         sourceAndOwner.mintTo(address(0xB0B));
 
         // The latch unwound with the reverted mint: nothing was drawn, so nothing is settled and the

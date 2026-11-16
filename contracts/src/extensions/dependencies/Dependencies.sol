@@ -27,12 +27,6 @@ abstract contract Dependencies is AbxBeaconCore, Ownable, AbxCodeDelegate, IAbxD
     /// @dev Current implemented version (bumps when the interface or semantics change).
     uint16 private constant VERSION = 1;
 
-    /// @notice Write index must be ≤ count (replace or append); reads must be < count.
-    /// @dev Kept declared here (not thrown here) so it stays in every composing token's ABI: both
-    ///      the writes and the bounds-checked `dependencyByIndex` read now revert from
-    ///      {AbxCodeLib}, whose identically-named error has the identical selector.
-    error DependencyIndexOutOfRange();
-
     /// @notice Owner writes/replaces the dependency at `index` (`== count` appends).
     function setDependency(uint256 index, Resolution resolution, bytes32 ref) external onlyOwner {
         AbxCodeLib.setDependency(index, resolution, ref);

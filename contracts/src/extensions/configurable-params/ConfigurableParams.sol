@@ -13,7 +13,8 @@ import {AbxParamsLib} from "../../libraries/AbxParamsLib.sol";
 ///         owner metadata and becomes a governed PostParam: values are written through the
 ///         typed, auth-checked `configureTokenParam*` path — by whoever the schema names
 ///         (`Creator` = the contract owner, `TokenOwner`, a specific `Address`, or combinations)
-///         — and the owner's raw setters are closed for it (the `_checkParamWrite` guard).
+///         — and the owner's raw setters are closed for it ({AbxParamsLib} refuses them with
+///         `SchemaGoverned`).
 /// @dev Values flow through the base store (`TokenParamConfigured`, `updatedBy` = the
 ///      configurer). The configureHook is a write-time **veto** (its revert bubbles); the
 ///      transferHook is a **veto** (its revert bubbles and fails the transfer or mint; freezable
@@ -33,15 +34,17 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
     ///      beacon's `extensionVersion` is how an integrator tells which calling convention a
     ///      deployed token uses. A v2 token calls the 4-argument form; a v3 token calls the
     ///      6-argument one, and a hook written for one will revert on the other.
-    uint16 private constant VERSION = 3;
+    /// @dev v4: the errors carry the key and the enforced auth (declared on
+    ///      {IAbxConfigurableParams}), a non-zero hook must have code, re-pointing the augment hook
+    ///      pings ERC-4906, and a schema may not carry bounds its type ignores or a malformed
+    ///      `Select` label.
+    uint16 private constant VERSION = 4;
 
     /// @dev The canonical delegate.xyz v2 registry — the same CREATE2 address on every chain.
     ///      The TokenOwner-leg default; opt-out at deploy, re-pointable by the owner.
     address private constant DEFAULT_DELEGATE_REGISTRY =
         0x00000000000000447e69651d841bD8D104Bed493;
 
-    /// @notice The key has a schema — writes go through `configureTokenParam*`, not raw setters.
-    error SchemaGoverned();
 
     // ── schema + hooks (owner) ──────────────────────────────────────────────--
 
@@ -221,7 +224,11 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
     ///      never sees mint or burn precisely so that a policy contract cannot brick issuance; the
     ///      distinction is that a validator is usually a third party's, and a hook is always yours.
     ///
-    ///      Returndata is still not read: the call returns nothing, so nothing is decoded.
+    ///      The call returns nothing, so nothing is decoded on success; a revert's data bubbles up
+    ///      unchanged. An ERC-721 self-transfer (`from == to`) reaches the hook like any other
+    ///      transfer: it needs the owner's or an approved operator's call, so it cannot be spoofed
+    ///      the way an ERC-1155 zero-amount transfer can (see {AbxEditionLib-notifyTransferHookForIds}).
+    ///      A hook that cares only about changes of holder ignores `from == to`.
     function _notifyTransferHook(uint256 tokenId, address from, address to) internal {
         address hook = ConfigurableParamsStorage.layout().transferHook;
         if (hook == address(0)) return;
@@ -251,7 +258,7 @@ abstract contract ConfigurableParams is Params, IAbxConfigurableParams {
     ///      un-set storage default (`address(0)`, never written) is both correct (nothing ever
     ///      reads it on this leg) and honest (`delegateRegistry()` reads back `address(0)` — "no
     ///      delegation configured" — rather than a live delegate.xyz address the token can never
-    ///      actually consult). Deliberately does NOT call `AbxParamsLib.setDelegateRegistry`
+    ///      actually consult). Deliberately does NOT call `AbxParamsLib.initDelegateRegistry`
     ///      (unlike the `disableTokenOwnerDelegation = true` path above), because that helper
     ///      unconditionally emits `DelegateRegistrySet` — a config event with nothing configured.
     function _initConfigurableParamsForEdition() internal {

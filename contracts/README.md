@@ -182,11 +182,13 @@ indistinguishable from a pre-721C token.
 | Token ids | one (`0`) | sequential, `IAbxSequentialMint` | sequential, `IAbxSequentialMint` |
 
 Every concrete contract's `initialize()` calls each mixin's `_init<Name>` in one fixed order, and the
-doc comment pins the exact resulting event sequence — e.g. `OneOfOneImage`'s: `AbxDeployed →
-AbxExtensionVersionSet(royalty) → RoyaltyChangedForAll → [AbxExtensionVersionSet(creator-token) →
-TransferValidatorUpdated] → AbxExtensionVersionSet(onchain-metadata) →
-TokenFieldSet*/ContractFieldSet* → ContractURIUpdated → (if minting) Transfer(0x0, mintTo, 0)`. An
-indexer author can read the sequence straight off the source instead of inferring it from tests.
+doc comment states the exact resulting event sequence — e.g. `OneOfOneImage`'s: `OwnershipTransferred →
+AbxDeployed → AbxExtensionVersionSet(royalty) → MaxRoyaltyBpsUpdated → RoyaltyChangedForAll →
+BurnConfigured → AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+[Transfer(0x0, mintTo, 0)] → Initialized(1)`, followed by the factory's `Deployed`. An indexer author
+can read the sequence straight off the source; `test/InitEventOrder.t.sol` pins all six against the
+code with every optional extension configured.
 
 ## Deployment & trust model
 

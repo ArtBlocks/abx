@@ -19,10 +19,32 @@ pragma solidity 0.8.28;
 ///         not an enumerated param). Everything else set is listed exactly once, and a cleared
 ///         key leaves.
 /// @dev `updatedBy` (indexed) is the authorized actor who set the param — on-chain provenance
-///      (can differ from the tx sender under delegation / hooks; under the Configurable Params
-///      auth model, different actors set different params). Has a read surface → a real
-///      ERC-165 id. Keys are readable-ASCII `bytes32` by convention (like fields).
+///      (it is the token's `msg.sender`, so it differs from the tx sender when a contract
+///      writes, and it is the seed source for a mint-time `seed`; under the Configurable Params
+///      auth model, different actors set different params). Has a read
+///      surface → a real ERC-165 id. Keys are printable-ASCII `bytes32` with only trailing zero
+///      padding, enforced on every write.
+/// @dev **Errors are declared here, not only in the library that raises them.** The write paths
+///      run in {AbxParamsLib} by delegatecall, so a revert surfaces from the token's address; it
+///      only decodes against the token's verified ABI because the token inherits these
+///      declarations. Every error that concerns one key names it, so a failing subcall inside a
+///      `multicall` identifies itself.
 interface IAbxParams {
+    /// @notice The key is not a printable-ASCII name with only trailing zero padding, or it is
+    ///         one of the coordinates every tokenData carries (`chainId`, `contractAddress`,
+    ///         `tokenId`), which a param can never override.
+    error InvalidParamKey(bytes32 key);
+    /// @notice A clear named a key that has no value at that scope.
+    error ParamNotSet(bytes32 key);
+    /// @notice A data (blob) write carried no bytes. Use a literal, or clear the key.
+    error EmptyParamValue(bytes32 key);
+    /// @notice A data (blob) write exceeds what one SSTORE2 contract can hold (24,575 bytes).
+    ///         Larger content belongs behind a pointer param.
+    error ParamDataTooLarge(bytes32 key, uint256 length);
+    /// @notice `seed` is assigned and settled — nothing may rewrite, re-shape, or clear it, and it
+    ///         is never data-backed.
+    error SeedSettled();
+
     /// @notice A contract-scope param was set / changed.
     event ContractParamConfigured(
         bytes32 indexed key, bytes32 value, bool valueIsHash, address indexed updatedBy
