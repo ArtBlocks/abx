@@ -230,6 +230,7 @@ lane. Read [capabilities.md](reference/capabilities.md) before designing a custo
 - The reference self-hosted toolkit is for collections controlled by one trusted operator, not unrelated tenants. Explain its network, preview, signing, and storage limits in the hosting reference.
 - Generic remotes, self-hosted resolvers/effects, storage, lifecycle, and migration → [hosting.md](reference/hosting.md)
 - Existing-project reads, mint/sales, fields, transfers, authority, and locks → [operate.md](reference/operate.md)
+- Collector sign-in, email login through a creator-owned Privy app, and wallet funding → [collector-wallets.md](reference/collector-wallets.md)
 - Failure classification, resume, RPC/storage/rendering faults, and retry discipline → [diagnose.md](reference/diagnose.md)
 - Optional utilities, ABX FS files/websites, native reads, and preservation → [utilities.md](reference/utilities.md)
 - Capability questions, extension seams, mechanics, and hard boundaries → [capabilities.md](reference/capabilities.md)

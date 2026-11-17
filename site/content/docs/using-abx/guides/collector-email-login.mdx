@@ -1,0 +1,62 @@
+---
+title: "Collector email login"
+description: "Let collectors sign in with an email and get a wallet, using your own Privy app."
+---
+
+The [mint page](/docs/using-abx/guides/sales#mint-page) connects a collector's browser wallet. If
+your collectors may not have one, you can add email login: a collector enters an email and gets an
+embedded wallet automatically.
+
+This uses a [Privy](https://privy.io) app that you create and own. ABX doesn't create the app or
+hold its credentials. Privy bills your account for monthly active users beyond its free tier.
+Collector wallets belong to your app. If you delete or abandon it, collectors who haven't exported
+their keys lose access.
+
+## Set up your Privy app
+
+1. Sign in to the [Privy dashboard](https://dashboard.privy.io) and create an app. Email login is
+   on by default.
+2. Add every domain your collectors will use to the app's allowed domains. An app with no allowed
+   domains accepts any website. Privy rejects `*.vercel.app` and `*.netlify.app` wildcards, so use a
+   custom domain or the exact preview URL.
+3. Switch the app to production before launch. New apps start in development mode, which caps how
+   many users can sign in.
+4. Copy the app ID. It's public. Your site doesn't need the app secret, so don't share it.
+
+Check the result from the app's public configuration:
+
+```bash
+curl -s -H "privy-app-id: <app-id>" https://api.privy.io/v1/apps/<app-id>
+```
+
+`email_auth` should be `true`, and `allowed_domains` should list each collector domain.
+
+## Add it to your site
+
+Ask your agent to add Privy login to your mint page with your app ID. The ABX skill wires
+`@privy-io/react-auth` so that:
+
+- collectors can sign in with an email or a browser wallet;
+- an embedded wallet is created for collectors who don't have one;
+- Privy's confirmation prompts stay on for every signature;
+- collectors can export their wallet's private key.
+
+Keep the confirmation prompts on. Turning them off (`showWalletUIs: false`) lets your site's code
+sign without the collector seeing it.
+
+## Funding new wallets
+
+A new email wallet is empty. Collectors need funds for the mint price and gas:
+
+- **Crypto transfer.** Collectors send ETH to their wallet address on the collection's network. No
+  setup is needed.
+- **Card or bank purchase.** Enable funding methods in your Privy dashboard, and your site can open
+  Privy's purchase flow.
+- **Gas sponsorship (optional).** Turn on fee sponsorship in your Privy dashboard, add prepaid
+  credits, and select the collection's network. Sponsorship pays gas, not the mint price, so it suits
+  free mints. Your credits pay for it.
+
+## Before launch
+
+On the testnet and your production domain, sign in with a new email, fund the wallet, mint, and
+confirm Privy's prompt appears before signing. Open the export flow once.

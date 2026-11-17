@@ -67,7 +67,8 @@ Use the shared minter commands for ordinary ETH primary sales:
 
 Do not call a sale live until price units, allocation, payee, minter address, pause state, and a
 representative purchase are verified. `abx mint-page` scaffolds a client for the shared minter; it does
-not configure the on-chain sale for you.
+not configure the on-chain sale for you. It connects browser wallets. Ask whether collectors already
+have one; if not, offer email login from [collector-wallets.md](collector-wallets.md).
 
 Use a custom minter for auctions, allowlists, raffles, free claims, ERC-20 pricing, or other issuance
 rules. The custom contract calls the canonical token's mint authority; the token itself remains a
