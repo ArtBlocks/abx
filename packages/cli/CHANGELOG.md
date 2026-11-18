@@ -1,5 +1,23 @@
 # @artblocks/abx-cli
 
+## 0.11.2
+
+### Patch Changes
+
+- ceae73a: Name the parameter and code-custody errors a code project reverts with, such as `NotParamAuthorized()`
+  and `ScriptIsLocked()`, and the edition-only supply errors, when explaining a failed dry run. They are
+  raised inside delegatecalled libraries and are not part of the token ABIs, so they used to appear as a
+  raw selector or a generic revert.
+- 7b60648: Guide creators who want collector email login. The bundled skill now asks whether collectors already
+  have browser wallets before a mint page launch and, if not, walks the creator through setting up
+  their own Privy app, wiring it with confirmation prompts and key export, and funding new wallets. The
+  `abx mint-page` README links to the new collector email login guide.
+- 9dd736b: Describe ABX projects in the bundled skill as programmable, durable digital objects built on standard
+  ERC-721 and ERC-1155 contracts, matching the public documentation.
+- 09d8c5c: Teach the bundled skill that ABX objects can act on other protocols, not only read them: hooks and
+  custom minters can launch tokens, trade, or call other contracts as side effects of a mint, transfer,
+  burn, or setting change. Agents now offer acting designs alongside read-driven ones during ideation.
+
 ## 0.11.1
 
 ### Patch Changes
