@@ -57,6 +57,12 @@ test('mintPageArtifact: emits a complete, runnable Next.js app', () => {
   assert.match(files['package.json'], /"viem":/);
 });
 
+test('mintPageArtifact: the README points collectors without a browser wallet to email login', () => {
+  for (const isEdition of [false, true]) {
+    assert.match(fileMap({...OPTS, isEdition})['README.md'], /docs\.abx\.io\/docs\/using-abx\/guides\/collector-email-login/);
+  }
+});
+
 test('mintPageArtifact: bakes token/minter/chain/name into .env.local, not into source', () => {
   const files = fileMap();
   const env = files['.env.local'];

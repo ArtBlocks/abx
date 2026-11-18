@@ -680,6 +680,7 @@ function readme(o: MintPageOptions): string {
     '## Customize (this is a starting point)\n\n' +
     '- **Design** — it is plain React + one `app/globals.css`. Restyle freely; ask your agent for a bespoke layout per drop.\n' +
     '- **Multi-wallet** — V1 uses the injected wallet (`window.ethereum`) with zero config. For WalletConnect/Coinbase/etc., swap in [RainbowKit](https://rainbowkit.com) + wagmi (needs a WalletConnect projectId).\n' +
+    '- **Email login** — for collectors without a browser wallet, add email sign-in and an embedded wallet through a Privy app you own. See https://docs.abx.io/docs/using-abx/guides/collector-email-login.\n' +
     '- **ERC-20 sales** — the mint button handles ETH. For an ERC-20-priced sale, add an `approve(minter, price)` step before `purchase` (see `lib/abi.ts`).\n' +
     '- **Sale terms are part of the purchase** — `purchase` takes the payment token and a max price, and the page passes the terms it just read from chain. If the owner re-prices mid-click the mint reverts `SaleTermsChanged` (nothing is charged) and the page tells the buyer to review the new price. Keep that: an unbounded price is how a re-priced sale could reach a buyer\'s ERC-20 allowance.\n' +
     '- **RPC** — `NEXT_PUBLIC_RPC_URL` is a public endpoint (may rate-limit). Use your own **keyless** endpoint if you like; never put a secret-keyed URL in a `NEXT_PUBLIC_` var — it ships to the browser.\n' +

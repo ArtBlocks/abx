@@ -1,0 +1,75 @@
+---
+title: "Collector email login"
+description: "Let collectors sign in with an email and get a wallet, using your own Privy app."
+---
+
+The [mint page](/docs/using-abx/guides/sales#mint-page) connects a collector's browser wallet. If
+your collectors may not have one, you can add email login: a collector enters an email and gets an
+embedded wallet automatically.
+
+This uses a [Privy](https://privy.io) app that you create and own. ABX doesn't create the app or
+hold its credentials. Privy bills your account for monthly active users beyond its free tier.
+Collector wallets belong to your app. If you delete or abandon it, collectors who haven't exported
+their keys lose access.
+
+## Set up your Privy app
+
+To start building:
+
+1. Sign in to the [Privy dashboard](https://dashboard.privy.io) and create an app. Email login is
+   on by default.
+2. Copy the app ID. It's public. Your site doesn't need the app secret, so don't share it.
+
+Your new app is in development mode, which is fine for building and testing. While it has no
+allowed domains, Privy accepts sign-ins from any website, including `localhost`. Development mode
+also caps how many users can sign in. When you're ready to launch, finish setup:
+
+3. Add every domain your collectors will use to the app's allowed domains. Privy rejects
+   `*.vercel.app` and `*.netlify.app` wildcards, so use a custom domain or the exact preview URL.
+4. Switch the app to production.
+
+You can check where setup stands from the app's public configuration:
+
+```bash
+curl -s -H "privy-app-id: <app-id>" https://api.privy.io/v1/apps/<app-id>
+```
+
+`email_auth` should be `true`. Before launch, `allowed_domains` should list each collector domain.
+
+## Add it to your site
+
+Ask your agent to add Privy login to your mint page with your app ID. The ABX skill wires
+`@privy-io/react-auth` so that:
+
+- collectors can sign in with an email or a browser wallet;
+- an embedded wallet is created for collectors who don't have one;
+- Privy's confirmation prompts stay on for every signature;
+- collectors can export their wallet's private key.
+
+Keep the confirmation prompts on. Turning them off (`showWalletUIs: false`) lets your site's code
+sign without the collector seeing it.
+
+## Other providers
+
+ABX's guidance covers Privy. If you already use another embedded wallet provider, such as
+[Coinbase CDP](https://docs.cdp.coinbase.com/wallets/non-custodial-wallets/overview) or
+[MetaMask Embedded Wallets](https://docs.metamask.io/embedded-wallets/), your agent can wire it the
+same way. Follow that provider's own docs for setup, pricing, and gas sponsorship.
+
+## Funding new wallets
+
+A new email wallet is empty. Collectors need funds for the mint price and gas:
+
+- **Crypto transfer.** Collectors send ETH to their wallet address on the collection's network. No
+  setup is needed.
+- **Card or bank purchase.** Enable funding methods in your Privy dashboard, and your site can open
+  Privy's purchase flow.
+- **Gas sponsorship (optional).** Turn on fee sponsorship in your Privy dashboard, add prepaid
+  credits, and select the collection's network. Sponsorship pays gas, not the mint price, so it suits
+  free mints. Your credits pay for it.
+
+## Before launch
+
+Add your collector domains and switch the app to production. Then, on the testnet and your
+production domain, sign in with a new email, fund the wallet, mint, and confirm Privy's prompt
+appears before signing. Open the export flow once.
