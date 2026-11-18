@@ -2,6 +2,15 @@
 
 `abx mint-page` connects the collector's browser wallet (`window.ethereum`). Keep that default.
 
+## Contents
+
+- [Offer email login when it fits](#offer-email-login-when-it-fits)
+- [Creator setup](#creator-setup)
+- [Wire the site](#wire-the-site)
+- [Other providers](#other-providers)
+- [Funding a new wallet](#funding-a-new-wallet)
+- [Verify before launch](#verify-before-launch)
+
 ## Offer email login when it fits
 
 Before generating or launching a collector page, ask whether collectors already have wallets. If
