@@ -209,7 +209,8 @@ test('every other representation carries raw bytes and is passed through untouch
 // the node sent none when it isn't (never "we couldn't read it").
 import {revertReason} from '../src/riskgate.js';
 import {encodeErrorResult} from 'viem';
-import {abxCoreV3ErrorsAbi, seriesCodeAbi} from '@artblocks/abx-sdk';
+import {abxCoreV3ErrorsAbi, editionCodeAbi, seriesCodeAbi} from '@artblocks/abx-sdk';
+import {abxCodeLibAbi} from '@artblocks/abx-sdk/abi';
 
 test('revertReason: an ABX custom error decodes to its own name', () => {
   const data = encodeErrorResult({abi: seriesCodeAbi, errorName: 'RoyaltyTooHigh'});
@@ -225,6 +226,14 @@ test('revertReason: param errors decode for both the current and the v3 generati
   // A v3 collection reverts with the argument-less shape — a different selector.
   const v3 = encodeErrorResult({abi: abxCoreV3ErrorsAbi, errorName: 'NotParamAuthorized'});
   assert.match(revertReason({data: v3}), /^NotParamAuthorized\(\)$/);
+});
+
+test('revertReason: other errors raised inside the delegatecalled libraries decode by name', () => {
+  // Not declared in the token ABIs, so these used to surface as a raw selector.
+  const scriptLocked = encodeErrorResult({abi: abxCodeLibAbi, errorName: 'ScriptIsLocked'});
+  assert.match(revertReason({data: scriptLocked}), /^ScriptIsLocked\(\)$/);
+  const supplyReached = encodeErrorResult({abi: editionCodeAbi, errorName: 'EditionSupplyReached'});
+  assert.match(revertReason({data: supplyReached}), /^EditionSupplyReached\(\)$/);
 });
 
 test('revertReason: a node that sends NO revert data says so, rather than blaming the decode', () => {
