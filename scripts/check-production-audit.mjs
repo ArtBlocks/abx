@@ -26,6 +26,16 @@ const accepted = new Map([
         'no upstream fix; faulty ECDSA nonce generation belongs to ethers-v5 signing, while ABX supplies viem-backed or remote Ethereum signatures and uses RSA for Arweave; Turbo signer integration tests cover both paths',
     },
   ],
+  [
+    'GHSA-fc5q-39xc-vjpf',
+    {
+      module: 'picomatch',
+      severity: 'high',
+      paths: ['site>fumadocs-core>tinyglobby>picomatch'],
+      reason:
+        'withdrawn by GitHub on 2026-11-18 but still served by npm; no upstream fix; fumadocs-core loads tinyglobby only in its remark-mdx-files plugin, which the private docs site does not use; remove this entry once npm stops reporting it',
+    },
+  ],
 ]);
 
 /**
