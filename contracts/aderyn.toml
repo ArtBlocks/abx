@@ -1,0 +1,25 @@
+# Aderyn settings for the ABX contracts. Run `aderyn .` from this directory.
+#
+# Aderyn can only skip a detector for the whole package, not one finding, and these contracts keep changing.
+# So only detectors that report style or a design choice that applies to every contract here are skipped;
+# everything else still reports, including findings already reviewed. Slither skips reviewed findings one by
+# one instead, from slither.db.json.
+version = 1
+root = "."
+src = "src"
+
+[detectors]
+exclude = [
+  # Style: numeric literals, single-use internal functions, and public functions that could be external.
+  "literal-instead-of-constant",
+  "large-numeric-literal",
+  "internal-function-used-once",
+  "unused-public-function",
+  # Validation loops revert on the first bad entry on purpose.
+  "require-revert-in-loop",
+  # Every bare revert() here is an unreachable line after a raw-calldata passthrough that always returns or
+  # reverts the frame; real failures use custom errors.
+  "empty-require-revert",
+  # Every ABX token is owned and configured by its creator; the owner powers are the documented design.
+  "centralization-risk",
+]

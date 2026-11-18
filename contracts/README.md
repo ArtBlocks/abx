@@ -234,6 +234,12 @@ guarded by the salt's leading 20 bytes — all-zero is permissionless, a specifi
   `deploy-code --copies --image-renderer/--attributes-renderer --onchain-uri` lane aligned with that
   executable capability. If the test stops passing, it is a contract regression rather than a CLI
   feature request.
+- **Static analysis:** run `slither .` and `aderyn .` from `contracts/`. `slither.db.json` lists each
+  reviewed Slither finding by id with its `reason`, so Slither prints only findings nobody has recorded.
+  A finding's id includes its line numbers, so a source change brings the affected findings back: review
+  them and record them again with a reason. A few reentrancy findings have several ids because Slither
+  lists tied entries in a random order; each ordering is recorded. `aderyn.toml` skips only style
+  detectors, so Aderyn still prints its reviewed findings.
 
 **Toolchain:** forge **1.4.3**, pinned in [`.foundry-version`](.foundry-version) and in CI. Install it
 with `foundryup -i 1.4.3` (`forge --version` then reports `1.4.3-stable` — `-stable` is the build
