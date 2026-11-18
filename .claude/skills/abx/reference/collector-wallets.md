@@ -54,13 +54,23 @@ Put the app ID in `NEXT_PUBLIC_PRIVY_APP_ID`, install `@privy-io/react-auth`, an
 ```
 
 - `'wallet'` keeps browser wallets working for collectors who already have one.
-- For a generated mint page, replace `window.ethereum` with the Privy wallet's provider: take the
-  wallet from `useWallets()`, call `switchChain(CHAIN_ID)`, then pass
-  `await wallet.getEthereumProvider()` to viem's `custom()` transport.
+- For a generated mint page, replace `window.ethereum` in `connect()` with the Privy wallet's
+  provider: take the wallet from `useWallets()`, call `switchChain(CHAIN_ID)`, then pass
+  `await wallet.getEthereumProvider()` to viem's `custom()` transport. Make this change right after
+  `abx mint-page`, before the first preview, and update the generated README's wallet line, so the
+  creator never sees a browser-wallet-only page.
 - Never set `showWalletUIs: false`, in the provider config or on a call. It removes Privy's
   confirmation prompts, so site code could sign without the collector seeing it.
 - Add an export button for embedded wallets with `useExportWallet().exportWallet()`. It works only on
   the app's allowed domains, and it is how collectors keep their wallet if the site goes away.
+
+## Other providers
+
+Privy is the default recipe. If the creator already uses another embedded wallet provider, such as
+Coinbase CDP or MetaMask Embedded Wallets, apply the same approach: sign the collector in with that
+provider, get its EIP-1193 provider, and pass it to viem's `custom()` in place of `window.ethereum`.
+Take that provider's setup, pricing, and sponsorship steps from its current docs; this reference
+does not cover them. Keep confirmation prompts on and give collectors a way to export their key.
 
 ## Funding a new wallet
 
