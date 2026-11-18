@@ -14,22 +14,27 @@ their keys lose access.
 
 ## Set up your Privy app
 
+To start building:
+
 1. Sign in to the [Privy dashboard](https://dashboard.privy.io) and create an app. Email login is
    on by default.
-2. Add every domain your collectors will use to the app's allowed domains. An app with no allowed
-   domains accepts any website. Privy rejects `*.vercel.app` and `*.netlify.app` wildcards, so use a
-   custom domain or the exact preview URL.
-3. Switch the app to production before launch. New apps start in development mode, which caps how
-   many users can sign in.
-4. Copy the app ID. It's public. Your site doesn't need the app secret, so don't share it.
+2. Copy the app ID. It's public. Your site doesn't need the app secret, so don't share it.
 
-Check the result from the app's public configuration:
+Your new app is in development mode, which is fine for building and testing. While it has no
+allowed domains, Privy accepts sign-ins from any website, including `localhost`. Development mode
+also caps how many users can sign in. When you're ready to launch, finish setup:
+
+3. Add every domain your collectors will use to the app's allowed domains. Privy rejects
+   `*.vercel.app` and `*.netlify.app` wildcards, so use a custom domain or the exact preview URL.
+4. Switch the app to production.
+
+You can check where setup stands from the app's public configuration:
 
 ```bash
 curl -s -H "privy-app-id: <app-id>" https://api.privy.io/v1/apps/<app-id>
 ```
 
-`email_auth` should be `true`, and `allowed_domains` should list each collector domain.
+`email_auth` should be `true`. Before launch, `allowed_domains` should list each collector domain.
 
 ## Add it to your site
 
@@ -65,5 +70,6 @@ A new email wallet is empty. Collectors need funds for the mint price and gas:
 
 ## Before launch
 
-On the testnet and your production domain, sign in with a new email, fund the wallet, mint, and
-confirm Privy's prompt appears before signing. Open the export flow once.
+Add your collector domains and switch the app to production. Then, on the testnet and your
+production domain, sign in with a new email, fund the wallet, mint, and confirm Privy's prompt
+appears before signing. Open the export flow once.

@@ -16,25 +16,29 @@ not add it unprompted, and state the creator's footprint before they choose it:
 
 ## Creator setup
 
-These are human dashboard steps; walk the creator through them:
+These are human dashboard steps; walk the creator through them. To start building:
 
 1. Sign in at https://dashboard.privy.io and create an app.
 2. Leave email login enabled. New apps enable it by default.
-3. Add every collector-facing domain to the app's allowed domains. An app with no allowed domains
-   accepts any website. Privy rejects `*.vercel.app` and `*.netlify.app` wildcards, so add a custom
-   domain or the exact preview URL.
-4. Switch the app to production before launch. New apps start in development mode, which caps how
-   many users can sign in.
-5. Share the app ID. It is public. Never ask for the app secret; the site does not need one.
+3. Share the app ID. It is public. Never ask for the app secret; the site does not need one.
 
-Confirm the setup from the app's public configuration:
+A new app is in development mode. That is a valid state for building and testing: with no allowed
+domains, Privy accepts sign-ins from any website, including `localhost`. Development mode also caps
+how many users can sign in. Tell the creator both constraints, and that these steps finish setup
+when they are ready to launch:
+
+4. Add every collector-facing domain to the app's allowed domains. Privy rejects `*.vercel.app` and
+   `*.netlify.app` wildcards, so add a custom domain or the exact preview URL.
+5. Switch the app to production.
+
+Read the app's public configuration to see where setup stands:
 
 ```bash
 curl -s -H "privy-app-id: <app-id>" https://api.privy.io/v1/apps/<app-id>
 ```
 
-`email_auth` must be `true`, and `allowed_domains` must list every collector domain. Treat an empty
-list as unfinished setup, not as "works everywhere."
+`email_auth` must be `true`. Report `allowed_domains` to the creator: an empty list is fine while
+testing, but before collectors arrive it should list every collector domain.
 
 ## Wire the site
 
@@ -89,6 +93,8 @@ options:
 
 ## Verify before launch
 
-On the paired testnet and the production domain, sign in with a fresh email, confirm a wallet
-appears, fund it, mint, and see Privy's confirmation prompt before signing. Open the export flow
-once. Then repeat the public-configuration check for the production domain.
+First confirm the launch steps with the creator: the public configuration lists every collector
+domain, and the app is in production. If they launch in development mode anyway, make sure they
+know about the sign-in cap. Then, on the paired testnet and the production domain, sign in with a
+fresh email, confirm a wallet appears, fund it, mint, and see Privy's confirmation prompt before
+signing. Open the export flow once.
