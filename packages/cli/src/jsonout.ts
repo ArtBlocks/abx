@@ -1,3 +1,5 @@
+import {AsyncLocalStorage} from 'node:async_hooks';
+import type {Address, PreparedTx} from '@artblocks/abx-sdk';
 import type {Flags} from './flags.js';
 
 /**
@@ -24,6 +26,49 @@ export function jsonMode(flags: Flags): boolean {
   return flags.json !== undefined;
 }
 
+type UnsignedTransaction = PreparedTx & {expectedSigner: Address | null};
+
+interface UnsignedJsonOutput {
+  txs: UnsignedTransaction[];
+  payload?: Record<string, unknown>;
+}
+
+const unsignedJson = new AsyncLocalStorage<UnsignedJsonOutput>();
+
+/** Capture only calldata actually prepared by the cold lane, in submission order. */
+export function recordUnsignedTransaction(tx: PreparedTx, expectedSigner?: Address): boolean {
+  const output = unsignedJson.getStore();
+  if (!output) return false;
+  output.txs.push({...tx, expectedSigner: expectedSigner ?? null});
+  return true;
+}
+
+/** Anchor setup may need an env-key send even when the collection will be signed elsewhere. */
+export function assertUnsignedJsonCanBootstrap(): void {
+  if (unsignedJson.getStore()) {
+    throw new Error('Unsigned transaction preparation requires existing on-chain dependencies. Use --dry-run to review setup and bootstrap the missing dependency separately.');
+  }
+}
+
+export async function withUnsignedJson(command: string, flags: Flags, body: () => Promise<void>): Promise<void> {
+  const output: UnsignedJsonOutput = {txs: []};
+  await withJson(flags, async () => {
+    await unsignedJson.run(output, body);
+    if (process.exitCode) return;
+    const clone = output.txs.find((tx) => tx.fields.clone)?.fields.clone;
+    return {
+      ...output.payload,
+      schemaVersion: 1,
+      command,
+      lane: 'unsigned',
+      dryRun: false,
+      sent: false,
+      txs: output.txs,
+      ...(clone ? {predicted: {clone}} : {}),
+    };
+  });
+}
+
 /**
  * Run `body` and, under `--json`, print whatever it returns as the sole contents of stdout.
  *
@@ -45,6 +90,14 @@ export async function withJson<T extends Record<string, unknown>>(
     await body(emit);
     return;
   }
+  // Commands that already emit JSON can contribute their result to the unsigned envelope.
+  // The outer command owns stdout and only emits after the whole preparation succeeds.
+  const unsigned = unsignedJson.getStore();
+  if (unsigned) {
+    const returned = await body(emit);
+    unsigned.payload = returned ?? payload ?? unsigned.payload;
+    return;
+  }
   const realLog = console.log;
   // Route human narration to stderr. Mirrors console.log's own formatting closely enough for
   // progress text; nothing structured goes through here.
@@ -55,6 +108,7 @@ export async function withJson<T extends Record<string, unknown>>(
     // A command that emitted nothing is a bug in that command, not a silent empty object — say so on
     // stderr and leave stdout empty rather than writing `{}` that a caller would trust.
     if (out === undefined) {
+      if (process.exitCode) return;
       process.stderr.write('abx: --json produced no payload for this command (please report it)\n');
       process.exitCode = 1;
       return;

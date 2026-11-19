@@ -153,6 +153,9 @@ addresses. If the lane changes, rerun the dry run and summarize the revised plan
 Run `abx doctor --for <address>` before a wallet or cold operation. On the wallet lane, give the
 human the locally generated signing page; never request or handle their key. On the cold lane, verify
 chain, sender, target, calldata, value, and ordering before handing transactions over.
+Use `--unsigned --json` to obtain the exact transactions in `txs`. Confirm each receipt before
+submitting the next transaction. Use `--dry-run --json` to review the plan without uploading content.
+
 
 `--onchain-image` staging cannot use the cold lane because each chunk transaction depends on the
 receipt of the preceding transaction. Use hot, wallet, or sponsored signing. Do not split staging

@@ -156,6 +156,24 @@ reuse the displayed salt with `--salt`. A salt's first 20 bytes are its deployer
 zero (permissionless) or the address that will sign. The CLI refuses a known signer/guard mismatch
 before authorization or broadcast.
 
+### Unsigned transactions (`--unsigned --json`)
+
+For deployments and owner writes, stdout contains one JSON document and progress goes to stderr.
+The document has `schemaVersion: 1`, `sent: false`, and an ordered `txs` array. Each entry includes
+`to` (`null` for direct contract creation), `data`, `value` (hex quantity), `chainId`,
+`expectedSigner` (`null` when unknown), and the operation's `op`, `summary`, and `fields`.
+A known clone address is available as `predicted.clone`. An empty `txs` array means there is no
+transaction to prepare, for example when a requested setup is already complete.
+
+For more than one transaction, sign and submit in array order and verify each receipt before
+estimating or submitting the next. An optional `gasFloor` is a hexadecimal minimum used to
+detect an implausibly low estimate. Use your signer's own estimate for the gas limit.
+
+Deploy preparation can create off-chain storage locators. Use `--dry-run --json` to preview
+without uploading or broadcasting. If a deployment needs an on-chain dependency bootstrapped,
+set it up separately before requesting unsigned JSON. A command that needs an on-chain staging
+receipt to compute later calldata requires an interactive signing lane.
+
 ### Structured deploy plan (`--dry-run --json`)
 
 `deploy`, `deploy-series`, and `deploy-code` include a versioned `plan` object in JSON output. It

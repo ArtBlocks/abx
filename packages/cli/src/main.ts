@@ -127,7 +127,8 @@ import {cmdUtils} from './utilities.js';
 import {CHAIN} from './config.js';
 import {CliError} from './errors.js';
 import {allowlistFor} from './flag-allowlists.js';
-import {type Flags, parseFlags, positionalArgs, warnStrayFlags} from './flags.js';
+import {withUnsignedJson} from './jsonout.js';
+import {type Flags, isDryRun, parseFlags, positionalArgs, warnStrayFlags} from './flags.js';
 import {bold, c, dim, ensureRenderer, g, ok, warn} from './output.js';
 import {
   cmdAttach,
@@ -382,9 +383,6 @@ async function main() {
     return printCommandHelp(cmd, positionalArgs(rest)[0]);
   }
 
-  await configureAdvertisedCreatorRpc();
-  warnActiveChainRisk(cmd);
-
   // One unknown-flag notice for every listed command. Centralized here rather than added to ~45
   // command bodies: one call site can't drift out of sync with itself, and a command absent from
   // COMMAND_FLAGS keeps its previous behavior instead of gaining a half-right allowlist.
@@ -393,11 +391,30 @@ async function main() {
   // an allowlist here could be incomplete, and a false refusal on a valid flag would break someone's
   // working script — strictly worse than the silence this replaces. `deploy*` still refuses via its own
   // exhaustive sets. The warning names the flag and points at the command's help, so the fix is local.
-  if (cmd) {
-    const allowed = allowlistFor(cmd, positionalArgs(rest)[0]);
-    if (allowed) warnStrayFlags(flags, allowed, cmd);
-  }
+  const sub = positionalArgs(rest)[0];
+  const allowed = cmd ? allowlistFor(cmd, sub) : undefined;
+  const run = async () => {
+    await configureAdvertisedCreatorRpc();
+    warnActiveChainRisk(cmd);
+    if (cmd && allowed) warnStrayFlags(flags, allowed, cmd);
+    return dispatchCommand(cmd, rest, flags);
+  };
 
+  if (cmd && flags.unsigned !== undefined && flags.json !== undefined && !isDryRun(flags) &&
+      (allowed?.has('unsigned') || COMMANDS_WITH_LOCAL_UNSIGNED_FLAGS.has(cmd) ||
+        (cmd === 'minter' && (sub === 'configure' || sub === 'buy')))) {
+    return withUnsignedJson(cmd, flags, run);
+  }
+  return run();
+}
+
+// These commands validate their flags at their own entry point.
+const COMMANDS_WITH_LOCAL_UNSIGNED_FLAGS = new Set([
+  'demo', 'deploy', 'deploy-series', 'deploy-code', 'mint', 'transfer',
+  'attach', 'replace-script', 'set-gateway', 'set-max-supply',
+]);
+
+async function dispatchCommand(cmd: string | undefined, rest: string[], flags: Flags): Promise<void> {
   switch (cmd) {
     case 'demo': return cmdDeploy(flags, true);
     case 'deploy': return cmdDeploy(flags, false);
