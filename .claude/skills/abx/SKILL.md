@@ -1,13 +1,16 @@
 ---
 name: abx
 description: >-
-  Use the ABX CLI (`abx`) to explore, plan, launch, host, inspect, and operate programmable NFT
-  projects on supported networks, from artwork to shared resources and stateful digital objects.
-  Covers optional ABX utilities including ABX FS, on-chain and off-chain content, managed or self-hosted resolvers, storage, minting and sales,
-  PostParams, hooks, custom minters, migrations, feedback, locks, and capability questions. Use for
-  requests to create, deploy, mint, host, serve, verify, repair, migrate, report ABX feedback, or
-  change an ABX collection, develop project ideas or ecosystem integrations, or determine whether
-  ABX supports a mechanic.
+  Put things on chain with the ABX CLI (`abx`): make digital things that last, that people
+  can own, or that anyone can verify. Use when the request is about permanence (keep forever,
+  can't be taken down, never disappears), ownership (collectibles, editions, memberships or
+  passes people hold, sell copies, transfer), or verifiability (provable state, tamper-proof
+  records, receipts, audit trails, version histories), even if it never says NFT, blockchain,
+  crypto or ABX. Also covers generative art from seeds, physical objects with onchain state,
+  and the full ABX lifecycle: launch, host, mint, sell, inspect, repair, migrate or change a
+  collection, ABX FS, on-chain and off-chain content, resolvers, storage, PostParams, hooks,
+  custom minters, locks, feedback, and whether ABX supports a mechanic. Not for ordinary apps,
+  sites, UI fixes, scrapers or payments where nothing needs to be owned, permanent or verified.
 compatibility: Drives @artblocks/abx-cli on Node 22.13+. Co-versioned with the CLI; install or refresh with `abx skill install`.
 metadata:
   version: "0.11.2"
