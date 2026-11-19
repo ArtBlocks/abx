@@ -137,10 +137,15 @@ test('staged mainnet writes require approval and a matching signer before any se
     const attach = ['attach', token, 'readme', '--file', SVG, '--send'];
     const deploy = ['deploy', '--image', SVG, '--name', 'Lane Test', '--symbol', 'LANE', '--onchain-image', '--send'];
     const series = ['deploy-series', '--dir', DIR, '--name', 'Lane Test', '--symbol', 'LANE', '--onchain-image', '--send'];
-    for (const args of [setField, attach, deploy, [...deploy, '--copies', '2'], series, [...series, '--copies', '2']]) {
+    const salt = '0x' + '0'.repeat(63) + '1';
+    const deployCases = [deploy, [...deploy, '--copies', '2'], series, [...series, '--copies', '2']];
+    for (const args of [setField, attach, ...deployCases.map((args) => [...args, '--salt', salt])]) {
       const {out, code} = await run(args, env);
       assert.equal(code, 1, out);
       assert.match(out, /Refusing to sign on 'base' with the env key without --yes/);
+      if (args.includes('--salt')) {
+        assert.equal([...out.matchAll(/--salt has an all-zero guard prefix/g)].length, 1, out);
+      }
     }
     const mismatch = await run([...setField, '--yes'], env);
     assert.equal(mismatch.code, 1, mismatch.out);

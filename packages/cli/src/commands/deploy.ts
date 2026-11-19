@@ -840,12 +840,17 @@ function withJson(flags: Flags, body: (emit: (payload: Record<string, unknown>) 
 }
 
 /** Preflight a staged image deploy before the trust-anchor lookup can bootstrap a write. */
-async function preflightImageStaging(flags: Flags, lane: Lane, name: string, count: number): Promise<SendTx | undefined> {
+async function preflightImageStaging(
+  flags: Flags,
+  lane: Lane,
+  name: string,
+  count: number,
+  explicitSalt: Hex | undefined,
+): Promise<SendTx | undefined> {
   if (!flags['onchain-image'] || isDryRun(flags)) return;
-  const salt = parseSaltFlag(flags.salt);
   const deployer = flags.for as Address | undefined;
-  if (salt && deployer) assertSaltGuardForDeployer(salt, deployer);
-  const guard = salt ? saltGuard(salt) : zeroAddress;
+  if (explicitSalt && deployer) assertSaltGuardForDeployer(explicitSalt, deployer);
+  const guard = explicitSalt ? saltGuard(explicitSalt) : zeroAddress;
   const expectedSigner = deployer ?? (guard === zeroAddress ? undefined : guard);
   const hotStage = lane === 'send' ? envStagingSender(!!flags.yes, expectedSigner) : undefined;
   await confirmSend(
@@ -996,7 +1001,8 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     );
   }
   if (flags['onchain-image'] && !flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
-  const hotStage = await preflightImageStaging(flags, lane, name, 1);
+  const explicitSalt = parseSaltFlag(flags.salt);
+  const hotStage = await preflightImageStaging(flags, lane, name, 1, explicitSalt);
 
   if (!serveAfter) step('Trust anchor');
   let factory: Address;
@@ -1188,7 +1194,6 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // Mint-on-deploy is the default; --no-mint defers it so you can stand up + warm
   // the resolver at the (known) address first, then `abx mint`. The demo always mints.
   const noMint = !serveAfter && (flags['no-mint'] === 'true' || flags['no-mint'] === '');
-  const explicitSalt = parseSaltFlag(flags.salt);
 
   // Wallet-lane Arweave uploads paid by the connecting wallet's Turbo credits (`--storage-signer eth`
   // + `--sign`). When set (after connect), buildForDeployer routes uploads through it.
@@ -1737,7 +1742,8 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
   }
 
   if (flags['onchain-image'] && !flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
-  const hotStage = await preflightImageStaging(flags, lane, name, 1);
+  const explicitSalt = parseSaltFlag(flags.salt);
+  const hotStage = await preflightImageStaging(flags, lane, name, 1, explicitSalt);
 
   step('Trust anchor');
   let factory: Address;
@@ -1807,7 +1813,6 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     // lane === 'sign' → staged inside the wallet session further down.
   }
 
-  const explicitSalt = parseSaltFlag(flags.salt);
   const noMint = flags['no-mint'] !== undefined;
   if (noMint && flags['mint-amount'] !== undefined) {
     throw new Error('--no-mint and --mint-amount disagree — drop one. (--no-mint defers ALL minting at deploy; --mint-amount sets how many copies mint at deploy.)');
@@ -2242,7 +2247,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   const explicitSalt = parseSaltFlag(flags.salt);
   const hasPublicUrl = !!(flags['public-base-url'] || process.env.ABX_PUBLIC_BASE_URL);
 
-  const hotStage = await preflightImageStaging(flags, lane, name, count);
+  const hotStage = await preflightImageStaging(flags, lane, name, count, explicitSalt);
 
   step('Trust anchor');
   let factory: Address;
@@ -2913,7 +2918,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   const explicitSalt = parseSaltFlag(flags.salt);
   const hasPublicUrl = !!(flags['public-base-url'] || process.env.ABX_PUBLIC_BASE_URL);
 
-  const hotStage = await preflightImageStaging(flags, lane, name, count);
+  const hotStage = await preflightImageStaging(flags, lane, name, count, explicitSalt);
 
   step('Trust anchor');
   let factory: Address;
