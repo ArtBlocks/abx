@@ -87,8 +87,20 @@ test('real CLI entry points prepare 1/1 deployment and field writes as one unsig
     );
     const legacyLink = await cli([...animation, '--text', locator, '--representation', 'url']);
     assert.equal(JSON.parse(legacyLink.stdout).txs[0].data, data);
+    for (const [scheme, representation, contentId] of [
+      ['IPFS', 'ipfs', 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3uudss7qaanhakze7u2vpdvy4/index.html'],
+      ['ar', 'arweave', 'UjJvbyBmYXJlIG9mZmljZXIgZW50cnkgY29udGVudCE/assets/index.html'],
+    ]) {
+      const native = await cli([...animation, '--url', `${scheme}://${contentId}`]);
+      const nativeData = JSON.parse(native.stdout).txs[0].data;
+      assert.deepEqual(
+        decodeFunctionData({abi: oneOfOneImageAbi, data: nativeData}).args,
+        [0n, encodeTag('animation_url'), encodeTag(representation), toHex(contentId)],
+      );
+    }
     await assert.rejects(cli([...animation, '--text', locator]), /Use --url for a locator in animation_url/);
     await assert.rejects(cli([...animation, '--url', locator, '--text', '<p>example</p>']), /Pass --url on its own/);
+    await assert.rejects(cli([...animation, '--url', 'ipfs://bafyexample', '--representation', 'url']), /uses the ipfs representation/);
     const inline = await cli([...animation, '--text', locator, '--representation', 'inline']);
     assert.equal(JSON.parse(inline.stdout).txs[0].fields.representation, 'inline');
     assert.deepEqual(unexpected, []);

@@ -1082,7 +1082,8 @@ const COMMAND_HELP: Record<string, string> = {
                           (creator · display_notes · creator_links · license), OR any custom key (which becomes an
                           ${bold('artifacts')} entry). NOT ${g('artifacts')}/${g('abx_params')}/${g('abx_provenance')} (computed).
     --text "<s>"          store literal UTF-8 on-chain (default representation ${g('inline')})
-    --url "<uri>"         store an absolute HTTP(S), IPFS or Arweave locator verbatim as ${g('url')}
+    --url "<uri>"         HTTP(S) uses ${g('url')}. Native ipfs:// and ar:// use their content-addressed representations.
+                          Set gateway preferences separately with ${g('abx set-gateway')}.
     --file <path>         store a FILE on-chain in SSTORE2 chunks behind the shared reader (multi-chunk)
                           ${dim('~360-405k gas/KB per tokenURI to READ it back (climbing with size). No size is refused: under ~117KB (~50M gas) every')}
                           ${dim('endpoint measured serves it; above that abx probes your RPC and reports its real cap before you spend.')}

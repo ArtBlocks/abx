@@ -80,6 +80,7 @@ import {
   encodeTag,
   decodeTag,
   METADATA_FIELD as F,
+  contentIdFromLocator,
   METADATA_REPRESENTATION as R,
   type Address,
   type Hex,
@@ -2567,8 +2568,9 @@ export function collectionImageWarning(): string {
   );
 }
 
-function isFieldLocator(value: string): boolean {
-  return representationForLocator(value) !== null && !/\s/.test(value) && !!URL.parse(value)?.hostname;
+function fieldLocatorRepresentation(value: string): string | null {
+  const representation = representationForLocator(value);
+  return representation && !/\s/.test(value) && URL.parse(value)?.hostname ? representation : null;
 }
 
 export async function cmdSetField(address: string | undefined, flags: Flags): Promise<void> {
@@ -2576,20 +2578,27 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   const contract = requireAddress(address, usage);
   const field = requireFlag(flags, 'field', usage);
   assertSettableField(field);
-  let locator: string | undefined;
+  let locator: {text: string; representation: string} | undefined;
   if (flags.url !== undefined) {
-    locator = requireFlag(flags, 'url', usage);
+    const url = requireFlag(flags, 'url', usage);
     if (flags.text !== undefined || flags.value !== undefined || flags.file !== undefined) {
       throw new CliError('Pass --url on its own as the field value.');
     }
-    if (flags.representation !== undefined && flags.representation !== R.url) {
-      throw new CliError('--url stores the url representation. Pass --value or --text to choose a different representation.');
+    const representation = fieldLocatorRepresentation(url);
+    if (!representation) throw new CliError('--url expects an absolute http://, https://, ipfs://, or ar:// locator.');
+    if (flags.representation !== undefined && flags.representation !== representation) {
+      throw new CliError(`This --url uses the ${representation} representation. Pass --value or --text to choose a different representation.`);
     }
-    if (!isFieldLocator(locator)) throw new CliError('--url expects an absolute http://, https://, ipfs://, or ar:// locator.');
+    // Native schemes name content. Store its ID and optional path independently of the gateway.
+    const text = representation === R.ipfs || representation === R.arweave
+      ? contentIdFromLocator(representation, url.replace(/^[a-z]+:/i, (scheme) => scheme.toLowerCase()))
+      : url;
+    if (!text) throw new CliError('--url must include a content identifier.');
+    locator = {text, representation};
   }
   // The on-chain renderer wraps literal animation and image bytes as data URIs.
   if (flags.representation === undefined && flags.text &&
-      (field === F.image || field === F.animationUrl) && isFieldLocator(flags.text.trim())) {
+      (field === F.image || field === F.animationUrl) && fieldLocatorRepresentation(flags.text.trim())) {
     throw new CliError(`Use --url for a locator in ${field}. For deliberate literal content, pass --text with --representation inline.`);
   }
   await assertChainId(CHAIN); // verify network up front — this op may stage on-chain content before the field tx
@@ -2697,14 +2706,14 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   // Hot lane (or no staging): compute the value, then sign the single field-set tx as usual.
   let value: Hex;
   let representation: string;
-  const text = locator ?? (flags.text === 'true' ? undefined : flags.text);
+  const text = locator?.text ?? (flags.text === 'true' ? undefined : flags.text);
   if (hotStage) {
     const compress = parseCompress(flags.compress);
     ({value, representation} = await putContentOnChain(readFileSync(resolvePath(flags.file as string)), compress, field, hotStage));
   } else if (text) {
     if (field === F.image && locator === undefined) refusePrewrappedImage(text, '--text');
     value = toHex(text);
-    representation = locator === undefined ? flags.representation ?? R.inline : R.url;
+    representation = locator?.representation ?? flags.representation ?? R.inline;
     console.log(dim(`  on-chain '${field}' (${representation})${collection ? ' (collection)' : ` on token #${flags.token ?? '0'}`}: ${JSON.stringify(text.slice(0, 60))}${text.length > 60 ? '…' : ''}`));
   } else {
     value = requireFlag(flags, 'value', usage) as Hex;
