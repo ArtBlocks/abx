@@ -351,3 +351,10 @@ test('inspect distinguishes a method on another object from the built-in Math.ra
   const b = analyzeScript(`abx.traits({Density: window.Math.random()});`);
   assert.equal(b.feasibility.verdict, 'infeasible');
 });
+
+
+test('inspect reports uncertainty when tokenData is assigned to a previously assigned name', () => {
+  const a = analyzeScript('let td = {}; td = abx.tokenData; abx.traits({Hue: td.palette});');
+  assert.deepEqual(a.paramHints, []);
+  assert.equal(a.hasDynamicParamReads, true);
+});

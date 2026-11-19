@@ -151,10 +151,12 @@ function paramReads(code: string, noComments: string): {paramHints: string[]; ha
   const assigned = new Set<string>();
   for (const match of code.matchAll(assignments)) {
     const name = match[1];
-    // Reused names are ambiguous in a source heuristic. Keep their reads out of the named hints.
+    const readsTokenDataObject = objectRhs.test(code.slice(match.index + match[0].length));
+    // Either assignment order can hide reads. Preserve uncertainty when a reused name binds
+    // tokenData, whether the first assignment or a later assignment introduced that binding.
     if (assigned.has(name)) {
-      if (aliases.delete(name)) hasDynamicParamReads = true;
-    } else if (objectRhs.test(code.slice(match.index + match[0].length))) aliases.add(name);
+      if (aliases.delete(name) || readsTokenDataObject) hasDynamicParamReads = true;
+    } else if (readsTokenDataObject) aliases.add(name);
     assigned.add(name);
   }
   if (aliases.size) {
