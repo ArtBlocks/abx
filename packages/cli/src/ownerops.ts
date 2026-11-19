@@ -146,9 +146,9 @@ import {CliError} from './errors.js';
 import {detectTokenKind, describeKind, isEditionContract, assertHasParamsSurface, hasParamsSurface} from './kind.js';
 import {planOnChainScript} from './script-chunks.js';
 import {fetchServedTokenUri, servedOk} from './served.js';
-import {openWalletSession, type SignResult, type TxProvider, type WalletSession} from './signer.js';
+import {assertHotWriteApproved, openWalletSession, type SignResult, type TxProvider, type WalletSession} from './signer.js';
 import {openSponsoredSession} from './creator-signer.js';
-import {gatedSend, laneFromFlags, type DryRunSimulation} from './riskgate.js';
+import {confirmSend, gatedSend, laneFromFlags, type DryRunSimulation} from './riskgate.js';
 import {withJson} from './jsonout.js';
 import {info} from './output.js';
 import {loadCollectionMetadata, validateCollectionMetadata} from './collection-metadata.js';
@@ -2033,8 +2033,12 @@ async function ensureChunkStore(send: SendTx, override?: string): Promise<Addres
  * instead (see {@link openWalletSession}); the cold lane can't stage interactively, so it's
  * rejected up front by the deploy/set-field commands.
  */
-export function envStagingSender(): SendTx {
+export function envStagingSender(yes: boolean, expectedSigner?: Address): SendTx {
+  assertHotWriteApproved(CHAIN, yes);
   const {wallet, account} = makeWalletClient({chainKey: CHAIN});
+  if (expectedSigner && account.address.toLowerCase() !== expectedSigner.toLowerCase()) {
+    throw new Error(`The env key ${account.address} does not match the required signer ${expectedSigner}. No content staged.`);
+  }
   const publicClient = makePublicClient({chainKey: CHAIN});
   return makeHotSender({wallet, account, publicClient});
 }
@@ -2621,6 +2625,12 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
     );
   }
 
+  const hotStage = staging && lane === 'send' ? envStagingSender(!!flags.yes, owner) : undefined;
+  if (staging) {
+    const scope = collection ? 'the collection' : `token #${flags.token ?? '0'}`;
+    await confirmSend(`Stage ${flags.file} on-chain and set ${field} on ${scope} of ${contract}?`, flags);
+  }
+
   if (staging && lane === 'sponsor') {
     const compress = parseCompress(flags.compress);
     const bytes = readFileSync(resolvePath(flags.file as string));
@@ -2669,9 +2679,9 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   // Hot lane (or no staging): compute the value, then sign the single field-set tx as usual.
   let value: Hex;
   let representation: string;
-  if (staging) {
+  if (hotStage) {
     const compress = parseCompress(flags.compress);
-    ({value, representation} = await putContentOnChain(readFileSync(resolvePath(flags.file as string)), compress, field, envStagingSender()));
+    ({value, representation} = await putContentOnChain(readFileSync(resolvePath(flags.file as string)), compress, field, hotStage));
   } else if (flags.text && flags.text !== 'true') {
     if (field === 'image') refusePrewrappedImage(flags.text, `--text`);
     value = toHex(flags.text);
@@ -2687,8 +2697,9 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   // encoded from putContentOnChain; this only ever changes a hand-passed --value.)
   value = encodeStructuredFieldValue(representation, value);
   if (representation === R.renderer) await assertFieldRendererDeployed(value);
-  let sent = await runWrite(contract, buildTx(value, representation), flags, owner);
-  if (sent && typeTx) sent = await runWrite(contract, typeTx, flags, owner);
+  const writeFlags = staging ? {...flags, confirm: undefined} : flags;
+  let sent = await runWrite(contract, buildTx(value, representation), writeFlags, owner);
+  if (sent && typeTx) sent = await runWrite(contract, typeTx, writeFlags, owner);
   // Then prove the thing the creator actually cares about: that the served document still reads.
   // A field renderer is the project's OWN contract — it can revert for reasons no static check
   // sees — so the honest confirmation is to call tokenURI once, after the write.

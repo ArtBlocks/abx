@@ -12,6 +12,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
+import {createServer} from 'node:http';
+import {encodeAbiParameters} from 'viem';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, resolve} from 'node:path';
 import {mkdtempSync, writeFileSync} from 'node:fs';
@@ -70,8 +72,8 @@ test('the hot lane WITH a key proceeds', () => {
 });
 
 // ── the wiring: all three deploy commands must route through it ──────────────
-function run(args: string[]): Promise<{out: string; code: number}> {
-  const env: NodeJS.ProcessEnv = {...process.env, ABX_CHAIN: 'base-sepolia', ABX_NO_UPDATE_CHECK: '1', ABX_DEPLOYER_PK: ''};
+function run(args: string[], overrides: NodeJS.ProcessEnv = {}): Promise<{out: string; code: number}> {
+  const env: NodeJS.ProcessEnv = {...process.env, ABX_CHAIN: 'base-sepolia', ABX_NO_UPDATE_CHECK: '1', ABX_DEPLOYER_PK: '', ...overrides};
   return new Promise((res) => {
     execFile(process.execPath, ['--import', 'tsx', MAIN, ...args], {env, timeout: 120_000}, (err, stdout, stderr) => {
       res({out: `${stdout}${stderr}`, code: err && typeof err.code === 'number' ? err.code : 0});
@@ -106,4 +108,46 @@ test('a keyless run still gets VALIDATION refusals, which cost nothing to check'
   const {out} = await run(['deploy-code', '--script', SKETCH, '--name', 'X', '--symbol', 'XX', '--onchain-uri', '--image-base', 'https://ipfs.io/ipfs/bafy.../{id}.png']);
   assert.match(out, /content-addressed/i, out);
   assert.doesNotMatch(out, /could not be sent/, out);
+});
+
+
+test('staged mainnet writes require approval and a matching signer before any send', async () => {
+  const methods: string[] = [];
+  const token = '0x0000000000000000000000000000000000000100';
+  const rpc = createServer(async (request, response) => {
+    let body = '';
+    for await (const chunk of request) body += chunk;
+    const {method, id} = JSON.parse(body);
+    methods.push(method);
+    const result = method === 'eth_chainId' ? '0x2105'
+      : method === 'eth_getBalance' ? '0x0'
+      : method === 'eth_call' ? encodeAbiParameters([{type: 'address'}], [WALLET])
+      : undefined;
+    response.setHeader('Content-Type', 'application/json');
+    response.end(JSON.stringify({jsonrpc: '2.0', id, ...(result === undefined
+      ? {error: {code: -32601, message: `unexpected method ${method}`}}
+      : {result})}));
+  });
+  await new Promise<void>((ready) => rpc.listen(0, '127.0.0.1', ready));
+  try {
+    const address = rpc.address();
+    assert.ok(address && typeof address === 'object');
+    const env = {ABX_CHAIN: 'base', ABX_DEPLOYER_PK: KEY, ABX_RPC_URLS_BASE: `http://127.0.0.1:${address.port}`};
+    const setField = ['set-field', token, '--field', 'animation_url', '--file', SVG, '--send'];
+    const attach = ['attach', token, 'readme', '--file', SVG, '--send'];
+    const deploy = ['deploy', '--image', SVG, '--name', 'Lane Test', '--symbol', 'LANE', '--onchain-image', '--send'];
+    const series = ['deploy-series', '--dir', DIR, '--name', 'Lane Test', '--symbol', 'LANE', '--onchain-image', '--send'];
+    for (const args of [setField, attach, deploy, [...deploy, '--copies', '2'], series, [...series, '--copies', '2']]) {
+      const {out, code} = await run(args, env);
+      assert.equal(code, 1, out);
+      assert.match(out, /Refusing to sign on 'base' with the env key without --yes/);
+    }
+    const mismatch = await run([...setField, '--yes'], env);
+    assert.equal(mismatch.code, 1, mismatch.out);
+    assert.match(mismatch.out, /does not match the required signer/);
+    assert.ok(methods.includes('eth_call'));
+    assert.ok(methods.every((method) => ['eth_chainId', 'eth_getBalance', 'eth_call'].includes(method)), methods.join(', '));
+  } finally {
+    await new Promise<void>((done) => rpc.close(() => done()));
+  }
 });

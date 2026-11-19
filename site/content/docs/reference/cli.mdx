@@ -151,6 +151,12 @@ If the creator has not chosen a signer, use the live remote descriptor to prefer
 chain and transaction group are eligible. Otherwise choose the appropriate bring-your-own lane.
 Never paste a private key into a chat or prompt.
 
+For `set-field --file`, `attach --file`, and image deployments with `--onchain-image`, the CLI
+checks that the configured hot key matches the required signer, when known, before staging content.
+On mainnet, the hot key requires `--yes` before staging begins. In an interactive terminal,
+`--confirm` asks for approval before the first write in the staged operation.
+
+
 A deploy preview reports the wallet approvals it will need. A predicted address is stable only when you
 reuse the displayed salt with `--salt`. A salt's first 20 bytes are its deployer guard: they must be
 zero (permissionless) or the address that will sign. The CLI refuses a known signer/guard mismatch
