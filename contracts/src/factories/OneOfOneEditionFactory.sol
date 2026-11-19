@@ -64,12 +64,15 @@ contract OneOfOneEditionFactory {
     }
 
     function _initAndRegister(address clone, OneOfOneEdition.InitParams calldata params) internal {
-        // Register AFTER `initialize` returns. Initialization makes one external call — to the
-        // owner-supplied transfer validator — and during that callback the clone would otherwise
-        // already read as canonical to any integration that treats `isAbxClone` as "fully set up",
-        // while deploy-time mints and `Deployed` have not happened yet. No present invariant break
-        // was found (caps are written before the callback, and the validator is owner-chosen), but
-        // the ordering costs nothing and removes the window.
+        // Register AFTER `initialize` returns. Initialization calls out — to the owner-supplied transfer validator (its code probe and
+        // `setTokenTypeOfCollection`) and to the recipient's `onERC1155Received` for a deploy-time
+        // mint — and
+        // during those calls the clone would otherwise already read as canonical to any
+        // integration that treats `isAbxClone` as "fully set up", while deploy-time mints and
+        // `Deployed` have not finished. No present invariant break was found (every cap is written
+        // before the first call out), but the ordering costs nothing and removes the window. The
+        // flip side, by design: a callee that gates on `isAbxClone(msg.sender)` sees `false` while
+        // the clone initializes.
         OneOfOneEdition(clone).initialize(params);
         isAbxClone[clone] = true;
         emit Deployed(clone, implementation, params.owner);

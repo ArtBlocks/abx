@@ -8,7 +8,6 @@ import {IAbxOnChainMetadata} from "./IAbxOnChainMetadata.sol";
 import {IERC4906} from "../../interfaces/IERC4906.sol";
 import {IERC7572} from "../../interfaces/IERC7572.sol";
 import {AbxMetadataLib} from "../../libraries/AbxMetadataLib.sol";
-import {OnChainMetadataStorage} from "../../libraries/OnChainMetadataStorage.sol";
 
 /// @title OnChainMetadata — the ABX On-Chain Metadata extension (Register 2), as a mixin
 /// @notice A token opts in by inheriting this. Each `field` (image, description, …) holds ONE

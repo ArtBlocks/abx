@@ -9,7 +9,6 @@ import {ContractURI} from "../uri/contract/ContractURI.sol";
 import {RoyaltyExtension} from "../extensions/royalty/RoyaltyExtension.sol";
 import {CreatorToken} from "../extensions/creator-token/CreatorToken.sol";
 import {OnChainMetadata} from "../extensions/onchain-metadata/OnChainMetadata.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
 import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @title OneOfOneImage — a single 1/1 image NFT
@@ -74,17 +73,28 @@ contract OneOfOneImage is
         IAbxOnChainMetadata.FieldInput[] contractFields; // optional; empty = none on-chain
     }
 
+    /// @notice The 1/1 has already been minted. Its holder may since have burned it; id 0 is still
+    ///         never issued twice.
+    error AlreadyMinted();
+
     constructor() {
         // Lock the implementation: only clones (which start uninitialized) can initialize.
         _disableInitializers();
     }
 
     /// @notice One-time setup, called by the factory in the deploy transaction.
-    /// @dev Event order: AbxDeployed → AbxExtensionVersionSet(royalty) → MaxRoyaltyBpsUpdated →
-    ///      RoyaltyChangedForAll → BurnConfigured → ContractURIUpdated
-    ///      → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] → (if minting) Transfer(0x0, mintTo, 0). (Ownable's
-    ///      OwnershipTransferred precedes them, during owner init.) When `mintTo` is
-    ///      zero the token is minted later via {mint}, so no Transfer fires here.
+    /// @dev Event order: OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
+    ///      MaxRoyaltyBpsUpdated → RoyaltyChangedForAll → BurnConfigured →
+    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+    ///      ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+    ///      [Transfer(0x0, mintTo, 0)] → Initialized(1). When `mintTo` is zero the token is minted
+    ///      later via {mint}, so no Transfer fires here.
+    ///      `[…]` = emitted only when configured; `*` = once per entry. `Initialized(1)` is Solady's
+    ///      initializer event; the factory then emits its own `Deployed`. `test/InitEventOrder.t.sol`
+    ///      pins this sequence with every optional extension configured.
+    ///      The creator-token pair fires LAST of the extension inits, after ContractURIUpdated,
+    ///      because enrollment is the only external call among them and every cap must be written
+    ///      before that reentrancy window opens (see the body).
     function initialize(InitParams calldata p) external initializer {
         _initOwner(p.owner);
 
@@ -92,8 +102,8 @@ contract OneOfOneImage is
         _initTokenURI(p.tokenURIBase, p.tokenURIRenderer);
         _initCollectionMetadata(p.name, p.symbol);
 
-        // discovery beacon → extensions (royalty, burn, creator-token, on-chain metadata) →
-        // contract-URI strategy.
+        // discovery beacon → extensions (royalty, burn, on-chain metadata) → contract-URI strategy;
+        // the creator-token extension comes last, below.
         // Order: AbxDeployed → AbxExtensionVersionSet(royalty) → MaxRoyaltyBpsUpdated →
         // RoyaltyChangedForAll → BurnConfigured → AbxExtensionVersionSet(onchain-metadata) →
         // TokenFieldSet*/ContractFieldSet* → ContractURIUpdated →
@@ -117,17 +127,32 @@ contract OneOfOneImage is
 
         // mint the single token now, or defer it (mintTo == 0) to a later {mint}.
         // Transfer from 0x0 is the ERC-721 "mint" signal either way.
-        if (p.mintTo != address(0)) _mint(p.mintTo, TOKEN_ID);
+        if (p.mintTo != address(0)) _mintOnce(p.mintTo);
     }
 
-    /// @notice Mint the single token (id 0) to `to`. Owner-only and one-shot: it
-    ///         reverts once the token exists, so the 1/1 can never become a 1/2.
+    /// @notice Mint the single token (id 0) to `to`. Owner-only and one-shot for the life of
+    ///         the collection: it reverts once the token has ever been minted, so the 1/1 can
+    ///         never become a 1/2 and, on a burnable collection, a burned 1/1 stays burned.
     /// @dev Lets a creator deploy first — standing up and warming the resolver at
     ///      the contract's (deterministic) address before any marketplace sees a
     ///      mint — then issue the token, or mint straight to a buyer on a primary
     ///      sale. Emits Transfer(0x0, to, 0), the ERC-721 mint signal the indexer
     ///      folds into ownership.
     function mint(address to) external onlyOwner {
+        _mintOnce(to);
+    }
+
+    /// @dev The only mint path, at deploy or later. Existence alone is not enough to make the mint
+    ///      one-shot: Solady's `_burn` clears the owner, so `_mint` would accept id 0 again and
+    ///      resurrect a token its holder destroyed (a burn-to-redeem would not stay redeemed). A
+    ///      dedicated error, rather than Solady's `TokenAlreadyExists`, because after a burn the
+    ///      token does not exist.
+    ///      The "ever minted" bit lives in id 0's ERC-721 `extraData`, which Solady preserves
+    ///      across mint, transfer and burn, so it costs no new storage slot. This matches
+    ///      {SeriesImage}, whose cursor never reissues an id.
+    function _mintOnce(address to) private {
+        if (_getExtraData(TOKEN_ID) != 0) revert AlreadyMinted();
+        _setExtraData(TOKEN_ID, 1);
         _mint(to, TOKEN_ID);
     }
 

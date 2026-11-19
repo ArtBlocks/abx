@@ -19,7 +19,9 @@ ABX supports two forms:
 | Template | Onchain script chunks and dependencies | Assembled by `AbxGenerator` |
 
 A directory project stores a locator in its `code` collection field. A template project stores script
-chunks through the code extensions. Dependency index 0 is the runtime by convention.
+chunks through the code extensions. Dependency index 0 is the runtime by convention. Each chunk holds
+at most 24,575 bytes, the most one SSTORE2 data contract can store; from core v4 a larger chunk is
+refused with `ScriptChunkTooLarge`. The CLI splits scripts well below that.
 
 ## Token data
 
@@ -66,7 +68,10 @@ can inspect or influence transaction execution. Use a commitment scheme or VRF-b
 outcome has material prize value.
 
 On OP Stack networks such as Base, `block.prevrandao` comes from the L1 origin and may remain the same
-across several L2 blocks. Do not treat it as fresh entropy for each L2 block.
+across several L2 blocks. On Arbitrum networks it is always `1`, and the block hash the source reads
+changes only with each L1 block, so the sequencer-set timestamp is the only value that varies between
+nearby blocks. Seeds remain unique per project and token ID on every network; do not treat block values
+as fresh entropy.
 
 On an ERC-721 Series, minting is sequential. The buyer accepts or rejects the next outcome. On an
 edition, the buyer names the ID. A code edition assigns its seed on that ID's first mint, so an unminted

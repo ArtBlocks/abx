@@ -14,6 +14,8 @@ interface IAbxMaxInvocations {
     /// @notice The supply cap changed. Only ever decreasing (monotonic).
     event MaxInvocationsUpdated(uint256 maxInvocations);
 
-    /// @notice The current supply cap (max tokens that can ever exist).
+    /// @notice The current supply cap. On an ERC-721 series, the most token ids that can ever be
+    ///         issued. On an ERC-1155 edition, the most distinct ids (works) that can ever be
+    ///         minted; copies per id are capped separately (`IAbxEditionSupply.maxSupply`).
     function maxInvocations() external view returns (uint256);
 }

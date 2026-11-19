@@ -15,6 +15,7 @@ contract TransferCountAugmentHook is IAbxAugmentHook {
     TransferCounterHook public immutable counter;
 
     constructor(TransferCounterHook counter_) {
+        if (address(counter_) == address(0)) revert WrongToken();
         counter = counter_;
     }
 

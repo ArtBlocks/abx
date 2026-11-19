@@ -63,7 +63,7 @@ abstract contract CreatorToken is AbxBeaconCore, Ownable, ICreatorToken {
 
     /// @notice Owner re-points the validator, or suspends enforcement with zero (stays enrolled).
     ///         Reverts unless the token enrolled at deploy — enrollment can never be added later.
-    /// @notice **Once the collection is ownerless, anyone may suspend enforcement** (pass
+    ///         **Once the collection is ownerless, anyone may suspend enforcement** (pass
     ///         `address(0)`), and that is the only thing they may do. See {_requireValidatorAuth}.
     function setTransferValidator(address validator) external {
         TransferValidatorStorage.Layout storage l = TransferValidatorStorage.layout();
@@ -171,7 +171,6 @@ abstract contract CreatorToken is AbxBeaconCore, Ownable, ICreatorToken {
         }
         if (bad) revert InvalidTransferValidator();
     }
-
 
     /// @dev Store + announce — the only writer of `validator`.
     function _setValidator(TransferValidatorStorage.Layout storage l, address validator) private {

@@ -5,8 +5,9 @@ pragma solidity 0.8.28;
 /// @notice The ecosystem-standard 1155 validation entrypoint (per Limit Break's
 ///         creator-token-standards): unlike the 721C surface, this is NOT a view — the validator
 ///         may record state per transfer. A policy violation reverts; the revert bubbles and
-///         blocks the transfer. Called once per `(id, amount)` pair — the ecosystem standard has
-///         no batch validator entrypoint, so a batch transfer loops, one call per id.
+///         blocks the transfer. Called once per `(id, amount)` pair with a non-zero amount — the
+///         ecosystem standard has no batch validator entrypoint, so a batch transfer loops, one
+///         call per id. (Stock ERC1155C also sends zero-amount pairs; ABX does not.)
 interface ITransferValidator1155 {
     /// @notice Validate a transfer of `amount` of `id` from `from` to `to`, initiated by `caller`.
     function validateTransfer(address caller, address from, address to, uint256 id, uint256 amount)

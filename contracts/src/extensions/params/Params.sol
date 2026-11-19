@@ -16,11 +16,12 @@ import {AbxParamsLib} from "../../libraries/AbxParamsLib.sol";
 ///         strings) is **one SSTORE2 blob — never multi-chunk** (one bound, one read; content
 ///         above the ~24 KB ceiling is a pointer param), with its keccak256 as the evented
 ///         value (`valueIsHash = true`), read back via the data views.
-/// @dev Owner-settable by default; composing layers narrow that — {ConfigurableParams} routes
-///      schema-governed keys through its typed, auth-checked path via the `_checkParamWrite`
-///      guard, and a token can add key-specific rules (e.g. the settled-`seed` promise) the same
-///      way. Internal `_setTokenParam` skips the guard: it is the token's own privileged path
-///      (mint-time seed, hooks) and carries its own `updatedBy`. Every write pings ERC-4906.
+/// @dev Owner-settable by default, narrowed in {AbxParamsLib}, the choke point every write passes
+///      through: a schema-governed key ({ConfigurableParams}) refuses the raw owner setters and
+///      moves only through the typed, auth-checked `configureTokenParam*` path, and the settled
+///      `seed` refuses every rewrite. Internal `_setTokenParam` skips the owner/schema gate: it is
+///      the token's own privileged path (the mint-time seed) and carries its own `updatedBy`.
+///      Every write pings ERC-4906.
 ///      The write paths and the key-enumeration reads live in {AbxParamsLib} — a shared external
 ///      library, delegatecalled, so storage stays in this token's ERC-7201 namespace and events
 ///      log from the token (the spine is identical to an inlined implementation; EIP-170 is why
@@ -32,14 +33,16 @@ abstract contract Params is AbxBeaconCore, Ownable, IAbxParams {
         0x710d217d7719955f00168e31b6b8c3c9fb8255d7caaea0010e20d28ca7fdb8a9;
 
     /// @dev Current implemented version (bumps when `IAbxParams` or semantics change).
-    ///      v2 added the key-enumeration reads.
-    uint16 private constant VERSION = 2;
+    ///      v2 added the key-enumeration reads. v3: the errors carry the key (and are declared on
+    ///      {IAbxParams}), the tokenData coordinate names are refused as keys, and a blob write is
+    ///      bounded to one SSTORE2 contract before it is written.
+    uint16 private constant VERSION = 3;
 
     // ── owner writes (guarded) ──────────────────────────────────────────────--
 
     // The owner WRITE shells are raw-calldata passthroughs to {AbxParamsLib}, exactly
-    // like the read shells below. The gate that lived here — `onlyOwner` + the `_checkParamWrite`
-    // schema-governance check — moved into the library front doors of the same selector
+    // like the read shells below. The gate that lived here — `onlyOwner` + the schema-governance
+    // check — moved into the library front doors of the same selector
     // ({AbxParamsLib-_requireOwner} / {AbxParamsLib-_requireUngoverned}); a typed shell that
     // re-encodes these args (a `bytes` blob among them) costs more than the extracted body saved,
     // and the code tokens had no room to spare. `msg.sender` (the caller) and `owner()` (from
@@ -210,8 +213,9 @@ abstract contract Params is AbxBeaconCore, Ownable, IAbxParams {
         return ParamsStorage.layout().tokenParams[tokenId][key].isSet;
     }
 
-    /// @dev The token's own privileged write (mint-time seed, hooks) — skips the guard and
-    ///      carries its own `updatedBy` for provenance.
+    /// @dev The token's own privileged write — today only {SeriesCode}'s mint-time seed (the edition
+    ///      lane writes its seed from {AbxEditionLib}). Skips the owner/schema gate and carries its
+    ///      own `updatedBy` (the seed source) for provenance.
     function _setTokenParam(
         uint256 tokenId,
         bytes32 key,

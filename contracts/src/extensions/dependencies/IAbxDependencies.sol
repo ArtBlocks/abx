@@ -10,6 +10,16 @@ pragma solidity 0.8.28;
 ///         makes resolution verifiable). Loaded assets (images, data on IPFS/Arweave) are
 ///         **params**, not dependencies.
 interface IAbxDependencies {
+    // Errors raised by the write paths and the bounds-checked read, which run in {AbxCodeLib} by
+    // delegatecall. Declared here so they decode against every composing token's ABI.
+
+    /// @notice The dependency list is locked; no entry can be written, removed or re-locked.
+    error DependenciesAreLocked();
+    /// @notice A dependency index is past the end (or there is no entry to remove).
+    error DependencyIndexOutOfRange();
+    /// @notice A dependency reference was empty.
+    error EmptyDependencyRef();
+
     /// @notice How a dependency reference resolves.
     enum Resolution {
         Registry, // `ref` = a registry `name@version` (readable-ASCII bytes32)

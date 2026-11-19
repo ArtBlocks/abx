@@ -15,7 +15,6 @@ import {PrimaryPayee} from "../extensions/primary-payee/PrimaryPayee.sol";
 import {Paused} from "../extensions/paused/Paused.sol";
 import {IAbxSequentialMint} from "../interfaces/IAbxSequentialMint.sol";
 import {SeriesMintStorage} from "../libraries/SeriesMintStorage.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
 import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @title SeriesImage — a multi-token image/media Series NFT
@@ -57,6 +56,8 @@ contract SeriesImage is
     /// @param contractURIRenderer On-chain renderer for the collection URI; `address(0)` = off-chain.
     /// @param royaltyReceiver Default royalty payee.
     /// @param royaltyBps Default royalty in basis points (<= the royalty cap).
+    /// @param maxRoyaltyBps Royalty ceiling in basis points (0–10000), reduce-only after deploy.
+    /// @param burnable Opt-in burn, fixed at deploy; `false` means tokens can never be destroyed.
     /// @param transferValidator Zero = a plain ERC-721 forever (the default). Non-zero =
     ///        permanently enrolled as an ERC-721C creator token with this validator (the owner
     ///        may re-point or suspend it later, never un-enroll).
@@ -106,22 +107,26 @@ contract SeriesImage is
     }
 
     /// @notice One-time setup, called by the factory in the deploy transaction.
-    /// @dev Event order: OwnershipTransferred (owner init) → AbxDeployed →
-    ///      AbxExtensionVersionSet(royalty) → RoyaltyChangedForAll →
+    /// @dev Event order: OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
+    ///      MaxRoyaltyBpsUpdated → RoyaltyChangedForAll → BurnConfigured →
     ///      AbxExtensionVersionSet(max-invocations) → MaxInvocationsUpdated →
     ///      AbxExtensionVersionSet(external-minter) → [MinterSet] →
     ///      AbxExtensionVersionSet(primary-payee) → [PrimaryPayeeChanged] →
     ///      AbxExtensionVersionSet(paused) → [PausedStatusChanged(true)] →
-    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet*/ContractFieldSet* →
-    ///      ContractURIUpdated → (per deploy-time mint) Transfer.
+    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+    ///      ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+    ///      Transfer* (one per deploy-time mint) → Initialized(1).
+    ///      `[…]` = emitted only when configured; `*` = once per entry. `Initialized(1)` is Solady's
+    ///      initializer event; the factory then emits its own `Deployed`. `test/InitEventOrder.t.sol`
+    ///      pins this sequence with every optional extension configured.
     /// @dev The deploy-time mint runs the internal `_mintNext` directly, **bypassing the paused
     ///      gate** (which lives on the public entrypoints) — so an owner's reserves mint at birth
-    ///      even when deploying `paused`, exactly as intended.
+    ///      even when deploying `paused`, exactly as intended. `mintTo == address(0)` defers all
+    ///      minting whatever `mintCount` says.
     ///
-    ///      The creator-token pair — [AbxExtensionVersionSet(creator-token) →
-    ///      TransferValidatorUpdated] — fires LAST of the extension inits, after
-    ///      ContractURIUpdated, because enrollment is the only external call here and every
-    ///      cap must be written before that reentrancy window opens (see the body).
+    ///      The creator-token pair fires LAST of the extension inits, after ContractURIUpdated,
+    ///      because enrollment is the only external call among them and every cap must be written
+    ///      before that reentrancy window opens (see the body).
     function initialize(InitParams calldata p) external initializer {
         if (p.maxInvocations == 0) revert InvalidMaxInvocations();
         if (p.mintCount > p.maxInvocations) revert MintCountExceedsMax();
@@ -178,8 +183,9 @@ contract SeriesImage is
         return _mintNext(to);
     }
 
-    /// @notice Mint `count` tokens in order to `to` — N individual `Transfer`s. Owner reserves /
-    ///         batch issuance; not part of {IAbxSequentialMint} (a minter mints one per call).
+    /// @notice Mint `count` tokens in order to `to` — N individual `Transfer`s. Batch issuance
+    ///         (typically owner reserves); not part of {IAbxSequentialMint}. Same authorization as
+    ///         {mint}: the owner always, the authorized minter while unpaused.
     /// @dev ERC-2309 batch signalling is intentionally not used.
     function mintMany(address to, uint256 count) external {
         _requireMintAuth();
@@ -188,21 +194,30 @@ contract SeriesImage is
         }
     }
 
-    /// @dev The single choke point for all mint paths: cap check → mint → advance the cursor.
+    /// @dev The single choke point for all mint paths: cap check → **reserve the id** → mint.
     ///      Returns the id minted (the pre-mint cursor value).
+    ///
+    ///      The cursor is committed before `_mint`, matching {SeriesCode-_mintNext}. No external
+    ///      call sits between the read and the write today (no receiver hook, no seed draw, and the
+    ///      transfer validator never sees a mint), so this ordering is not what keeps the current
+    ///      path correct. It keeps `nextTokenId <= maxInvocations` and the {_maxInvocationsFloor}
+    ///      promise independent of that fact, so a later change that adds a callback to this path
+    ///      cannot reopen a check-then-effect window.
     function _mintNext(address to) internal returns (uint256 tokenId) {
-        tokenId = SeriesMintStorage.layout().nextTokenId;
+        SeriesMintStorage.Layout storage m = SeriesMintStorage.layout();
+        tokenId = m.nextTokenId;
         _requireWithinMax(tokenId); // sold-out guard (tokenId < maxInvocations)
+        unchecked {
+            m.nextTokenId = tokenId + 1; // reserve before minting
+        }
         // `_mint`, deliberately, NOT `_safeMint`. The tradeoff, stated so it reads as a decision
         // rather than an omission: skipping `onERC721Received` saves the receiver call on every
-        // purchase and removes a reentrancy surface from the mint path, at the cost that
-        // `purchaseTo` can deliver into a contract that cannot move it out. A 721 has no burn and
-        // no clawback here, so that is unrecoverable. The buyer names the recipient, and the sale
-        // path is the one place we most want free of callbacks.
-        _mint(to, tokenId); // Transfer(0x0, to, tokenId) — no receiver hook (matches OneOfOne)
-        unchecked {
-            SeriesMintStorage.layout().nextTokenId = tokenId + 1;
-        }
+        // purchase and keeps the mint path free of any callback, at the cost that `purchaseTo` can
+        // deliver into a contract that cannot move it out. There is no clawback, and burning (where
+        // the collection opted into it) needs the holder's own call, so that is unrecoverable. The
+        // buyer names the recipient, and the sale path is the one place we most want free of
+        // callbacks.
+        _mint(to, tokenId); // Transfer(0x0, to, tokenId) — no receiver hook (as in OneOfOneImage)
     }
 
     /// @dev Mint authorization, composing {Ownable} + {Paused} + {ExternalMinter}:
@@ -218,12 +233,11 @@ contract SeriesImage is
     // ── composition wiring ──────────────────────────────────────────────────--
 
     /// @dev The cap can't be lowered below the number of ids already ISSUED. Floors on the issuance
-    ///      cursor, not on `totalSupply()`, and the difference is load-bearing: the cursor is
-    ///      committed before the mint-time seed call, so it is correct even mid-frame, whereas
-    ///      `totalSupply()` is written inside `_mint` and reads stale while a reentrant mint is in
-    ///      flight — which let a nested mint drive supply past a cap that had already been lowered
-    ///      (observed `totalSupply() == 3` against `maxInvocations() == 1`). The cursor is also the
-    ///      honest quantity for this promise: it never decreases, so no issued id is ever stranded.
+    ///      cursor, not on `totalSupply()`: the cursor never decreases, so no issued id is ever
+    ///      stranded, whereas `totalSupply()` falls on burn and would let the cap drop below an id
+    ///      that already exists. The cursor is committed before `_mint` (see {_mintNext}), so the
+    ///      floor stays correct even if a later change adds a callback to the mint path — the
+    ///      failure {SeriesCode} observed when its seed call could re-enter.
     function _maxInvocationsFloor() internal view override(MaxInvocations) returns (uint256) {
         return SeriesMintStorage.layout().nextTokenId;
     }

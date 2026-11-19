@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {IAbxParams} from "../src/extensions/params/IAbxParams.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {EditionCode} from "../src/tokens/EditionCode.sol";
@@ -141,7 +142,7 @@ contract EditionCodeTest is Test {
         vm.prank(owner);
         nft.mint(collectorA, 0, 1);
         vm.prank(owner);
-        vm.expectRevert(EditionCode.SeedSettled.selector);
+        vm.expectRevert(IAbxParams.SeedSettled.selector);
         nft.setTokenParam(0, SEED_KEY, bytes32("override"));
     }
 
@@ -217,7 +218,16 @@ contract EditionCodeTest is Test {
         );
 
         vm.prank(stranger); // holds 0 copies of id 0
-        vm.expectRevert(); // NotParamAuthorized (thrown from the delegatecalled AbxParamsLib)
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.NotParamAuthorized.selector,
+                PALETTE_KEY,
+                0,
+                stranger,
+                IAbxConfigurableParams.AuthOption.TokenOwner,
+                address(0)
+            )
+        );
         nft.configureTokenParam(0, PALETTE_KEY, bytes32(uint256(0xff0000)));
     }
 

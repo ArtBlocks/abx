@@ -106,6 +106,17 @@ contract RevertingTransferHook {
 }
 
 /// @dev Minimal delegate.xyz v2 stand-in: explicit (delegate, vault, tokenId) grants.
+/// A registry that authorizes anyone — the shape an owner-controlled registry could take.
+contract YesDelegateRegistry {
+    function checkDelegateForERC721(address, address, address, uint256, bytes32)
+        external
+        pure
+        returns (bool)
+    {
+        return true;
+    }
+}
+
 contract MockDelegateRegistry {
     mapping(bytes32 => bool) internal grants;
 
@@ -227,10 +238,10 @@ contract SeriesCodeTest is Test {
     }
 
     function test_ExtensionsAnnounced() public view {
-        assertEq(nft.extensionVersion(PARAMS_ID), 2); // v2: key enumeration
+        assertEq(nft.extensionVersion(PARAMS_ID), 3); // v3: keyed errors, blob bound
         // v3: the configure hook's calling convention gained dataLength + dataBlobAddress, so the
         // beacon version is how an integrator tells which form a deployed token will call.
-        assertEq(nft.extensionVersion(CONFIGURABLE_PARAMS_ID), 3);
+        assertEq(nft.extensionVersion(CONFIGURABLE_PARAMS_ID), 4);
         assertEq(nft.extensionVersion(ONCHAIN_SCRIPT_ID), 1);
         assertEq(nft.extensionVersion(DEPENDENCIES_ID), 1);
         assertEq(nft.extensionVersion(SEED_SOURCE_ID), 1);
@@ -302,11 +313,11 @@ contract SeriesCodeTest is Test {
         uint256 id = nft.mint(collector);
 
         vm.prank(owner);
-        vm.expectRevert(SeriesCode.SeedSettled.selector);
+        vm.expectRevert(IAbxParams.SeedSettled.selector);
         nft.setTokenParam(id, SEED, bytes32(uint256(1)));
 
         vm.prank(owner);
-        vm.expectRevert(SeriesCode.SeedSettled.selector);
+        vm.expectRevert(IAbxParams.SeedSettled.selector);
         nft.clearTokenParam(id, SEED);
     }
 
@@ -333,7 +344,9 @@ contract SeriesCodeTest is Test {
 
         // raw owner path stays closed (now by the schema-governed rule)
         vm.prank(owner);
-        vm.expectRevert(ConfigurableParams.SchemaGoverned.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.SchemaGoverned.selector, SEED)
+        );
         nft.setTokenParam(id, SEED, bytes32(uint256(1)));
 
         // the governed path reassigns it to a value the caller chose, provenance = the token owner
@@ -487,7 +500,16 @@ contract SeriesCodeTest is Test {
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
         vm.prank(stranger);
-        vm.expectRevert(AbxParamsLib.NotParamAuthorized.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.NotParamAuthorized.selector,
+                PALETTE,
+                id,
+                stranger,
+                IAbxConfigurableParams.AuthOption.TokenOwner,
+                address(0)
+            )
+        );
         nft.configureTokenParam(id, PALETTE, bytes32(uint256(1)));
     }
 
@@ -497,7 +519,16 @@ contract SeriesCodeTest is Test {
         _colorSchema(IAbxConfigurableParams.AuthOption.Creator, address(0), 0);
 
         vm.prank(collector); // token owner is NOT the creator here
-        vm.expectRevert(AbxParamsLib.NotParamAuthorized.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.NotParamAuthorized.selector,
+                PALETTE,
+                id,
+                collector,
+                IAbxConfigurableParams.AuthOption.Creator,
+                address(0)
+            )
+        );
         nft.configureTokenParam(id, PALETTE, bytes32(uint256(1)));
 
         vm.prank(owner);
@@ -521,7 +552,9 @@ contract SeriesCodeTest is Test {
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
         vm.prank(collector);
-        vm.expectRevert(AbxParamsLib.InvalidParamValue.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.InvalidParamValue.selector, PALETTE, id)
+        );
         nft.configureTokenParam(id, PALETTE, bytes32(uint256(0x1000000))); // > 0xFFFFFF
     }
 
@@ -547,7 +580,11 @@ contract SeriesCodeTest is Test {
         nft.configureTokenParam(id, "mood", bytes32(uint256(1)));
 
         vm.prank(collector);
-        vm.expectRevert(AbxParamsLib.InvalidParamValue.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.InvalidParamValue.selector, bytes32("mood"), id
+            )
+        );
         nft.configureTokenParam(id, "mood", bytes32(uint256(2)));
     }
 
@@ -562,14 +599,18 @@ contract SeriesCodeTest is Test {
 
         vm.warp(lockAt + 1);
         vm.prank(collector);
-        vm.expectRevert(AbxParamsLib.ParamLockExpired.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.ParamLockExpired.selector, PALETTE, lockAt)
+        );
         nft.configureTokenParam(id, PALETTE, bytes32(uint256(2)));
     }
 
     function test_SchemaClosesRawOwnerSetters() public {
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
         vm.prank(owner);
-        vm.expectRevert(ConfigurableParams.SchemaGoverned.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.SchemaGoverned.selector, PALETTE)
+        );
         nft.setTokenParam(0, PALETTE, bytes32(uint256(1)));
     }
 
@@ -589,7 +630,13 @@ contract SeriesCodeTest is Test {
         );
 
         vm.prank(collector);
-        vm.expectRevert(AbxParamsLib.WrongValuePath.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.WrongValuePath.selector,
+                bytes32("title"),
+                IAbxConfigurableParams.ParamType.String
+            )
+        );
         nft.configureTokenParam(id, "title", bytes32(uint256(1)));
 
         vm.prank(collector);
@@ -604,7 +651,9 @@ contract SeriesCodeTest is Test {
         vm.prank(owner);
         uint256 id = nft.mint(collector);
         vm.prank(collector);
-        vm.expectRevert(AbxParamsLib.NoParamSchema.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.NoParamSchema.selector, bytes32("unknown"))
+        );
         nft.configureTokenParam(id, "unknown", bytes32(uint256(1)));
     }
 
@@ -619,9 +668,9 @@ contract SeriesCodeTest is Test {
         uint256 id = nft.mint(collector);
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
-        MockDelegateRegistry registry = new MockDelegateRegistry();
-        vm.prank(owner);
-        nft.setDelegateRegistry(address(registry));
+        // The token already points at the canonical registry (the default); put a recording
+        // registry's code there, since only the canonical address (or none) can be configured.
+        MockDelegateRegistry registry = _canonicalRegistry();
         registry.allow(stranger, collector, id); // collector's vault delegates to `stranger`
 
         vm.prank(stranger);
@@ -635,12 +684,19 @@ contract SeriesCodeTest is Test {
         uint256 id = nft.mint(collector);
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
-        MockDelegateRegistry registry = new MockDelegateRegistry();
-        vm.prank(owner);
-        nft.setDelegateRegistry(address(registry)); // no grant for `stranger`
+        _canonicalRegistry(); // no grant for `stranger`
 
         vm.prank(stranger);
-        vm.expectRevert(AbxParamsLib.NotParamAuthorized.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.NotParamAuthorized.selector,
+                PALETTE,
+                id,
+                stranger,
+                IAbxConfigurableParams.AuthOption.TokenOwner,
+                address(0)
+            )
+        );
         nft.configureTokenParam(id, PALETTE, bytes32(uint256(1)));
     }
 
@@ -652,7 +708,16 @@ contract SeriesCodeTest is Test {
         _colorSchema(IAbxConfigurableParams.AuthOption.TokenOwner, address(0), 0);
 
         vm.prank(stranger);
-        vm.expectRevert(AbxParamsLib.NotParamAuthorized.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.NotParamAuthorized.selector,
+                PALETTE,
+                id,
+                stranger,
+                IAbxConfigurableParams.AuthOption.TokenOwner,
+                address(0)
+            )
+        );
         nft.configureTokenParam(id, PALETTE, bytes32(uint256(1)));
 
         vm.prank(collector);
@@ -664,6 +729,62 @@ contract SeriesCodeTest is Test {
         p.disableTokenOwnerDelegation = true;
         SeriesCode noDelegation = SeriesCode(factory.deploy(p));
         assertEq(noDelegation.delegateRegistry(), address(0));
+    }
+
+    /// The canonical-address mock: `vm.etch` its code at the delegate.xyz v2 address.
+    function _canonicalRegistry() internal returns (MockDelegateRegistry r) {
+        r = MockDelegateRegistry(0x00000000000000447e69651d841bD8D104Bed493);
+        vm.etch(address(r), address(new MockDelegateRegistry()).code);
+    }
+
+    /// The registry is an authority source, so the owner may only switch between the canonical
+    /// registry and none — never point it at a contract they control.
+    function test_OwnerCannotPointRegistryElsewhere() public {
+        address custom = address(new MockDelegateRegistry());
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.InvalidDelegateRegistry.selector, custom)
+        );
+        nft.setDelegateRegistry(custom);
+
+        vm.startPrank(owner);
+        nft.setDelegateRegistry(address(0));
+        nft.setDelegateRegistry(0x00000000000000447e69651d841bD8D104Bed493);
+        vm.stopPrank();
+        assertEq(nft.delegateRegistry(), 0x00000000000000447e69651d841bD8D104Bed493);
+    }
+
+    /// Regression: a TokenOwner-only seed schema keeps the creator out. Before, the owner could
+    /// point the registry at one that answers `true` for anyone and rewrite a collector's settled
+    /// seed as their "delegate".
+    function test_OwnerCannotRewriteSettledSeedThroughRegistry() public {
+        vm.prank(owner);
+        nft.setParamSchema(
+            SEED,
+            IAbxConfigurableParams.ParamType.Uint256Range,
+            IAbxConfigurableParams.AuthOption.TokenOwner,
+            address(0),
+            0,
+            bytes32(0),
+            bytes32(0),
+            new string[](0)
+        );
+        vm.prank(owner);
+        uint256 id = nft.mint(collector);
+        (bytes32 settled,,) = nft.tokenParam(id, SEED);
+
+        address yes = address(new YesDelegateRegistry());
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAbxConfigurableParams.InvalidDelegateRegistry.selector, yes)
+        );
+        nft.setDelegateRegistry(yes);
+
+        vm.prank(owner);
+        vm.expectRevert();
+        nft.configureTokenParam(id, SEED, bytes32(uint256(42)));
+        (bytes32 still,,) = nft.tokenParam(id, SEED);
+        assertEq(still, settled);
     }
 
     function test_OwnerRepointsOrDisablesRegistry() public {
@@ -841,9 +962,9 @@ contract SeriesCodeTest is Test {
         nft.setParamHooks(address(0), address(0), address(hook));
         nft.lockParamHooks();
 
-        vm.expectRevert(AbxParamsLib.ParamHooksLocked.selector);
+        vm.expectRevert(IAbxConfigurableParams.ParamHooksLocked.selector);
         nft.setParamHooks(address(0), address(0), address(0)); // cannot clear
-        vm.expectRevert(AbxParamsLib.ParamHooksLocked.selector);
+        vm.expectRevert(IAbxConfigurableParams.ParamHooksLocked.selector);
         nft.setParamHooks(address(0), address(0), address(hook)); // cannot re-set the same thing
         vm.stopPrank();
 
@@ -875,7 +996,7 @@ contract SeriesCodeTest is Test {
         nft.removeLastScriptChunk();
         assertEq(nft.scriptChunkCount(), 1);
 
-        vm.expectRevert(AbxCodeLib.ScriptIndexOutOfRange.selector);
+        vm.expectRevert(IAbxOnChainScript.ScriptIndexOutOfRange.selector);
         nft.setScriptChunk(5, bytes("x")); // sparse writes are not a thing
         vm.stopPrank();
     }
@@ -887,9 +1008,9 @@ contract SeriesCodeTest is Test {
         emit ScriptLocked();
         nft.lockScript();
 
-        vm.expectRevert(AbxCodeLib.ScriptIsLocked.selector);
+        vm.expectRevert(IAbxOnChainScript.ScriptIsLocked.selector);
         nft.setScriptChunk(0, bytes("let x = 2;"));
-        vm.expectRevert(AbxCodeLib.ScriptIsLocked.selector);
+        vm.expectRevert(IAbxOnChainScript.ScriptIsLocked.selector);
         nft.removeLastScriptChunk();
         vm.stopPrank();
     }
@@ -924,7 +1045,7 @@ contract SeriesCodeTest is Test {
 
         nft.lockDependencies();
         assertTrue(nft.dependenciesLocked());
-        vm.expectRevert(AbxCodeLib.DependenciesAreLocked.selector);
+        vm.expectRevert(IAbxDependencies.DependenciesAreLocked.selector);
         nft.setDependency(1, IAbxDependencies.Resolution.Registry, bytes32("threejs@0.150.0"));
         vm.stopPrank();
     }

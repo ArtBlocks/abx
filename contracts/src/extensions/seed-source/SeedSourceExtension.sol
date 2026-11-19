@@ -12,11 +12,19 @@ import {AbxParamsLib} from "../../libraries/AbxParamsLib.sol";
 /// @title SeedSourceExtension — the ABX Seed Source extension (Register 2), as a mixin
 /// @notice A token opts into configurable mint-time randomness by inheriting this. The mixin
 ///         owns the address + event + read; the *composing token* wires `_drawSeed` into its
-///         mint path and persists the result as the `seed` param (with the settled-once rule —
-///         see the token's `_checkParamWrite`). Set at `initialize`, owner-settable after;
+///         mint path and persists the result as the `seed` param (with the settled-once rule,
+///         enforced in {AbxParamsLib-setTokenParam}). Set at `initialize`, owner-settable after;
 ///         changing the source affects future mints only.
 /// @dev Read surface → non-zero ERC-165 id. Storage is ERC-7201 (`SeedSourceStorage`).
 ///      Self-registers its version in `_initSeedSource`.
+/// @dev **The canonical {AbxSeedSource} across chains.** It hashes the project, `tokenId`,
+///      `block.prevrandao`, `blockhash(block.number - 1)` and `block.timestamp`, so seeds are unique
+///      and uniformly distributed per `(project, tokenId)` on every chain. How far ahead a seed can
+///      be known depends on the chain's block values: on OP Stack chains (e.g. Base)
+///      `block.prevrandao` is the L1 origin's and repeats across the L2 blocks that share it; on
+///      Arbitrum Nitro chains it is the constant `1` and `block.number` tracks L1, so only the
+///      sequencer-set timestamp varies between neighbouring L2 blocks. On every chain the seed is
+///      pseudorandom and not lottery-grade — see {AbxSeedSource}.
 abstract contract SeedSourceExtension is AbxBeaconCore, Ownable, IAbxSeedSourceConfig {
     /// @dev keccak256("abx.extension.seed-source") — permanent extension id.
     bytes32 private constant ID =

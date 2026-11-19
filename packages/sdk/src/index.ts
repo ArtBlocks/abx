@@ -69,6 +69,7 @@ export {
   abxFixedPriceMinterAbi,
   abxFixedPriceMinter1155Abi,
   spineEventAbi,
+  abxCoreV3ErrorsAbi,
 } from './abi/index.js';
 
 export {publicProjectState} from './public-state.js';

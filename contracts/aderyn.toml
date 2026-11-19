@@ -1,0 +1,22 @@
+# Aderyn settings for the ABX contracts. Run `aderyn .` from this directory.
+#
+# Aderyn can only skip a detector for the whole package, not one finding, and these contracts keep changing.
+# So only style detectors are skipped; everything else still reports, including findings already reviewed.
+# Slither skips reviewed findings one by one instead, from slither.db.json.
+version = 1
+root = "."
+src = "src"
+
+[detectors]
+exclude = [
+  # Style: numeric literals, single-use internal functions, and public functions that could be external.
+  "literal-instead-of-constant",
+  "large-numeric-literal",
+  "internal-function-used-once",
+  "unused-public-function",
+  # Validation loops revert on the first bad entry on purpose.
+  "require-revert-in-loop",
+  # Style: asks for a reason string or custom error on every revert. The bare revert() lines here are unreachable
+  # after a raw-calldata passthrough that always returns or reverts the frame; real failures use custom errors.
+  "empty-require-revert",
+]

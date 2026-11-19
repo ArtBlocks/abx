@@ -29,12 +29,6 @@ abstract contract OnChainScript is AbxBeaconCore, Ownable, AbxCodeDelegate, IAbx
     /// @dev Current implemented version (bumps when the interface or semantics change).
     uint16 private constant VERSION = 1;
 
-    /// @notice Write index must be ≤ count (replace or append); reads must be < count.
-    /// @dev Kept declared here (not thrown here) so it stays in every composing token's ABI: both
-    ///      the writes and the bounds-checked `scriptChunk` read now revert from {AbxCodeLib}, whose
-    ///      identically-named error has the identical selector.
-    error ScriptIndexOutOfRange();
-
     /// @notice Owner writes/replaces the chunk at `index` (`== count` appends).
     function setScriptChunk(uint256 index, bytes calldata chunk) external onlyOwner {
         AbxCodeLib.setScriptChunk(index, chunk);

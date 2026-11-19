@@ -18,6 +18,10 @@ holds their `keccak256` hash. Each write records the address that made it.
 An unset value differs from an empty value. Governed `String` and `Bytes` parameters cannot be written
 with zero bytes. Use a sentinel or a companion scalar when the work needs an explicit empty state.
 
+A blob holds at most 24,575 bytes, the most one SSTORE2 data contract can store. Put larger content
+behind a pointer parameter. From core v4 the contract refuses an oversized blob before writing it, with
+`ParamDataTooLarge(key, length)`; earlier generations fail inside the data-contract deployment instead.
+
 ## Schemas
 
 A schema tells wallets and applications how a parameter may be edited.
@@ -29,8 +33,15 @@ A schema tells wallets and applications how a parameter may be edited.
 | Constraint | Range bounds or select options |
 | Deadline | Optional `lockAfter` timestamp |
 
-`TokenOwner` accepts delegate.xyz delegates. On an ERC-1155 edition, it means any holder of that ID.
-They all edit one shared value, not a value attached to each copy.
+On an ERC-721 project, `TokenOwner` accepts full delegate.xyz v2 delegations from the token's owner:
+all-wallet, per-contract or per-token delegations made without a rights scope. A delegation scoped to a
+specific right does not qualify. On an ERC-1155 edition, `TokenOwner` means any current holder of that
+ID, and delegation is not consulted. All holders edit one shared value, not a value attached to each
+copy.
+
+From core v4 the owner can only switch delegation between the canonical delegate.xyz v2 registry and
+off. A registry the owner controlled could approve the owner as any holder's delegate, so any other
+address is refused with `InvalidDelegateRegistry`.
 
 The onchain enum is zero-indexed in this exact order:
 
@@ -53,6 +64,11 @@ abx set-schema 0xYourContract \
 
 abx configure-param 0xYourContract 42 palette Ochre --sign
 ```
+
+Range bounds apply only to `Uint256Range`, `Int256Range`, `DecimalRange` and `Timestamp`. From core v4
+the contract refuses a schema that sets `min` or `max` on any other type, because those bounds would be
+shown to users but never enforced. It also refuses an empty or malformed-UTF-8 `Select` label, which
+would otherwise make every selecting token's metadata undecodable.
 
 A schema may be replaced while it is unlocked. Replacing it does not rewrite or revalidate old values.
 The CLI requires `--force` when a change could strand a stored value.
@@ -81,12 +97,24 @@ function configureTokenParamData(
 ) external;
 ```
 
-Keys are readable ASCII packed into `bytes32`. Do not hash the key name. Use the CLI or SDK to avoid
-encoding mistakes.
+Keys are printable ASCII packed into `bytes32`, with only trailing zero padding. Do not hash the key
+name. Use the CLI or SDK to avoid encoding mistakes. `seed` is reserved (see below). From core v4 the
+tokenData coordinate names `chainId`, `contractAddress` and `tokenId` are refused as keys at every write
+path; earlier generations stored them, and renderers ignored them.
 
-`NotParamAuthorized()` has no arguments in the current contract generation. It means the caller did
-not satisfy the key's current schema; it does not mean “creator only.” Read `paramSchema(key)`, use
-`abx state <address>`, or run `abx configure-param` to see the required authority before sending.
+`NotParamAuthorized` means the caller did not satisfy the key's current schema; it does not mean
+“creator only.” Its shape depends on the generation:
+
+| Generation | Error | What it tells you |
+| --- | --- | --- |
+| Core v4 | `NotParamAuthorized(bytes32 key, uint256 tokenId, address caller, uint8 auth, address authAddress)` | The key, token and caller, plus the authority that was enforced (`AUTH_OPTIONS[auth]`) and the named address, if any. |
+| Core v3 and earlier | `NotParamAuthorized()` | Nothing more. Read `paramSchema(key)`, use `abx state <address>`, or run `abx configure-param` to see the required authority before sending. |
+
+From core v4 the other parameter errors also name the key they concern, so a failing call inside a
+`multicall` identifies itself, and every error the parameter library raises is declared in the token's
+own ABI. Earlier generations raise most of them without arguments, and their verified token ABIs do not
+include them. Decode those against the SDK's `abxCoreV3ErrorsAbi`, which the CLI already includes when
+it explains a revert.
 
 First writes cost more than updates because the contract adds the key to its enumeration. Large blob
 writes also deploy an SSTORE2 data contract. Keep holder-writable edition parameters small unless shared
@@ -132,6 +160,10 @@ that case. ERC-1155 projects skip self-transfers and zero-amount entries before 
 abx set-param-hooks 0xYourContract --transfer 0xYourHook
 abx lock-param-hooks 0xYourContract
 ```
+
+From core v4 each non-zero hook address must have code when it is set; a codeless transfer hook would
+otherwise make every mint and transfer revert with no reason. Re-pointing the augment hook changes every
+token's `tokenData`, so it emits ERC-4906 `BatchMetadataUpdate` for the whole collection.
 
 `lock-param-hooks` freezes all three addresses. Freezing an empty set proves that no transfer hook can
 be added later. Freezing an active hook leaves it active. There is no permissionless way to remove a

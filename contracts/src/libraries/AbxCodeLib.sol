@@ -6,6 +6,7 @@ import {SSTORE2} from "solady/utils/SSTORE2.sol";
 import {OnChainScriptStorage} from "./OnChainScriptStorage.sol";
 import {DependenciesStorage} from "./DependenciesStorage.sol";
 import {IAbxDependencies} from "../extensions/dependencies/IAbxDependencies.sol";
+import {IAbxOnChainScript} from "../extensions/onchain-script/IAbxOnChainScript.sol";
 
 /// @title AbxCodeLib — the On-Chain Script + Dependencies write paths, as an EXTERNAL library
 /// @notice The sibling of {AbxParamsLib}: deployed once per chain, `delegatecall`ed by every
@@ -35,20 +36,20 @@ library AbxCodeLib {
     ///      had been skipping, not a new convention.
     event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId);
 
-    error ScriptIsLocked();
-    error ScriptIndexOutOfRange();
-    error EmptyScriptChunk();
-    error DependenciesAreLocked();
-    error DependencyIndexOutOfRange();
-    error EmptyDependencyRef();
+    // Errors are declared on {IAbxOnChainScript} / {IAbxDependencies} and raised here by qualified
+    // name, so the selector reverted is by construction the one the token's ABI decodes.
 
     // ── on-chain script ─────────────────────────────────────────────────────--
 
     function setScriptChunk(uint256 index, bytes calldata chunk) public {
         OnChainScriptStorage.Layout storage l = OnChainScriptStorage.layout();
-        if (l.locked) revert ScriptIsLocked();
-        if (chunk.length == 0) revert EmptyScriptChunk();
-        if (index > l.chunks.length) revert ScriptIndexOutOfRange();
+        if (l.locked) revert IAbxOnChainScript.ScriptIsLocked();
+        if (chunk.length == 0) revert IAbxOnChainScript.EmptyScriptChunk();
+        // The same bound as a param blob ({AbxParamsLib}): one SSTORE2 contract holds at most
+        // 24,575 bytes (EIP-170's 24,576 minus the STOP prefix). Refused up front rather than left
+        // to fail inside SSTORE2's CREATE, which burns the gas forwarded to it where EIP-170 applies.
+        if (chunk.length > 24_575) revert IAbxOnChainScript.ScriptChunkTooLarge(chunk.length);
+        if (index > l.chunks.length) revert IAbxOnChainScript.ScriptIndexOutOfRange();
         address ptr = SSTORE2.write(chunk);
         if (index == l.chunks.length) l.chunks.push(ptr);
         else l.chunks[index] = ptr;
@@ -58,9 +59,9 @@ library AbxCodeLib {
 
     function removeLastScriptChunk() public {
         OnChainScriptStorage.Layout storage l = OnChainScriptStorage.layout();
-        if (l.locked) revert ScriptIsLocked();
+        if (l.locked) revert IAbxOnChainScript.ScriptIsLocked();
         uint256 len = l.chunks.length;
-        if (len == 0) revert ScriptIndexOutOfRange();
+        if (len == 0) revert IAbxOnChainScript.ScriptIndexOutOfRange();
         l.chunks.pop();
         emit ScriptUpdated(len - 1); // the removed index; count re-read tells the story
         emit BatchMetadataUpdate(0, type(uint256).max);
@@ -68,7 +69,7 @@ library AbxCodeLib {
 
     function lockScript() public {
         OnChainScriptStorage.Layout storage l = OnChainScriptStorage.layout();
-        if (l.locked) revert ScriptIsLocked();
+        if (l.locked) revert IAbxOnChainScript.ScriptIsLocked();
         l.locked = true;
         emit ScriptLocked();
     }
@@ -79,9 +80,9 @@ library AbxCodeLib {
         public
     {
         DependenciesStorage.Layout storage l = DependenciesStorage.layout();
-        if (l.locked) revert DependenciesAreLocked();
-        if (ref == bytes32(0)) revert EmptyDependencyRef();
-        if (index > l.deps.length) revert DependencyIndexOutOfRange();
+        if (l.locked) revert IAbxDependencies.DependenciesAreLocked();
+        if (ref == bytes32(0)) revert IAbxDependencies.EmptyDependencyRef();
+        if (index > l.deps.length) revert IAbxDependencies.DependencyIndexOutOfRange();
         DependenciesStorage.Dependency memory d =
             DependenciesStorage.Dependency(uint8(resolution), ref);
         if (index == l.deps.length) l.deps.push(d);
@@ -92,9 +93,9 @@ library AbxCodeLib {
 
     function removeLastDependency() public {
         DependenciesStorage.Layout storage l = DependenciesStorage.layout();
-        if (l.locked) revert DependenciesAreLocked();
+        if (l.locked) revert IAbxDependencies.DependenciesAreLocked();
         uint256 len = l.deps.length;
-        if (len == 0) revert DependencyIndexOutOfRange();
+        if (len == 0) revert IAbxDependencies.DependencyIndexOutOfRange();
         l.deps.pop();
         emit DependencyRemoved(len - 1);
         emit BatchMetadataUpdate(0, type(uint256).max);
@@ -102,7 +103,7 @@ library AbxCodeLib {
 
     function setDependencyRegistry(address registry) public {
         DependenciesStorage.Layout storage l = DependenciesStorage.layout();
-        if (l.locked) revert DependenciesAreLocked();
+        if (l.locked) revert IAbxDependencies.DependenciesAreLocked();
         l.registry = registry;
         emit DependencyRegistrySet(registry);
         emit BatchMetadataUpdate(0, type(uint256).max);
@@ -110,7 +111,7 @@ library AbxCodeLib {
 
     function lockDependencies() public {
         DependenciesStorage.Layout storage l = DependenciesStorage.layout();
-        if (l.locked) revert DependenciesAreLocked();
+        if (l.locked) revert IAbxDependencies.DependenciesAreLocked();
         l.locked = true;
         emit DependenciesLocked();
     }
@@ -133,7 +134,7 @@ library AbxCodeLib {
 
     function scriptChunk(uint256 index) public view returns (bytes memory) {
         OnChainScriptStorage.Layout storage l = OnChainScriptStorage.layout();
-        if (index >= l.chunks.length) revert ScriptIndexOutOfRange();
+        if (index >= l.chunks.length) revert IAbxOnChainScript.ScriptIndexOutOfRange();
         return SSTORE2.read(l.chunks[index]);
     }
 
@@ -151,7 +152,7 @@ library AbxCodeLib {
         returns (IAbxDependencies.Resolution resolution, bytes32 ref)
     {
         DependenciesStorage.Layout storage l = DependenciesStorage.layout();
-        if (index >= l.deps.length) revert DependencyIndexOutOfRange();
+        if (index >= l.deps.length) revert IAbxDependencies.DependencyIndexOutOfRange();
         DependenciesStorage.Dependency storage d = l.deps[index];
         return (IAbxDependencies.Resolution(d.resolution), d.ref);
     }

@@ -19,8 +19,6 @@ import {OnChainScript} from "../extensions/onchain-script/OnChainScript.sol";
 import {Dependencies} from "../extensions/dependencies/Dependencies.sol";
 import {IAbxSequentialMint} from "../interfaces/IAbxSequentialMint.sol";
 import {SeriesMintStorage} from "../libraries/SeriesMintStorage.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
-import {AbxCodeLib} from "../libraries/AbxCodeLib.sol";
 import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @title SeriesCode — a multi-token code-project NFT (a program is the content)
@@ -71,6 +69,8 @@ contract SeriesCode is
     /// @param contractURIRenderer On-chain renderer for the collection URI; `address(0)` = off-chain.
     /// @param royaltyReceiver Default royalty payee.
     /// @param royaltyBps Default royalty in basis points (<= the royalty cap).
+    /// @param maxRoyaltyBps Royalty ceiling in basis points (0–10000), reduce-only after deploy.
+    /// @param burnable Opt-in burn, fixed at deploy; `false` means tokens can never be destroyed.
     /// @param transferValidator Zero = a plain ERC-721 forever (the default). Non-zero =
     ///        permanently enrolled as an ERC-721C creator token with this validator (the owner
     ///        may re-point or suspend it later, never un-enroll).
@@ -118,11 +118,6 @@ contract SeriesCode is
     error MintCountExceedsMax();
     /// @notice A non-owner tried to mint while minting is paused.
     error MintingPaused();
-    /// @notice `seed` is assigned and settled — nothing may rewrite, re-shape, or clear it.
-    /// @dev Declared for this contract's ABI; the rule itself is enforced once, structurally, in
-    ///      {AbxParamsLib} — the single choke point every external param write passes through, so
-    ///      no schema, lock state, or reentrant ordering can route around it. Same selector.
-    error SeedSettled();
 
     constructor() {
         // Lock the implementation: only clones (which start uninitialized) can initialize.
@@ -130,23 +125,32 @@ contract SeriesCode is
     }
 
     /// @notice One-time setup, called by the factory in the deploy transaction.
-    /// @dev Event order mirrors {SeriesImage} with the code-project extensions appended:
-    ///      OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
-    ///      RoyaltyChangedForAll →
-    ///      …(max-invocations, external-minter, primary-payee, paused)… →
+    /// @dev Event order: OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
+    ///      MaxRoyaltyBpsUpdated → RoyaltyChangedForAll → BurnConfigured →
+    ///      AbxExtensionVersionSet(max-invocations) → MaxInvocationsUpdated →
+    ///      AbxExtensionVersionSet(external-minter) → [MinterSet] →
+    ///      AbxExtensionVersionSet(primary-payee) → [PrimaryPayeeChanged] →
+    ///      AbxExtensionVersionSet(paused) → [PausedStatusChanged(true)] →
     ///      AbxExtensionVersionSet(seed-source) → [SeedSourceSet] →
     ///      AbxExtensionVersionSet(params) → AbxExtensionVersionSet(configurable-params) →
     ///      [DelegateRegistrySet(0), only when delegation is opted out] →
     ///      AbxExtensionVersionSet(onchain-script) → AbxExtensionVersionSet(dependencies) →
-    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet*/ContractFieldSet* →
-    ///      ContractURIUpdated → (per deploy-time mint) TokenParamConfigured("seed") + Transfer.
+    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+    ///      ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+    ///      per deploy-time mint: [TokenParamConfigured("seed") → MetadataUpdate] → Transfer →
+    ///      Initialized(1). The seed pair fires when a seed source is set; its ERC-4906 ping
+    ///      precedes the token's `Transfer`, because the seed is written before the mint so a
+    ///      transfer hook observes it. `mintTo == address(0)` defers all minting whatever
+    ///      `mintCount` says.
+    ///      `[…]` = emitted only when configured; `*` = once per entry. `Initialized(1)` is Solady's
+    ///      initializer event; the factory then emits its own `Deployed`. `test/InitEventOrder.t.sol`
+    ///      pins this sequence with every optional extension configured.
     ///      Script chunks, dependencies, and schemas are post-deploy owner ops (`multicall`
     ///      under a gas budget) — a script is far too large for a fat initialize.
     ///
-    ///      The creator-token pair — [AbxExtensionVersionSet(creator-token) →
-    ///      TransferValidatorUpdated] — fires LAST of the extension inits, after
-    ///      ContractURIUpdated, because enrollment is the only external call here and every
-    ///      cap must be written before that reentrancy window opens (see the body).
+    ///      The creator-token pair fires LAST of the extension inits, after ContractURIUpdated,
+    ///      because enrollment is the only external call among them and every cap must be written
+    ///      before that reentrancy window opens (see the body).
     function initialize(InitParams calldata p) external initializer {
         if (p.maxInvocations == 0) revert InvalidMaxInvocations();
         if (p.mintCount > p.maxInvocations) revert MintCountExceedsMax();
@@ -207,7 +211,9 @@ contract SeriesCode is
         return _mintNext(to);
     }
 
-    /// @notice Mint `count` tokens in order to `to` — N individual `Transfer`s (owner reserves).
+    /// @notice Mint `count` tokens in order to `to` — N individual `Transfer`s. Batch issuance
+    ///         (typically owner reserves); same authorization as {mint}: the owner always, the
+    ///         authorized minter while unpaused.
     function mintMany(address to, uint256 count) external {
         _requireMintAuth();
         for (uint256 i; i < count; ++i) {
@@ -241,11 +247,12 @@ contract SeriesCode is
         }
         // `_mint`, deliberately, NOT `_safeMint`. The tradeoff, stated so it reads as a decision
         // rather than an omission: skipping `onERC721Received` saves the receiver call on every
-        // purchase and removes a reentrancy surface from the mint path, at the cost that
-        // `purchaseTo` can deliver into a contract that cannot move it out. A 721 has no burn and
-        // no clawback here, so that is unrecoverable. The buyer names the recipient, and the sale
-        // path is the one place we most want free of callbacks.
-        _mint(to, tokenId); // Transfer(0x0, to, tokenId) — no receiver hook (matches Series)
+        // purchase and keeps the BUYER-controlled callback off the mint path (the owner-configured
+        // seed source above and the transfer hook in `_afterTokenTransfer` remain), at the cost
+        // that `purchaseTo` can deliver into a contract that cannot move it out. There is no
+        // clawback, and burning (where the collection opted into it) needs the holder's own call,
+        // so that is unrecoverable. The buyer names the recipient.
+        _mint(to, tokenId); // Transfer(0x0, to, tokenId) — no receiver hook (as in SeriesImage)
     }
 
     /// @dev Mint authorization, composing {Ownable} + {Paused} + {ExternalMinter} — identical
@@ -324,6 +331,4 @@ contract SeriesCode is
         super._afterTokenTransfer(from, to, id);
         _notifyTransferHook(id, from, to);
     }
-
-
 }

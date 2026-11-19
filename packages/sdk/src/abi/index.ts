@@ -46,6 +46,8 @@ export {
   abxFixedPriceMinterBytecode,
 } from './generated.js';
 
+export {abxCoreV3ErrorsAbi} from './legacy-errors.js';
+
 import {
   oneOfOneImageAbi,
   oneOfOneImageFactoryAbi,
@@ -86,13 +88,11 @@ function eventKey(f: {type: string; name?: string; inputs?: ReadonlyArray<{type:
  * via inheritance (Uri1155/CreatorToken1155/EditionSupply), so including it would only add pure
  * duplicates (`abxCodeLibAbi` is excluded for the same reason).
  *
- * **`abxParamsLibAbi` is unioned in**, unlike the other two libraries, because one of its events is
- * NOT a duplicate: `ParamHooksFrozen()` is declared only there — the token's `IAbxConfigurableParams`
- * interface declares `HooksConfigured` but not the freeze — so without this the one-way lock on the
- * param hooks would be invisible to every consumer that folds the spine, while the hook it freezes
- * can veto a transfer. `eventKey`'s dedup makes the rest of the library's mirrors free, so this
- * costs nothing beyond the fragment that was missing. (The durable fix is for the interface to
- * declare the event; unioning here keeps reconstruction honest either way.)
+ * **`abxParamsLibAbi` is unioned in** as a guard, unlike the other libraries. Every event it emits,
+ * `ParamHooksFrozen()` included, is now also declared on the token interfaces, and
+ * `test/abi-lockstep.test.ts` fails if a library event or error ever goes missing from a composing
+ * token's ABI. The union is kept because a spine that silently lost the hook freeze would hide the
+ * one signal that a transfer veto can never be armed; `eventKey`'s dedup makes it free.
  */
 export const spineEventAbi = (() => {
   const all = [
@@ -110,7 +110,7 @@ export const spineEventAbi = (() => {
     ...editionImageFactoryAbi,
     ...editionCodeFactoryAbi,
     ...abxFixedPriceMinter1155Abi,
-    ...abxParamsLibAbi, // for ParamHooksFrozen — see the note above; the rest dedup away
+    ...abxParamsLibAbi, // guard — see the note above; every fragment dedups away today
   ].filter((f: {type: string}) => f.type === 'event');
   const seen = new Set<string>();
   const out: typeof all = [];

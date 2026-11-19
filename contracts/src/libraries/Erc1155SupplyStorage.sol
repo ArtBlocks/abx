@@ -14,7 +14,7 @@ pragma solidity 0.8.28;
 ///      id + 1 that has EVER received a mint (monotonic, never decremented — a full burn of the
 ///      top id does not lower it). `MaxInvocations`-capped 1155 tokens (`EditionImage`,
 ///      `EditionCode`) read it as their `_maxInvocationsFloor()` — the id-space analogue of a
-///      Series' "can't lower the cap below totalSupply()" promise, generalized to non-sequential
+///      Series' "can't lower the cap below the issuance cursor" promise, generalized to non-sequential
 ///      id assignment: an edition mint names its id explicitly (no natural "tokens minted so far"
 ///      cursor to reuse), so the floor has to be tracked as its own high-water mark instead of
 ///      derived from a live count. `OneOfOneEdition` (no id-space cap) never touches it.

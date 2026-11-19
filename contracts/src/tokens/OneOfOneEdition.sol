@@ -14,8 +14,6 @@ import {ExternalMinter} from "../extensions/external-minter/ExternalMinter.sol";
 import {PrimaryPayee} from "../extensions/primary-payee/PrimaryPayee.sol";
 import {Paused} from "../extensions/paused/Paused.sol";
 import {IAbxEditionMint} from "../interfaces/IAbxEditionMint.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
-import {AbxEditionLib} from "../libraries/AbxEditionLib.sol";
 import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @title OneOfOneEdition — copies of a single work (ERC-1155, id space fixed to {0})
@@ -25,9 +23,10 @@ import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMet
 ///         from day one: `ExternalMinter` + `PrimaryPayee` + `Paused` + `EditionSupply`, plus the
 ///         same core composition as the 721 side — `AbxErc1155Base` + the `Uri1155`/`ContractURI`
 ///         strategies + `RoyaltyExtension` + `OnChainMetadata` + `CreatorToken1155`. One contract
-///         = one work = id `0`; `editionSize` (0 = open) caps how many copies of it may ever
-///         exist. Deployed as an immutable EIP-1167 clone by {OneOfOneEditionFactory}; never used
-///         directly.
+///         = one work = id `0`; `editionSize` (0 = open) caps how many copies of it may exist at
+///         once. The cap binds LIVE supply: on a burnable edition, a burned copy frees room to
+///         mint another (see {EditionSupply}). Deployed as an immutable EIP-1167 clone by
+///         {OneOfOneEditionFactory}; never used directly.
 contract OneOfOneEdition is
     AbxErc1155Base,
     Uri1155,
@@ -59,6 +58,8 @@ contract OneOfOneEdition is
     /// @param contractURIRenderer On-chain renderer for the collection URI; `address(0)` = off-chain.
     /// @param royaltyReceiver Default royalty payee.
     /// @param royaltyBps Default royalty in basis points (<= the royalty cap).
+    /// @param maxRoyaltyBps Royalty ceiling in basis points (0–10000), reduce-only after deploy.
+    /// @param burnable Opt-in burn, fixed at deploy; `false` means copies can never be destroyed.
     /// @param transferValidator Zero = a plain ERC-1155 forever (the default). Non-zero =
     ///        permanently enrolled as an ERC-1155C creator token with this validator (the owner
     ///        may re-point or suspend it later, never un-enroll).
@@ -105,19 +106,21 @@ contract OneOfOneEdition is
     }
 
     /// @notice One-time setup, called by the factory in the deploy transaction.
-    /// @dev Event order mirrors {OneOfOneImage} with the 1155 sale-stack extensions inserted:
-    ///      OwnershipTransferred (owner init) → AbxDeployed → AbxExtensionVersionSet(royalty) →
-    ///      RoyaltyChangedForAll → AbxExtensionVersionSet(edition-supply) →
+    /// @dev Event order: OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
+    ///      MaxRoyaltyBpsUpdated → RoyaltyChangedForAll → BurnConfigured →
+    ///      AbxExtensionVersionSet(edition-supply) → DefaultMaxSupplySet →
     ///      AbxExtensionVersionSet(external-minter) → [MinterSet] →
     ///      AbxExtensionVersionSet(primary-payee) → [PrimaryPayeeChanged] →
     ///      AbxExtensionVersionSet(paused) → [PausedStatusChanged(true)] →
-    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet*/ContractFieldSet* →
-    ///      ContractURIUpdated → (if minting) TransferSingle(0x0, mintTo, 0, mintAmount).
-    ///
-    ///      The creator-token pair — [AbxExtensionVersionSet(creator-token) →
-    ///      TransferValidatorUpdated] — fires LAST of the extension inits, after
-    ///      ContractURIUpdated, because enrollment is the only external call here and every
-    ///      cap must be written before that reentrancy window opens (see the body).
+    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+    ///      ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+    ///      [TransferSingle(op, 0x0, mintTo, 0, mintAmount)] → Initialized(1).
+    ///      `[…]` = emitted only when configured; `*` = once per entry. `Initialized(1)` is Solady's
+    ///      initializer event; the factory then emits its own `Deployed`. `test/InitEventOrder.t.sol`
+    ///      pins this sequence with every optional extension configured.
+    ///      The creator-token pair fires LAST of the extension inits, after ContractURIUpdated,
+    ///      because enrollment is the only external call among them and every cap must be written
+    ///      before that reentrancy window opens (see the body).
     function initialize(InitParams calldata p) external initializer {
         _initOwner(p.owner);
 
@@ -156,11 +159,12 @@ contract OneOfOneEdition is
     // ── minting ───────────────────────────────────────────────────────────────
 
     /// @inheritdoc IAbxEditionMint
-    /// @dev Reverts unless `id == 0` — the id space is fixed to the single work. Owner always;
-    ///      the authorized minter only when unpaused.
+    /// @dev Owner always; the authorized minter only when unpaused. Then reverts unless `id == 0`
+    ///      — the id space is fixed to the single work. Authorization is checked first, as on
+    ///      {EditionImage} and {EditionCode}, so an unauthorized caller always sees the auth error.
     function mint(address to, uint256 id, uint256 amount) external override {
-        if (id != TOKEN_ID) revert InvalidTokenId();
         _requireMintAuth();
+        if (id != TOKEN_ID) revert InvalidTokenId();
         _mintEdition(to, amount);
     }
 
@@ -182,8 +186,9 @@ contract OneOfOneEdition is
     // ── composition wiring ──────────────────────────────────────────────────--
 
     /// @dev Compose ERC-165 by OR-ing the base and each mixin that defines supportsInterface.
-    ///      (`Uri1155`/`ContractURI` define none — no ERC-4906, and ERC-7572 has no 165 id — so
-    ///      they're absent here, exactly like the 721 twin excludes `ContractURI`. `ERC1155` must
+    ///      (`Uri1155`/`ContractURI` define no `supportsInterface` of their own — ERC-4906 is
+    ///      advertised by `OnChainMetadata`, and ERC-7572 has no 165 id — so they're absent here,
+    ///      exactly like the 721 twin excludes `ContractURI`. `ERC1155` must
     ///      still be named: `Uri1155` inherits it too, via a second path to the same original
     ///      declaration, so Solidity treats it as its own diamond leg — exactly why the 721 twins
     ///      also name `ERC721` here even though `AbxErc721Base` already resolved it once.)
@@ -260,18 +265,4 @@ contract OneOfOneEdition is
     ) internal override(AbxErc1155Base, ERC1155) {
         super._afterTokenTransfer(from, to, ids, amounts, data);
     }
-    // ── {Uri1155} / {CreatorToken1155} / {EditionSupply} bodies, delegated ────────
-    //
-    // The same extraction {EditionCode} and {EditionImage} perform, for the same reason: the ERC-4906
-    // refresh emissions pushed this contract under its EIP-170 policy
-    // floor, and the floor exists to force exactly this decision rather than be lowered. Access
-    // control (`onlyOwner`) stays on these overrides; the library assumes its caller already gated.
-    //
-    // On the premise that previously kept this contract library-free — that linking one would cost
-    // its factory a CREATE2-deterministic address — see the note in {EditionImage}: the broadcast
-    // artifacts refute it. Libraries, implementations and factories are each deployed
-    // deterministically, so the chain is deterministic end to end; what linking costs is operational
-    // (ordering, re-addressing on a library redeploy, a mandatory `--libraries` pin), not
-    // determinism.
-
 }

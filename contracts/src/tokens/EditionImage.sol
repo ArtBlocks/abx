@@ -16,8 +16,6 @@ import {PrimaryPayee} from "../extensions/primary-payee/PrimaryPayee.sol";
 import {Paused} from "../extensions/paused/Paused.sol";
 import {IAbxEditionMint} from "../interfaces/IAbxEditionMint.sol";
 import {Erc1155SupplyStorage} from "../libraries/Erc1155SupplyStorage.sol";
-import {AbxEditionLib} from "../libraries/AbxEditionLib.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
 import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @title EditionImage — copies of many distinct works (ERC-1155, N works × copies each)
@@ -29,13 +27,13 @@ import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMet
 /// @dev **Ids are caller-named, not a sequential cursor.** Unlike {SeriesImage} (`mint(to)` picks
 ///      the next id automatically), {IAbxEditionMint}'s `mint(to, id, amount)` lets a minter
 ///      target any `id < maxInvocations` in any order — a collector buys copies of the specific
-///      work they want. That breaks the 721 twins' "totalSupply() IS the floor" shortcut for
-///      lowering `maxInvocations`: there's no natural "tokens minted so far" cursor here. Instead
+///      work they want. So there is no sequential issuance cursor to floor `maxInvocations` on, as
+///      the 721 twins do with `nextTokenId`. Instead
 ///      this token maintains its own monotonic **id high-water mark**
 ///      (`Erc1155SupplyStorage.idWatermark` — the highest id + 1 ever minted, never decremented
 ///      even by a full burn) and uses it as {MaxInvocations}'s floor, so the owner can never lower
 ///      the id-space cap below a work that has ever had a copy minted (the same
-///      no-stranding promise the 721 twin protects via `totalSupply()`, generalized to
+///      no-stranding promise the 721 twin protects via its issuance cursor, generalized to
 ///      non-sequential id assignment).
 contract EditionImage is
     AbxErc1155Base,
@@ -60,6 +58,8 @@ contract EditionImage is
     /// @param contractURIRenderer On-chain renderer for the collection URI; `address(0)` = off-chain.
     /// @param royaltyReceiver Default royalty payee.
     /// @param royaltyBps Default royalty in basis points (<= the royalty cap).
+    /// @param maxRoyaltyBps Royalty ceiling in basis points (0–10000), reduce-only after deploy.
+    /// @param burnable Opt-in burn, fixed at deploy; `false` means copies can never be destroyed.
     /// @param transferValidator Zero = a plain ERC-1155 forever. Non-zero = permanent ERC-1155C
     ///        enrollment with this validator.
     /// @param maxInvocations The id-space cap N (> 0): the number of distinct works this
@@ -111,23 +111,27 @@ contract EditionImage is
     }
 
     /// @notice One-time setup, called by the factory in the deploy transaction.
-    /// @dev Event order mirrors {SeriesImage} with the 1155 extensions substituted:
-    ///      OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
-    ///      RoyaltyChangedForAll → AbxExtensionVersionSet(max-invocations) →
-    ///      MaxInvocationsUpdated → AbxExtensionVersionSet(edition-supply) →
+    /// @dev Event order: OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
+    ///      MaxRoyaltyBpsUpdated → RoyaltyChangedForAll → BurnConfigured →
+    ///      AbxExtensionVersionSet(max-invocations) → MaxInvocationsUpdated →
+    ///      AbxExtensionVersionSet(edition-supply) → DefaultMaxSupplySet →
     ///      AbxExtensionVersionSet(external-minter) → [MinterSet] →
     ///      AbxExtensionVersionSet(primary-payee) → [PrimaryPayeeChanged] →
     ///      AbxExtensionVersionSet(paused) → [PausedStatusChanged(true)] →
-    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet*/ContractFieldSet* →
-    ///      ContractURIUpdated → (per deploy-time id) TransferSingle.
+    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+    ///      ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+    ///      TransferSingle* (one per deploy-time id) → Initialized(1).
+    ///      `[…]` = emitted only when configured; `*` = once per entry. `Initialized(1)` is Solady's
+    ///      initializer event; the factory then emits its own `Deployed`. `test/InitEventOrder.t.sol`
+    ///      pins this sequence with every optional extension configured.
     /// @dev The deploy-time mint runs the internal `_mintEditionId` directly, bypassing the
     ///      paused gate (which lives on the public entrypoint) — owner reserves mint at birth
-    ///      even when deploying paused, exactly like the 721 twins.
+    ///      even when deploying paused, exactly like the 721 twins. `mintTo == address(0)` defers
+    ///      all minting whatever `mintCount`/`mintAmount` say.
     ///
-    ///      The creator-token pair — [AbxExtensionVersionSet(creator-token) →
-    ///      TransferValidatorUpdated] — fires LAST of the extension inits, after
-    ///      ContractURIUpdated, because enrollment is the only external call here and every
-    ///      cap must be written before that reentrancy window opens (see the body).
+    ///      The creator-token pair fires LAST of the extension inits, after ContractURIUpdated,
+    ///      because enrollment is the only external call among them and every cap must be written
+    ///      before that reentrancy window opens (see the body).
     function initialize(InitParams calldata p) external initializer {
         if (p.maxInvocations == 0) revert InvalidMaxInvocations();
         if (p.mintCount > p.maxInvocations) revert MintCountExceedsMax();
@@ -283,22 +287,4 @@ contract EditionImage is
     ) internal override(AbxErc1155Base, ERC1155) {
         super._afterTokenTransfer(from, to, ids, amounts, data);
     }
-    // ── {Uri1155} / {CreatorToken1155} / {EditionSupply} bodies, delegated ────────
-    //
-    // Same extraction {EditionCode} performs, for the same reason and by the same pattern: the
-    // ERC-4906 refresh emissions pushed this contract under its EIP-170
-    // policy floor, and the floor is the point. Access control (`onlyOwner`) stays on these
-    // overrides; the library assumes its caller already gated.
-    //
-    // This contract was previously held library-free on the stated grounds that linking one would
-    // cost its factory a CREATE2-deterministic address. That premise does not survive the broadcast
-    // artifacts: every recorded library deploy goes through the keyless CREATE2 proxy at salt zero,
-    // `AbxParamsLib` landed at one address on two chains from deployer nonces 215 apart, and both
-    // library-linked factories already hold chain-identical addresses across four generations.
-    // Libraries deployed deterministically, implementations deterministically, factories
-    // deterministically — the chain is deterministic end to end. What linking really costs is
-    // operational: the library must exist before the factory on each chain, a library redeploy
-    // re-addresses every linked factory, and the `--libraries` pin in the deploy script becomes
-    // mandatory. Real tax, paid knowingly, and cheaper than eroding a size floor a second time.
-
 }

@@ -84,11 +84,7 @@ abstract contract EditionSupply is AbxBeaconCore, Ownable, IAbxEditionSupply {
     ///      nothing but `0` is legal from then on. Only while `overridden[id]` is still false does
     ///      the un-overridden default (`0` = open, uncapped) apply, and only a NON-zero default
     ///      constrains the first override.
-    function setMaxSupply(uint256 id, uint256 cap) external virtual onlyOwner {
-        // ONE implementation. This body used to live here AND in {AbxEditionLib}, with every
-        // concrete edition token overriding to pick the library copy — so the mixin's copy was
-        // unreachable, and three separate fixes landed in it instead of in the code that runs.
-        // The mixin now delegates, and the tokens carry no override at all.
+    function setMaxSupply(uint256 id, uint256 cap) external onlyOwner {
         AbxEditionLib.setMaxSupply(id, cap);
     }
 

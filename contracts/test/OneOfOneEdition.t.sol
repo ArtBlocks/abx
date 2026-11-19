@@ -114,6 +114,14 @@ contract OneOfOneEditionTest is Test {
         nft.mint(collector, 1, 1);
     }
 
+    /// Authorization is checked before the id, as on the sibling edition tokens, so an
+    /// unauthorized caller always sees the authorization error.
+    function test_Mint_UnauthorizedCallerSeesAuthErrorBeforeIdError() public {
+        vm.prank(stranger);
+        vm.expectRevert(ExternalMinter.NotMinterOrOwner.selector);
+        nft.mint(collector, 1, 1);
+    }
+
     function test_Mint_RevertsZeroAmount() public {
         vm.prank(owner);
         vm.expectRevert(OneOfOneEdition.ZeroMintAmount.selector);

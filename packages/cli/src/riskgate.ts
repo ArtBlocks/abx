@@ -25,6 +25,7 @@ import {
   pinGas,
   seriesCodeAbi,
   editionCodeAbi,
+  abxCoreV3ErrorsAbi,
   GasEstimateBelowFloorError,
   type Address,
   type PreparedTx,
@@ -149,11 +150,17 @@ export interface DryRunSimulation {
  * Every error an ABX token can revert with. The parameter and code-custody write paths run in
  * delegatecalled libraries, and their errors (`NotParamAuthorized`, `ScriptIsLocked`, …) are not in
  * the token ABIs, so decoding against a token ABI alone left them as raw selectors. The edition ABI
- * adds the edition-only errors (`EditionSupplyReached`, …).
+ * adds the edition-only errors (`EditionSupplyReached`, …). From core v4 the token ABIs declare the
+ * library errors themselves, with new signatures; `abxCoreV3ErrorsAbi` keeps v3 collections'
+ * argument-less shapes decodable.
  */
-const REVERT_ERRORS_ABI = [...seriesCodeAbi, ...editionCodeAbi, ...abxParamsLibAbi, ...abxCodeLibAbi].filter(
-  (f) => f.type === 'error',
-);
+const REVERT_ERRORS_ABI = [
+  ...seriesCodeAbi,
+  ...editionCodeAbi,
+  ...abxParamsLibAbi,
+  ...abxCodeLibAbi,
+  ...abxCoreV3ErrorsAbi,
+].filter((f) => f.type === 'error');
 
 export function revertReason(err: unknown): string {
   const data = (err as {data?: unknown; cause?: {data?: unknown}})?.data ?? (err as {cause?: {data?: unknown}})?.cause?.data;

@@ -34,6 +34,13 @@ import {SupplyStorage} from "../libraries/SupplyStorage.sol";
 ///      `msg.value` for accounting, so the classic multicall double-spend cannot arise.
 ///      Do NOT combine this with ERC-2771 / a trusted forwarder (calldata-suffix
 ///      spoofing); ABX authorization reads the real `msg.sender` only.
+///
+///      **Inherited `payable` functions.** Solady marks some functions `payable` to save gas: the
+///      ownership functions (`transferOwnership`, `renounceOwnership`, `requestOwnershipHandover`,
+///      `cancelOwnershipHandover`, `completeOwnershipHandover`) and ERC-721 `approve`, the three transfer functions.
+///      No ABX token has a withdrawal path, so ETH sent with any of them is unrecoverable. This is
+///      accepted rather than overridden: re-declaring each as non-payable costs bytecode on tokens
+///      at the EIP-170 ceiling, and no ABX flow sends value to a token.
 abstract contract AbxErc721Base is ERC721, AbxBeaconCore, Ownable, Initializable, Multicallable {
     /// @notice A collection cannot be created without an owner.
     error InvalidOwner();
@@ -68,7 +75,7 @@ abstract contract AbxErc721Base is ERC721, AbxBeaconCore, Ownable, Initializable
         return CollectionMetadataLib.layout().symbol;
     }
 
-    /// @dev Set the ERC-721 collection identity at initialize. No event (set once at mint).
+    /// @dev Set the ERC-721 collection identity at initialize. No event (set once, at deploy).
     function _initCollectionMetadata(string calldata name_, string calldata symbol_) internal {
         CollectionMetadataLib.Layout storage m = CollectionMetadataLib.layout();
         m.name = name_;
@@ -130,5 +137,4 @@ abstract contract AbxErc721Base is ERC721, AbxBeaconCore, Ownable, Initializable
         return AbxBeaconCore.supportsInterface(interfaceId) // 165 + beacon
             || ERC721.supportsInterface(interfaceId); // 721 + 721Metadata
     }
-
 }

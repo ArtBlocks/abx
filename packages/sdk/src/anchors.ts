@@ -110,7 +110,7 @@ export type AnchorEvent = {anchor: AnchorKind} & (
 /** `AbxVersion.CORE_VERSION` in `contracts/src/libraries/AbxVersion.sol`. MUST move in lockstep with
  *  it — the Solidity constant's own NatSpec says so, and `test/anchor-version.test.ts` pins the two
  *  together so a bump on one side cannot ship alone. */
-export const ABX_CORE_VERSION = 3n;
+export const ABX_CORE_VERSION = 4n;
 
 /** Is this implementation built from the current core?
  *
