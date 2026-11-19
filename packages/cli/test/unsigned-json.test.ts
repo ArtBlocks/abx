@@ -6,8 +6,8 @@ import {createServer} from 'node:http';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {promisify} from 'node:util';
-import {ABX_CORE_VERSION, oneOfOneImageAbi, oneOfOneImageFactoryAbi} from '@artblocks/abx-sdk';
-import {decodeFunctionData, encodeAbiParameters, toFunctionSelector, type Hex} from 'viem';
+import {ABX_CORE_VERSION, encodeTag, oneOfOneImageAbi, oneOfOneImageFactoryAbi} from '@artblocks/abx-sdk';
+import {decodeFunctionData, encodeAbiParameters, toFunctionSelector, toHex, type Hex} from 'viem';
 
 const run = promisify(execFile);
 const main = resolve(import.meta.dirname, '../src/main.ts');
@@ -77,6 +77,20 @@ test('real CLI entry points prepare 1/1 deployment and field writes as one unsig
     assert.equal(tx.expectedSigner, signer);
     assert.equal(decodeFunctionData({abi: oneOfOneImageAbi, data: tx.data}).functionName, 'setTokenField');
     assert.match(field.stderr, /Set on-chain description/);
+    const animation = ['set-field', clone, '--field', 'animation_url'];
+    const locator = 'https://example.org/site/index.html?preview=1';
+    const link = await cli([...animation, '--url', locator]);
+    const data = JSON.parse(link.stdout).txs[0].data;
+    assert.deepEqual(
+      decodeFunctionData({abi: oneOfOneImageAbi, data}).args,
+      [0n, encodeTag('animation_url'), encodeTag('url'), toHex(locator)],
+    );
+    const legacyLink = await cli([...animation, '--text', locator, '--representation', 'url']);
+    assert.equal(JSON.parse(legacyLink.stdout).txs[0].data, data);
+    await assert.rejects(cli([...animation, '--text', locator]), /Use --url for a locator in animation_url/);
+    await assert.rejects(cli([...animation, '--url', locator, '--text', '<p>example</p>']), /Pass --url on its own/);
+    const inline = await cli([...animation, '--text', locator, '--representation', 'inline']);
+    assert.equal(JSON.parse(inline.stdout).txs[0].fields.representation, 'inline');
     assert.deepEqual(unexpected, []);
   } finally {
     await new Promise<void>((done) => rpc.close(() => done()));

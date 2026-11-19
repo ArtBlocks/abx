@@ -90,11 +90,34 @@ New-project defaults use the current factory; a software update does not upgrade
 
 ## Connect FS content to an ABX project
 
-Use existing ABX metadata, link, or attachment surfaces for served content. Use the official FS native
-reader and fixed-source ABX reader adapter when the field must consume bounded EVM-readable content.
-The reader's supported codecs and execution budgets are documented by FS; do not reimplement them.
+For a minted ABX 1/1 with on-chain token metadata and a writable `animation_url`, use that field to
+open an FS HTML file or a directory with an entrypoint. Set `ABX_CHAIN` for the ABX token's network. The gateway URL
+includes the network where the FS content was stored.
 
-Verify the exact token metadata, animation, image, and attachment experience after integration.
+```bash
+ABX_CHAIN=base-sepolia abx set-field "$TOKEN" --token 0 --field animation_url --url "$FS_GATEWAY_URL" --sign
+ABX_CHAIN=base-sepolia abx tokenuri "$TOKEN" --token 0 --json
+```
+
+Use the public FS URL returned by the FS tooling as `FS_GATEWAY_URL`. In `tokenuri`, check that
+`animation_url` contains the exact locator. Serving depends on that gateway remaining
+available. For an attachment that should appear in a resolver's artifact list, use `abx attach`.
+
+For bounded EVM-readable HTML on the same chain, deploy the official fixed-source adapter for
+the root and entrypoint using the [FS reader reference](https://docs.fs.abx.io/docs/reference/presentation).
+Set `ADAPTER` to that deployed contract and encode it as both reader and pointer.
+
+```bash
+READER_VALUE=$(cast abi-encode 'f(address,address)' "$ADAPTER" "$ADAPTER")
+ABX_CHAIN=base-sepolia abx set-field "$TOKEN" --token 0 --field animation_url --representation reader --value "$READER_VALUE" --sign
+ABX_CHAIN=base-sepolia abx tokenuri "$TOKEN" --token 0 --json
+```
+
+Check that `animation_url` is an HTML data URI that decodes to the expected file.
+Keep the adapter's codec and read limits in mind. Verify the complete `tokenURI` within the
+RPC budget used by the intended consumer.
+
+
 A preserved website does not itself supply a mutable backend, an indexed attachment list, or a
-marketplace thumbnail. Choose those surfaces deliberately using the [storage guide](/docs/using-abx/guides/storage) and
-[deployment guide](/docs/using-abx/guides/deploy-a-digital-asset).
+marketplace thumbnail. Choose those surfaces deliberately using the [storage guide](/docs/using-abx/guides/storage)
+and [deployment guide](/docs/using-abx/guides/deploy-a-digital-asset).

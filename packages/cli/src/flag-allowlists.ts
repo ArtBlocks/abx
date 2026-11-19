@@ -192,7 +192,7 @@ export const COMMAND_FLAGS: Record<string, ReadonlySet<string>> = {
   'set-royalty-cap': set(['cap'], SHARED_WRITE),
   'set-transfer-validator': set([], SHARED_WRITE),
   'set-seed-source': set([], SHARED_WRITE),
-  'set-field': set(['field', 'text', 'value', 'representation', 'collection', 'token', 'file', 'compress'], SHARED_WRITE),
+  'set-field': set(['field', 'text', 'url', 'value', 'representation', 'collection', 'token', 'file', 'compress'], SHARED_WRITE),
   'lock-field': set(['field', 'collection', 'token', 'force-field'], SHARED_WRITE),
   'set-renderer': set(['collection', 'off', 'renderer'], SHARED_WRITE),
   'lock-uri': set(['collection'], SHARED_WRITE),

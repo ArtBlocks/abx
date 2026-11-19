@@ -65,6 +65,12 @@ FS has its own chain selection and signer configuration. ABX's `ABX_CHAIN`, `--s
 use current-generation defaults for new projects. Verify that the installed utility and selected
 network actually expose the requested reader/presentation capability.
 
+For FS HTML served through a public gateway, use
+`abx set-field <token> --field animation_url --token 0 --url "<FS gateway URL>"` with the creator's
+chosen signing lane, then verify the exact locator with `abx tokenuri <token> --token 0 --json`.
+The [ABX utilities guide](https://docs.abx.io/docs/using-abx/guides/utilities#connect-fs-content-to-an-abx-project)
+also shows how to set a reader field from a deployed root/path adapter.
+
 Use existing ABX metadata/link/attachment fields or the official fixed-source reader adapter to
 connect content. Verify each collector-facing surface separately: a link does not automatically
 make attachments enumerable, provide marketplace stills, or replace an ABX resolver. For the adapter,

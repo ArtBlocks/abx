@@ -2567,13 +2567,31 @@ export function collectionImageWarning(): string {
   );
 }
 
+function isFieldLocator(value: string): boolean {
+  return representationForLocator(value) !== null && !/\s/.test(value) && !!URL.parse(value)?.hostname;
+}
+
 export async function cmdSetField(address: string | undefined, flags: Flags): Promise<void> {
-  const contract = requireAddress(
-    address,
-    'abx set-field <address> --field <name> (--text "…" | --value 0x…) [--representation <rep>] [--collection | --token 0]',
-  );
-  const field = requireFlag(flags, 'field', 'abx set-field <address> --field <name> (--text … | --value 0x… | --file <path>)');
-  assertSettableField(field); // `artifacts`/`abx_provenance` are computed, not settable → point at `abx attach`
+  const usage = 'abx set-field <address> --field <name> (--text "…" | --url <locator> | --value 0x… | --file <path>) [--collection | --token 0]';
+  const contract = requireAddress(address, usage);
+  const field = requireFlag(flags, 'field', usage);
+  assertSettableField(field);
+  let locator: string | undefined;
+  if (flags.url !== undefined) {
+    locator = requireFlag(flags, 'url', usage);
+    if (flags.text !== undefined || flags.value !== undefined || flags.file !== undefined) {
+      throw new CliError('Pass --url on its own as the field value.');
+    }
+    if (flags.representation !== undefined && flags.representation !== R.url) {
+      throw new CliError('--url stores the url representation. Pass --value or --text to choose a different representation.');
+    }
+    if (!isFieldLocator(locator)) throw new CliError('--url expects an absolute http://, https://, ipfs://, or ar:// locator.');
+  }
+  // The on-chain renderer wraps literal animation and image bytes as data URIs.
+  if (flags.representation === undefined && flags.text &&
+      (field === F.image || field === F.animationUrl) && isFieldLocator(flags.text.trim())) {
+    throw new CliError(`Use --url for a locator in ${field}. For deliberate literal content, pass --text with --representation inline.`);
+  }
   await assertChainId(CHAIN); // verify network up front — this op may stage on-chain content before the field tx
   const collection = !!flags.collection;
   if (collection && field === F.image) console.error(`  ${yellow('⚠')} ${collectionImageWarning()}`);
@@ -2679,16 +2697,17 @@ export async function cmdSetField(address: string | undefined, flags: Flags): Pr
   // Hot lane (or no staging): compute the value, then sign the single field-set tx as usual.
   let value: Hex;
   let representation: string;
+  const text = locator ?? (flags.text === 'true' ? undefined : flags.text);
   if (hotStage) {
     const compress = parseCompress(flags.compress);
     ({value, representation} = await putContentOnChain(readFileSync(resolvePath(flags.file as string)), compress, field, hotStage));
-  } else if (flags.text && flags.text !== 'true') {
-    if (field === 'image') refusePrewrappedImage(flags.text, `--text`);
-    value = toHex(flags.text);
-    representation = flags.representation ?? R.inline;
-    console.log(dim(`  inline on-chain '${field}'${collection ? ' (collection)' : ` on token #${flags.token ?? '0'}`}: ${JSON.stringify(flags.text.slice(0, 60))}${flags.text.length > 60 ? '…' : ''}`));
+  } else if (text) {
+    if (field === F.image && locator === undefined) refusePrewrappedImage(text, '--text');
+    value = toHex(text);
+    representation = locator === undefined ? flags.representation ?? R.inline : R.url;
+    console.log(dim(`  on-chain '${field}' (${representation})${collection ? ' (collection)' : ` on token #${flags.token ?? '0'}`}: ${JSON.stringify(text.slice(0, 60))}${text.length > 60 ? '…' : ''}`));
   } else {
-    value = requireFlag(flags, 'value', 'abx set-field <address> --field <name> --text … | --value 0x…') as Hex;
+    value = requireFlag(flags, 'value', usage) as Hex;
     representation = flags.representation ?? R.keccak256;
   }
   // A structured representation is decoded on chain before the field can resolve — normalize the

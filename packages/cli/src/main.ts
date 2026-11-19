@@ -1081,7 +1081,8 @@ const COMMAND_HELP: Record<string, string> = {
                           background_color · …), a collection authorship/rights field with ${g('--collection')}
                           (creator · display_notes · creator_links · license), OR any custom key (which becomes an
                           ${bold('artifacts')} entry). NOT ${g('artifacts')}/${g('abx_params')}/${g('abx_provenance')} (computed).
-    --text "<s>"          store literal UTF-8 ON-CHAIN (representation defaults ${g('inline')}) — NOT for an off-chain URL (use ${bold('attach')})
+    --text "<s>"          store literal UTF-8 on-chain (default representation ${g('inline')})
+    --url "<uri>"         store an absolute HTTP(S), IPFS or Arweave locator verbatim as ${g('url')}
     --file <path>         store a FILE on-chain in SSTORE2 chunks behind the shared reader (multi-chunk)
                           ${dim('~360-405k gas/KB per tokenURI to READ it back (climbing with size). No size is refused: under ~117KB (~50M gas) every')}
                           ${dim('endpoint measured serves it; above that abx probes your RPC and reports its real cap before you spend.')}
@@ -1471,7 +1472,7 @@ function help() {
     ${g('abx set-transfer-validator')} <addr> <0x..|none|recommended>   manage an ERC-721C collection's validator (enrolled-at-deploy only)
     ${g('abx set-seed-source')} <addr> <0x..|canonical|none>   re-point a CODE project's mint-seed source (probed; future mints only)
     ${g('abx attach')} <addr> <key> <ipfs://…|ar://…|https://…>   attach a named file → the token's ${bold('artifacts')} manifest (data plane)
-    ${g('abx set-field')} <addr>    set an on-chain metadata field (low-level)   --field <name> (--text "…" | --value 0x..) [--collection]
+    ${g('abx set-field')} <addr>    set an on-chain metadata field (low-level)   --field <name> (--text "…" | --url <uri> | --value 0x..) [--collection]
     ${g('abx lock-field')} <addr>   freeze a field forever   --field <name> [--collection]
     ${g('abx set-gateway')} <addr>  repoint where ipfs/arweave content is SERVED from (the CID never moves)   [--ipfs <prefix>] [--arweave <prefix>]
     ${g('abx set-renderer')} <addr> toggle URI resolution on-chain ↔ off-chain   [--off] [--renderer 0x..] [--collection]
