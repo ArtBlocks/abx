@@ -33,7 +33,7 @@ export interface ScriptAnalysis {
   estChunks: number; // ~22KB SSTORE2 chunks
   traits: {present: boolean; keys: string[]};
   paramHints: string[]; // Statically visible PostParam keys, excluding runtime coordinates.
-  hasDynamicParamReads?: boolean; // A computed key or rest binding could carry other inputs.
+  hasDynamicParamReads?: boolean; // Computed, rest, or ambiguous alias reads can hide inputs.
   prng: {seeded: boolean; usesBareRandom: boolean; usesMathRandom: boolean; usesNoise: boolean};
   depHints: string[]; // detected library globals (e.g. "p5")
   looksP5: boolean;
@@ -152,9 +152,21 @@ function paramReads(code: string, noComments: string): {paramHints: string[]; ha
   for (const match of code.matchAll(assignments)) {
     const name = match[1];
     // Reused names are ambiguous in a source heuristic. Keep their reads out of the named hints.
-    if (assigned.has(name)) aliases.delete(name);
-    else if (objectRhs.test(code.slice(match.index + match[0].length))) aliases.add(name);
+    if (assigned.has(name)) {
+      if (aliases.delete(name)) hasDynamicParamReads = true;
+    } else if (objectRhs.test(code.slice(match.index + match[0].length))) aliases.add(name);
     assigned.add(name);
+  }
+  if (aliases.size) {
+    // The scan does not resolve lexical scope. Omit alias reads when a function or arrow
+    // parameter could shadow that alias, while still reporting direct tokenData reads.
+    const parameters = /\bfunction\s*\*?\s*(?:[A-Za-z_$][\w$]*\s*)?\(([^()]*)\)|\(([^()]*)\)\s*=>|(?<![\w$.])([A-Za-z_$][\w$]*)\s*=>/g;
+    for (const match of code.matchAll(parameters)) {
+      const list = match[1] ?? match[2] ?? match[3];
+      for (const [name] of list.matchAll(/[A-Za-z_$][\w$]*/g)) {
+        if (aliases.delete(name)) hasDynamicParamReads = true;
+      }
+    }
   }
   const aliasNames = [...aliases].map((name) => name.replaceAll('$', '\\$')).join('|');
   const receivers = aliasNames ? `(?:${TOKEN_DATA}|${aliasNames})` : TOKEN_DATA;
@@ -321,7 +333,8 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   // `abx.traits(` call survives in `code`. A string that *mentions* `abx.traits({foo:1})`
   // used to list `foo` while Runtime said "no abx.traits call" — two sections contradicting
   // each other on a correct program. Gate the extractor on the same view the flag uses.
-  const usesMathRandom = /Math\s*\.\s*random\s*\(/.test(code);
+  const mathRandomCall = /(?<![\w$.])(?:(?:window|globalThis)\s*\??\.\s*)?Math\s*\??\.\s*random\s*\(/;
+  const usesMathRandom = mathRandomCall.test(code);
   // p5's bare random(...) — a `random(` NOT preceded by `.` or a word char (so not Math.random / obj.random)
   const usesBareRandom = /(^|[^.\w])random\s*\(/.test(code);
   const seeded = /\brandomSeed\s*\(/.test(code);
@@ -348,7 +361,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   const traitsStart = traitsCallArgumentStart(code);
   const reportsTraits = traitsStart !== null;
   const keys = traitsStart === null ? [] : traitKeys(traitsArgument(noComments, traitsStart));
-  const traitsUseMathRandom = traitsStart !== null && /Math\s*\.\s*random\s*\(/.test(traitsArgument(code, traitsStart));
+  const traitsUseMathRandom = traitsStart !== null && mathRandomCall.test(traitsArgument(code, traitsStart));
   let wrongGlobal: string | null = null;
   if (!readsTokenData) {
     if (/window\s*\.\s*tokenTraits\b/.test(code)) wrongGlobal = 'window.tokenTraits — traits are reported by CALLING abx.traits({…}), never by writing a global';
@@ -361,7 +374,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   let reason: string;
   if (!reportsTraits) {
     verdict = 'none';
-    reason = 'no abx.traits({…}) call → NO marketplace traits on ANY lane. A resolver captures the keys you pass to abx.traits(); it does not invent traits from internal variables or a global. Call abx.traits({…}) in the sketch if you want filterable traits.';
+    reason = 'no abx.traits({…}) call recognized. A render runner captures JS traits from that call. Metadata can also use stored attributes or a field renderer.';
   } else if (traitsUseMathRandom) {
     verdict = 'infeasible';
     reason = 'the trait expression calls unseeded Math.random(). Use deterministic trait inputs for reproducible attributes.';
@@ -370,7 +383,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
     reason = 'the script uses Math.random(). Static inspection cannot tell whether it affects traits. Check repeatability with identical inputs.';
   } else if (seeded && looksP5) {
     verdict = 'exact-likely';
-    reason = 'seeded p5 random() is a documented LCG — integer floor/threshold/select traits port EXACTLY to Solidity. Confirm no trait keys off a raw float value. Wire with --attributes-renderer (see site/content/docs/protocol/renderers.mdx).';
+    reason = 'p5 randomSeed() appears in the script. If traits use the seeded p5 generator, compare outputs for identical inputs before porting its arithmetic and call order to an attributes renderer.';
   } else if (seeded) {
     verdict = 'careful';
     reason = "seeded, but the PRNG isn't identified as p5 — reproducible on-chain if you port that generator + the exact call order.";
@@ -424,8 +437,8 @@ export function recommendLane(a: ScriptAnalysis): string {
       ? 'Animation size is uncertain until dependency sizes are known. Verify tokenURI or use a resolver.'
       : 'Animation may exceed a single tokenURI call. Consider DIRECTORY mode (--code-dir), a CDN dependency, or the generator’s piecewise getters.';
   const traits = a.traits.present
-    ? 'A resolver with a render runner can serve the reported JS traits. Chain-rendered traits require --attributes-renderer.'
+    ? 'A resolver with a render runner can serve the reported JS traits. Use an attributes renderer for traits computed from chain state.'
     : 'The script has no recognized abx.traits() call for the resolver to capture.';
   return `${animation}
-  Marketplace stills need an image renderer, a public image URL, or a resolver. ${traits}`;
+  Marketplace stills can use stored image bytes, an image renderer, a public image URL, or a resolver. ${traits}`;
 }

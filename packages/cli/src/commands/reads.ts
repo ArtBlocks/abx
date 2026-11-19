@@ -273,7 +273,7 @@ export async function cmdInspect(path: string | undefined, flags: Flags) {
     info('no named PostParam reads recognized by static inspection.');
   }
   if (a.hasDynamicParamReads) {
-    warn('computed or destructured PostParam reads may use additional keys. Declare the intended inputs explicitly with --schema.');
+    warn('computed or ambiguous PostParam reads may use additional keys. Declare the intended inputs explicitly with --schema.');
   }
 
   step('On-chain document — RPC viability');

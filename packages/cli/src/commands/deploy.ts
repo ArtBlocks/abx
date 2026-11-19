@@ -4262,19 +4262,22 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   // the palette param, then deployed without it.
   const declaredSchemaKeys = new Set(schemas.map((s) => s.key));
   const undeclaredParams = (scriptAnalysis?.paramHints ?? []).filter((k) => !declaredSchemaKeys.has(k));
-  const paramsDisposition = scriptAnalysis
+  const paramsDisposition = (scriptAnalysis
     ? undeclaredParams.length
-      ? `⚠ the script READS ${undeclaredParams.join(', ')} but ${undeclaredParams.length === 1 ? "it isn't" : "they aren't"} in --schema → dropped at render (default used) UNLESS an augment hook supplies ${undeclaredParams.length === 1 ? 'it' : 'them'}. Add --schema ${undeclaredParams.map((k) => `${k}:<Type>:<Auth>`).join(',')} only for collector/creator inputs (a palette collectors set = HexColor:TokenOwner); ignore this for keys your augment hook derives`
+      ? `⚠ static inspection found ${undeclaredParams.join(', ')} missing from --schema. Declare intended collector or creator inputs with --schema ${undeclaredParams.map((key) => `${key}:<Type>:<Auth>`).join(',')}. An augment hook may supply these values without a schema.`
       : schemas.length
         ? `${schemas.length} declared: ${schemaSummary}`
-        : 'none (the script reads no collector params)'
+        : 'no named collector inputs recognized by static inspection'
     : schemas.length
       ? `${schemas.length} declared: ${schemaSummary}`
       : (hasImageRenderer || hasAttributesRenderer)
         // Renderer-only lane: the CLI can't introspect an opaque Solidity renderer to know which
         // PostParams it reads (unlike the JS lane's static paramHints), so nudge — the palette-miss.
         ? `⚠ none declared — if your Solidity renderer reads ANY collector PostParam, declare EACH with ${bold('--schema <key>:Type:Auth')} (matching the key your renderer reads — e.g. ${bold('palette:HexColor:TokenOwner')}) or that input is FIXED at the renderer's default forever and collectors can't set it (the CLI can't detect the key — a Solidity renderer is opaque, so this is on you to declare)`
-        : 'none declared';
+        : 'none declared') +
+    (scriptAnalysis?.hasDynamicParamReads
+      ? ' Computed or ambiguous reads may use additional keys. Review the intended inputs.'
+      : '');
   // Hoisted here (rather than beside its one printed use, in the Surfaces block below) so BOTH the
   // dry-run's Surfaces block and the plan object's `surfaces.postParams.ok` (populated at every one
   // of this lane's emit sites, dry-run/sent/resume alike) read the exact same verdict.
@@ -4387,7 +4390,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         `owner+royalty: ${flags.for ? `pinned to ${String(flags.for)}` : flags.sign !== undefined ? '⚠ the wallet you connect (NOT pinned — pass --for to enforce)' : 'your wallet'} @ ${royaltyBps / 100}%.` +
         (transferValidator !== zeroAddress ? ` ERC-721C: enrolled at deploy, permanently (validator ${transferValidator}).` : '') + `\n` +
         `  Surfaces — thumbnail: ${imageDisposition}. traits: ${traitsDisposition}. postparams: ${paramsDisposition}.` +
-        ((imageOrphaned || traitsBroken || undeclaredParams.length)
+        ((imageOrphaned || traitsBroken)
           ? `\n  ⚠ One or more surfaces resolve to NOTHING marketplaces can see. Settle them now: fixing one after deploy is an owner-signed re-point + re-render, on a collection that showed a placeholder in between. Re-run --dry-run after fixing, or pass --yes to ship as-is.`
           : ''),
       flags,

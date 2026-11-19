@@ -41,7 +41,7 @@ test('analyzeScript: seeded p5 sketch — all four trait keys, p5 detected, exac
   assert.equal(a.doc.fitsSingleCall, true); // 1.7KB script + runtime + p5 ~200KB ≪ ceiling
   // Without deployment context, inspect names the tradeoff instead of pretending one lane is
   // universally correct.
-  assert.match(recommendLane(a), /Marketplace stills need/);
+  assert.match(recommendLane(a), /Marketplace stills can use stored image bytes/);
   assert.match(recommendLane(a), /Animation can use --onchain-uri/);
   // A ternary VALUE ('Sparse'/'Dense'/'Calm'/'Wild') must NOT be mistaken for a trait key.
   for (const bogus of ['Sparse', 'Dense', 'Calm', 'Wild']) assert.ok(!a.traits.keys.includes(bogus), `stray key ${bogus}`);
@@ -93,7 +93,7 @@ test('analyzeScript: no traits reported → none, still fully-on-chain viable', 
   const a = analyzeScript(`function setup(){createCanvas(400,400);} function draw(){background(0);}`, ['p5@1.0.0']);
   assert.equal(a.traits.present, false);
   assert.equal(a.feasibility.verdict, 'none');
-  assert.match(recommendLane(a), /Marketplace stills need/);
+  assert.match(recommendLane(a), /Marketplace stills can use stored image bytes/);
   assert.match(recommendLane(a), /Animation can use --onchain-uri/);
 });
 
@@ -143,10 +143,10 @@ test('runtime contract: a bare `tokenData` global → flagged', () => {
   assert.match(a.runtime.wrongGlobal ?? '', /bare/);
 });
 
-test('analyzeScript: no abx.traits() → traits feasibility reason states no traits on ANY lane (not just on-chain)', () => {
-  const a = analyzeScript(`function setup(){createCanvas(400,400);} function draw(){background(0);}`, ['p5@1.0.0']);
-  assert.match(a.feasibility.reason, /ANY lane/i);
-  assert.match(a.feasibility.reason, /does not invent traits/i);
+test('analyzeScript: a missing JS trait report leaves stored and computed attributes available', () => {
+  const a = analyzeScript('abx.done();');
+  assert.equal(a.feasibility.verdict, 'none');
+  assert.match(a.feasibility.reason, /stored attributes or a field renderer/);
 });
 
 // ── heuristics must read CODE, not prose ─────────────────────────────────────────
@@ -275,7 +275,7 @@ test('inspect: real seeded p5 still gets the p5-specific verdict', () => {
     function draw(){ abx.traits({ n: floor(random(1,9)) }); }
   `);
   assert.equal(a.feasibility.verdict, 'exact-likely');
-  assert.match(a.feasibility.reason, /p5 random/);
+  assert.match(a.feasibility.reason, /p5 randomSeed/);
 });
 
 // ── Runtime vs Traits must not contradict ──────────────────────────────────────
@@ -335,4 +335,19 @@ abx.traits({Name: abx.tokenData.museName});
 
   const b = analyzeScript(`drawGrain(Math.random()); abx.traits({Name: 'Mica'});`);
   assert.equal(b.feasibility.verdict, 'unknown');
+});
+
+
+test('inspect treats a shadowed alias as uncertain while keeping direct PostParam reads', () => {
+  const a = analyzeScript(`const td = abx.tokenData; function draw(td) { return td.width; } abx.traits({Hue: abx.tokenData.hue});`);
+  assert.deepEqual(a.paramHints, ['hue']);
+  assert.equal(a.hasDynamicParamReads, true);
+});
+
+test('inspect distinguishes a method on another object from the built-in Math.random', () => {
+  const a = analyzeScript(`const audioMath = {random: () => 0.5}; abx.traits({Density: audioMath.random()});`);
+  assert.equal(a.prng.usesMathRandom, false);
+  assert.notEqual(a.feasibility.verdict, 'infeasible');
+  const b = analyzeScript(`abx.traits({Density: window.Math.random()});`);
+  assert.equal(b.feasibility.verdict, 'infeasible');
 });
