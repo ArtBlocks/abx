@@ -34,6 +34,7 @@ export default function HomePage() {
         <footer className={styles.facts}>
           <span>Open source</span>
           <span>Built by the team at Art Blocks</span>
+          <a href="/llms.txt">Docs for agents</a>
         </footer>
       </section>
     </main>
