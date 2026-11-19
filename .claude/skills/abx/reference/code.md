@@ -74,7 +74,9 @@ each row after minting.
 
 ## Preview and inspect honestly
 
-Use `abx preview` while authoring and `abx inspect` before choosing a deployment lane.
+Use `abx preview` to observe the work while authoring. `abx inspect` reads the local script as
+text and offers wiring hints and a size estimate. Declare the intended schema explicitly and
+verify actual render and deployment behavior using the relevant preview and chain reads.
 
 Preview uses the canonical runtime envelope, dependency order, and token-data shape with synthetic
 inputs. It is a high-fidelity authoring preview, not an end-to-end deployment proof. It does not prove:

@@ -4571,9 +4571,6 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
       const which = imageOrphaned && traitsBroken ? 'the thumbnail and traits surfaces resolve' : `the ${imageOrphaned ? 'thumbnail' : 'traits'} surface resolves`;
       warn(`${bold(`${which} to NOTHING a marketplace can see`)} — fix before deploy (a deploy-time decision you can't add later without a re-point tx): ${remedies}.`);
     }
-    // A dropped param is its own, milder problem: the piece renders, that input just takes its
-    // default. Kept separate from the broken-surface alarm above (see the note there).
-    if (undeclaredParams.length) info(`  ${dim('dropped params render with their defaults — declare collector/creator inputs with')} ${bold('--schema <key>:<Type>:<Auth>')} ${dim('(skip this for keys an augment hook supplies)')}`);
     // The runner/verify line is for lanes that need an off-chain STILL. An on-chain image renderer has
     // no still to render, host, or refresh — whether or not there's also a program driving
     // animation_url — so pointing at a runner and a bucket backend there is simply wrong.

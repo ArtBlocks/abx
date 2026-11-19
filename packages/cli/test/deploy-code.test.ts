@@ -536,7 +536,7 @@ test('Surfaces: an undeclared param alone never claims a surface resolves to NOT
   assert.match(out, /thumbnail: ON-CHAIN/i, 'the on-chain thumbnail must be reported as resolved');
   assert.doesNotMatch(out, /resolves? to NOTHING/i, 'a dropped param must not be called a dead surface');
   // ...and the milder, correct guidance is still given.
-  assert.match(out, /dropped params render with their defaults/i);
+  assert.match(out, /static inspection found palette missing from --schema/i);
 });
 
 // An on-chain image renderer has no off-chain still — so a runner, a bucket backend, and a "publishes

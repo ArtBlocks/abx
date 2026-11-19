@@ -42,7 +42,7 @@ test('analyzeScript: seeded p5 sketch — all four trait keys, p5 detected, exac
   // Without deployment context, inspect names the tradeoff instead of pretending one lane is
   // universally correct.
   assert.match(recommendLane(a), /Marketplace stills can use stored image bytes/);
-  assert.match(recommendLane(a), /Animation can use --onchain-uri/);
+  assert.match(recommendLane(a), /Estimated animation size is within the budget for --onchain-uri/);
   // A ternary VALUE ('Sparse'/'Dense'/'Calm'/'Wild') must NOT be mistaken for a trait key.
   for (const bogus of ['Sparse', 'Dense', 'Calm', 'Wild']) assert.ok(!a.traits.keys.includes(bogus), `stray key ${bogus}`);
 });
@@ -94,7 +94,7 @@ test('analyzeScript: no traits reported → none, still fully-on-chain viable', 
   assert.equal(a.traits.present, false);
   assert.equal(a.feasibility.verdict, 'none');
   assert.match(recommendLane(a), /Marketplace stills can use stored image bytes/);
-  assert.match(recommendLane(a), /Animation can use --onchain-uri/);
+  assert.match(recommendLane(a), /Estimated animation size is within the budget for --onchain-uri/);
 });
 
 test('analyzeScript: a document too large for one eth_call → directory-mode recommendation', () => {
@@ -331,7 +331,7 @@ abx.traits({Name: abx.tokenData.museName});
 `);
   assert.equal(a.feasibility.verdict, 'careful');
   assert.match(a.feasibility.reason, /cannot tell whether it affects traits/);
-  assert.match(recommendLane(a), /^Animation can use --onchain-uri/);
+  assert.match(recommendLane(a), /^Estimated animation size is within the budget for --onchain-uri/);
 
   const b = analyzeScript(`drawGrain(Math.random()); abx.traits({Name: 'Mica'});`);
   assert.equal(b.feasibility.verdict, 'unknown');
@@ -339,9 +339,11 @@ abx.traits({Name: abx.tokenData.museName});
 
 
 test('inspect treats a shadowed alias as uncertain while keeping direct PostParam reads', () => {
-  const a = analyzeScript(`const td = abx.tokenData; function draw(td) { return td.width; } abx.traits({Hue: abx.tokenData.hue});`);
-  assert.deepEqual(a.paramHints, ['hue']);
-  assert.equal(a.hasDynamicParamReads, true);
+  for (const declaration of ['function draw(td)', 'function * draw(td)', 'const steps = function *(td)']) {
+    const a = analyzeScript(`const td = abx.tokenData; ${declaration} { return td.width; }; abx.traits({Hue: abx.tokenData.hue});`);
+    assert.deepEqual(a.paramHints, ['hue']);
+    assert.equal(a.hasDynamicParamReads, true);
+  }
 });
 
 test('inspect distinguishes a method on another object from the built-in Math.random', () => {

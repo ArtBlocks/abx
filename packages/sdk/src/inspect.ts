@@ -1,10 +1,8 @@
 /**
  * `abx inspect <script.js>` — static analysis of a generative script, BEFORE picking a lane.
  *
- * The membrane fix behind this: an agent (or creator) should DERIVE the deployment lane from what
- * the script actually needs — are there traits? are they reproducible on-chain? how big is the
- * assembled document (does a single `tokenURI` eth_call even fit)? — instead of guessing "fully
- * on-chain!" and walking it back. This module is the pure analysis; `cmdInspect` formats it.
+ * Provides source-level diagnostics and a document-size estimate. The creator chooses the schema
+ * and delivery using previewed and deployed output. `cmdInspect` formats these advisory results.
  *
  * Static only — it never executes the script (that's the resolver/runner's job, and executing
  * untrusted code in the CLI would be a footgun). JS analysis uses source heuristics; HTML
@@ -120,9 +118,8 @@ function sourceViews(source: string): {code: string; noComments: string} {
 
 /**
  * Coordinates the runtime injects into `tokenData` on every render. They are NOT PostParams: they
- * arrive automatically, and `--schema tokenId:…` is advice that must never be followed (a reserved
- * key can't be declared). Excluded from {@link paramReads} so the "declare EACH or it's dropped"
- * warning only ever names keys a creator can actually declare.
+ * arrive automatically and cannot be declared in the schema. {@link paramReads} omits them from
+ * the candidate schema keys.
  */
 const RESERVED_TOKEN_DATA_KEYS = new Set(['seed', 'tokenId', 'chainId', 'contractAddress']);
 
@@ -162,7 +159,7 @@ function paramReads(code: string, noComments: string): {paramHints: string[]; ha
   if (aliases.size) {
     // The scan does not resolve lexical scope. Omit alias reads when a function or arrow
     // parameter could shadow that alias, while still reporting direct tokenData reads.
-    const parameters = /\bfunction\s*\*?\s*(?:[A-Za-z_$][\w$]*\s*)?\(([^()]*)\)|\(([^()]*)\)\s*=>|(?<![\w$.])([A-Za-z_$][\w$]*)\s*=>/g;
+    const parameters = /\bfunction\s*(?:\*\s*)?(?:[A-Za-z_$][\w$]*\s*)?\(([^()]*)\)|\(([^()]*)\)\s*=>|(?<![\w$.])([A-Za-z_$][\w$]*)\s*=>/g;
     for (const match of code.matchAll(parameters)) {
       const list = match[1] ?? match[2] ?? match[3];
       for (const [name] of list.matchAll(/[A-Za-z_$][\w$]*/g)) {
@@ -434,7 +431,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
 /** Animation size and marketplace serving have independent requirements. */
 export function recommendLane(a: ScriptAnalysis): string {
   const animation = a.doc.fitsSingleCall
-    ? 'Animation can use --onchain-uri. Verify the assembled tokenURI with the RPC and consumers you plan to use.'
+    ? 'Estimated animation size is within the budget for --onchain-uri. Verify the assembled tokenURI with the RPC and consumers you plan to use.'
     : a.doc.unknownDepSizes
       ? 'Animation size is uncertain until dependency sizes are known. Verify tokenURI or use a resolver.'
       : 'Animation may exceed a single tokenURI call. Consider DIRECTORY mode (--code-dir), a CDN dependency, or the generator’s piecewise getters.';
