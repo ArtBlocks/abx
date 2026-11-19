@@ -150,7 +150,7 @@ import {openWalletSession, type SignResult, type TxProvider, type WalletSession}
 import {openSponsoredSession} from './creator-signer.js';
 import {gatedSend, laneFromFlags, type DryRunSimulation} from './riskgate.js';
 import {withJson} from './jsonout.js';
-import {info} from './output.js';
+import {lazyBootstrapSender, info} from './output.js';
 import {loadCollectionMetadata, validateCollectionMetadata} from './collection-metadata.js';
 import {currentSigningReadiness} from './riskgate.js';
 import {viewerSurface, tokenViewerUrl} from './view-url.js';
@@ -2822,7 +2822,8 @@ export async function cmdAttach(rest: string[], flags: Flags): Promise<void> {
   // Warn (never throw) on an unrecognized flag — a typo or a hopeful `--mime-type` otherwise no-ops
   // INVISIBLY (round-1: an agent passed `--mime-type` and it was silently swallowed). mimeType is
   // declared from the URL extension, not a flag; say so.
-  for (const f of unknownFlags(flags, ATTACH_FLAGS)) {
+  const acceptedFlags = flags.unsigned !== undefined && !isDryRun(flags) ? [...ATTACH_FLAGS, 'json'] : ATTACH_FLAGS;
+  for (const f of unknownFlags(flags, acceptedFlags)) {
     const hint = f.includes('mime')
       ? ' mimeType is declared from the file EXTENSION in the URI, not a flag.'
       : f === 'for'
@@ -3285,8 +3286,7 @@ async function ensureFixedPriceMinter(override?: string): Promise<Address> {
       return predicted;
     }
   }
-  const {wallet, account} = makeWalletClient({chainKey: CHAIN});
-  const send = makeHotSender({wallet, account, publicClient});
+  const send = lazyBootstrapSender(publicClient);
   console.log(dim('  deploying the canonical fixed-price minter (shared, ownerless) — CREATE2…'));
   const {minter, txHash} = await deployFixedPriceMinter(send, publicClient);
   console.log(`  ${green('✓')} fixed-price minter ${minter}`);
@@ -3317,8 +3317,7 @@ async function ensureFixedPriceMinter1155(override?: string): Promise<Address> {
       return predicted;
     }
   }
-  const {wallet, account} = makeWalletClient({chainKey: CHAIN});
-  const send = makeHotSender({wallet, account, publicClient});
+  const send = lazyBootstrapSender(publicClient);
   console.log(dim('  deploying the canonical fixed-price edition minter (shared, ownerless) — CREATE2…'));
   const {minter, txHash} = await deployFixedPriceMinter1155(send, publicClient);
   console.log(`  ${green('✓')} fixed-price edition minter ${minter}`);

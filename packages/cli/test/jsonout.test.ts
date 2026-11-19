@@ -1,7 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {jsonMode, jsonSafe, withJson} from '../src/jsonout.js';
+import {jsonMode, jsonSafe, withJson, withUnsignedJson} from '../src/jsonout.js';
 import type {Flags} from '../src/flags.js';
+import {signTx} from '../src/signer.js';
+import {lazyBootstrapSender} from '../src/output.js';
+import type {PreparedTx, PublicClient} from '@artblocks/abx-sdk';
 
 /**
  * The contract under test is one sentence: **under `--json`, stdout carries exactly one JSON document
@@ -166,4 +169,62 @@ test('jsonSafe: bigints become decimal strings instead of throwing', () => {
   // JSON.stringify refuses them outright — which would fail at the LAST line of a real deploy.
   const out = jsonSafe({block: 12345678901234567890n, nested: {ids: [1n, 2n]}, keep: 'text'});
   assert.deepEqual(out, {block: '12345678901234567890', nested: {ids: ['1', '2']}, keep: 'text'});
+});
+
+
+const signer = '0x0000000000000000000000000000000000000001';
+const clone = '0x0000000000000000000000000000000000000002';
+const deploy: PreparedTx = {
+  op: 'deploy-code', to: signer, data: '0x1234', value: '0x0', chainId: 84532,
+  summary: 'Deploy a clone', fields: {clone},
+};
+const setup: PreparedTx = {
+  op: 'setup', to: clone, data: '0xabcd', value: '0x0', chainId: 84532,
+  summary: 'Stage generator code', fields: {chunks: '1'}, gasFloor: '0x100',
+};
+const cold = {lane: 'unsigned', chainKey: 'base-sepolia', expectedSigner: signer} as const;
+
+test('unsigned JSON keeps command fields and emits exact transactions in the order prepared', async () => {
+  const {out, err} = await capture(() => withUnsignedJson('deploy-code', jsonFlags, async () => {
+    await withJson(jsonFlags, async (emit) => {
+      console.log('preparing');
+      await signTx(deploy, cold);
+      await signTx(setup, cold);
+      emit({kind: 'code', sent: false});
+    });
+  }));
+  assert.deepEqual(JSON.parse(out), {
+    kind: 'code', schemaVersion: 1, command: 'deploy-code', lane: 'unsigned',
+    dryRun: false, sent: false, predicted: {clone},
+    txs: [{...deploy, expectedSigner: signer}, {...setup, expectedSigner: signer}],
+  });
+  assert.match(err, /preparing/);
+  assert.match(err, /Deploy a clone/);
+});
+
+test('unsigned JSON keeps an existing completed no-op and reports an empty transaction list', async () => {
+  const {out} = await capture(() => withUnsignedJson('deploy-code', jsonFlags, async () => {
+    await withJson(jsonFlags, async () => ({complete: true}));
+  }));
+  assert.deepEqual(JSON.parse(out), {
+    complete: true, schemaVersion: 1, command: 'deploy-code', lane: 'unsigned',
+    dryRun: false, sent: false, txs: [],
+  });
+});
+
+test('unsigned JSON refuses an implicit bootstrap and does not emit a partial transaction list', async () => {
+  const {out} = await capture(async () => {
+    await assert.rejects(withUnsignedJson('deploy-code', jsonFlags, async () => {
+      await signTx(deploy, cold);
+      const send = lazyBootstrapSender({} as PublicClient);
+      await send(setup);
+    }), /bootstrap the missing dependency separately/);
+  });
+  assert.equal(out, '');
+});
+
+test('plain unsigned output retains its human narration and gas-floor hint', async () => {
+  const {out} = await capture(async () => { await signTx(setup, cold); });
+  assert.match(out, /unsigned transaction/);
+  assert.match(out, /"gasMustExceed": "0x100"/);
 });

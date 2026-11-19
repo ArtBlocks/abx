@@ -47,6 +47,7 @@ import {
 import {resolveBackend, validateRenderStorageCombo} from '@artblocks/abx-storage';
 import {CHAIN, explorerBase, activeBackendId, backendResolution, collectContentLocators, localIndexer, storageOptions, storageOverrides} from './config.js';
 import {type Flags} from './flags.js';
+import {assertUnsignedJsonCanBootstrap} from './jsonout.js';
 import {looksPerTokenAttributes, parseSeriesTraitsById} from './series-traits.js';
 import {ANSI, ansiBold, ansiDim, ansiGreen, ansiPurple} from './ansi.js';
 
@@ -112,6 +113,7 @@ export function refuseMissingFactory(kind: string, envVar: string, reason: strin
 export function lazyBootstrapSender(publicClient: PublicClient): SendTx {
   let cached: SendTx | undefined;
   return (tx) => {
+    assertUnsignedJsonCanBootstrap();
     if (!cached) {
       const {wallet, account} = makeWalletClient({chainKey: CHAIN});
       cached = makeHotSender({wallet, account, publicClient});

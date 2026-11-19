@@ -22,6 +22,7 @@ import {
 import type {TransactionReceipt} from 'viem';
 import {faucetHint} from './config.js';
 import {openSponsoredSession} from './creator-signer.js';
+import {recordUnsignedTransaction} from './jsonout.js';
 import {ANSI as C, ansiBold as bold, ansiDim as dim, ansiGreen as green, ansiPurple as purple} from './ansi.js';
 
 /**
@@ -273,6 +274,7 @@ async function signCold(provider: TxProvider, opts: SignOptions): Promise<null> 
   }
   const prepared = await resolveTx(provider, opts.expectedSigner ?? ('0x0000000000000000000000000000000000000000' as Address));
   printIntent(prepared, opts);
+  if (recordUnsignedTransaction(prepared, opts.expectedSigner)) return null;
   console.log(`\n  ${bold('unsigned transaction')} ${dim('— sign + broadcast this with your own signer (multisig / offline):')}\n`);
   console.log(
     JSON.stringify(
