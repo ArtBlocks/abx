@@ -89,6 +89,7 @@ import {
   resolveSeedSource,
   resolveSeriesCodeFactory,
   saltFor,
+  saltGuard,
   seriesCodeAbi,
   seriesCodeFactoryAbi,
   tryReadContract,
@@ -838,6 +839,27 @@ function withJson(flags: Flags, body: (emit: (payload: Record<string, unknown>) 
   }));
 }
 
+/** Preflight a staged image deploy before the trust-anchor lookup can bootstrap a write. */
+async function preflightImageStaging(
+  flags: Flags,
+  lane: Lane,
+  name: string,
+  count: number,
+  explicitSalt: Hex | undefined,
+): Promise<SendTx | undefined> {
+  if (!flags['onchain-image'] || isDryRun(flags)) return;
+  const deployer = flags.for as Address | undefined;
+  if (explicitSalt && deployer) assertSaltGuardForDeployer(explicitSalt, deployer);
+  const guard = explicitSalt ? saltGuard(explicitSalt) : zeroAddress;
+  const expectedSigner = deployer ?? (guard === zeroAddress ? undefined : guard);
+  const hotStage = lane === 'send' ? envStagingSender(!!flags.yes, expectedSigner) : undefined;
+  await confirmSend(
+    `About to stage ${count} image(s) on-chain and deploy "${name}" on ${CHAIN}. Staging and any required contract setup spend gas before the collection deploys.`,
+    flags,
+  );
+  return hotStage;
+}
+
 export async function cmdDeploy(flags: Flags, serveAfter: boolean) {
   if (serveAfter && isDryRun(flags)) {
     throw new Error('abx demo is a live deployment walkthrough; use `abx deploy --dry-run --for <address>` for a non-mutating preview');
@@ -972,6 +994,16 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // protocol's event spine is an ABX token, and the factory is one way to get there, not the
   // definition of the thing. Rather than restate it more carefully, the demo skips it: a first-timer
   // does not need a provenance lecture before they have made anything.
+  if (flags['onchain-image'] && lane === 'unsigned') {
+    throw new Error(
+      'Staging an on-chain image (--onchain-image) needs interactive signing — each chunk tx feeds ' +
+        'the next. Use the hot lane (a funded key), --sign (browser wallet), or --sponsor; --unsigned cannot stage content.',
+    );
+  }
+  if (flags['onchain-image'] && !flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
+  const explicitSalt = parseSaltFlag(flags.salt);
+  const hotStage = await preflightImageStaging(flags, lane, name, 1, explicitSalt);
+
   if (!serveAfter) step('Trust anchor');
   let factory: Address;
   if (dryRun) {
@@ -1118,25 +1150,10 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // dry run (no bytes written) — we note that a real deploy would stage it.
   let bakedImage: OnChainFieldInput[] | undefined;
   if (onchainImage) {
-    if (!flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
-    // On-chain staging is a SEQUENCE (chunk write(s) → the deploy that references the manifest)
-    // where each tx's receipt feeds the next, so it can't be signed offline in one run.
-    if (lane === 'unsigned') {
-      throw new Error(
-        'Staging an on-chain image (--onchain-image) needs interactive signing — each chunk tx feeds ' +
-          'the next. Use the hot lane (a funded key), --sign (browser wallet), or --sponsor; --unsigned cannot stage content.',
-      );
-    }
     step('Stage on-chain image');
     if (dryRun) {
-      info(await previewImageStaging(flags.image, parseCompress(flags.compress)));
-    } else if (lane === 'send') {
-      // hot lane: the env key stages now (deployer-independent — the manifest doesn't depend
-      // on the clone address), then the deploy below bakes in the reader field.
-      const {fields, note} = await stageImageField(flags.image, parseCompress(flags.compress), envStagingSender());
-      bakedImage = fields;
-      info(note);
-    } else {
+      info(await previewImageStaging(flags.image as string, parseCompress(flags.compress)));
+    } else if (lane !== 'send') {
       // wallet lane: the staging tx(s) are signed by the connecting wallet, so they're deferred
       // into the sign session below (one connect, then approve each step) and baked there.
       info('image will be staged on-chain in your wallet (one connect, then approve each step), then baked into the deploy.');
@@ -1177,7 +1194,6 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   // Mint-on-deploy is the default; --no-mint defers it so you can stand up + warm
   // the resolver at the (known) address first, then `abx mint`. The demo always mints.
   const noMint = !serveAfter && (flags['no-mint'] === 'true' || flags['no-mint'] === '');
-  const explicitSalt = parseSaltFlag(flags.salt);
 
   // Wallet-lane Arweave uploads paid by the connecting wallet's Turbo credits (`--storage-signer eth`
   // + `--sign`). When set (after connect), buildForDeployer routes uploads through it.
@@ -1333,13 +1349,18 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
   }
 
   // opt-in --confirm: a final y/N before the real send (no-op without --confirm; never blocks scripts)
-  await confirmSend(
+  if (!onchainImage) await confirmSend(
     `About to deploy 1/1 "${name}" (${symbol})${flags.image ? ' with your image' : ' (generative demo content)'}; mint: ${noMint ? 'deferred' : 'token #0 at deploy'}; approvals: ${approvals} wallet approval(s); owner+royalty: your wallet @ ${royaltyBps / 100}%.` +
       (transferValidator !== zeroAddress ? ` ERC-721C: enrolled at deploy, permanently (validator ${transferValidator}).` : ''),
     flags,
   );
 
   if (lane === 'send') {
+    if (hotStage) {
+      const {fields, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), hotStage);
+      bakedImage = fields;
+      info(note);
+    }
     // hot lane: the env key is the deployer, known up front.
     const {wallet, account} = makeWalletClient({chainKey: CHAIN});
     deployerAddr = account.address;
@@ -1385,6 +1406,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
       const signer = await session.connect();
       deployerAddr = signer;
       // Stage on-chain through the session (sets bakedImage, which buildForDeployer reads below).
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, signer);
       const {fields, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
       bakedImage = fields;
       info(note);
@@ -1409,6 +1431,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
         throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
       }
       deployerAddr = session.address;
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, session.address);
       const {fields, note} = await stageImageField(flags.image as string, parseCompress(flags.compress), sessionStagingSender(session));
       bakedImage = fields;
       info(note);
@@ -1718,6 +1741,10 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     if (signer) await warnUnfunded(publicClient, signer, lane);
   }
 
+  if (flags['onchain-image'] && !flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
+  const explicitSalt = parseSaltFlag(flags.salt);
+  const hotStage = await preflightImageStaging(flags, lane, name, 1, explicitSalt);
+
   step('Trust anchor');
   let factory: Address;
   if (dryRun) {
@@ -1781,14 +1808,11 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     info(note);
   };
   if (onchainImage) {
-    if (!flags.image) throw new Error('--onchain-image needs --image <path> (the bytes to put on-chain)');
     step('Stage on-chain image');
-    if (dryRun) info(await previewImageStaging(flags.image, parseCompress(flags.compress)));
-    else if (lane === 'send') await stageOnChainImage(envStagingSender());
+    if (dryRun) info(await previewImageStaging(flags.image as string, parseCompress(flags.compress)));
     // lane === 'sign' → staged inside the wallet session further down.
   }
 
-  const explicitSalt = parseSaltFlag(flags.salt);
   const noMint = flags['no-mint'] !== undefined;
   if (noMint && flags['mint-amount'] !== undefined) {
     throw new Error('--no-mint and --mint-amount disagree — drop one. (--no-mint defers ALL minting at deploy; --mint-amount sets how many copies mint at deploy.)');
@@ -1933,13 +1957,14 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     return;
   }
 
-  await confirmSend(
+  if (!onchainImage) await confirmSend(
     `About to deploy an edition of "${name}" (${symbol}) — ${editionSize === 0n ? 'open' : editionSize.toString()} copies${flags.image ? ' with your image' : ' (generative demo content)'}; mint: ${mintAmount > 0n ? `${mintAmount} at deploy` : 'deferred'}; approvals: ${approvals} wallet approval(s); owner+royalty: your wallet @ ${royaltyBps / 100}%.` +
       (transferValidator !== zeroAddress ? ` ERC-1155C: enrolled at deploy, permanently (validator ${transferValidator}).` : ''),
     flags,
   );
 
   if (lane === 'send') {
+    if (hotStage) await stageOnChainImage(hotStage);
     const {wallet, account} = makeWalletClient({chainKey: CHAIN});
     deployerAddr = account.address;
     const {clone: predicted, params, salt, contentNote} = await buildForDeployer(account.address);
@@ -1972,6 +1997,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
     try {
       const signer = await session.connect();
       deployerAddr = signer;
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, signer);
       await stageOnChainImage(sessionStagingSender(session)); // sets bakedImage, read by buildForDeployer
       const {clone: predicted, params, salt, contentNote} = await buildForDeployer(signer);
       info(contentNote);
@@ -1994,6 +2020,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
         throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
       }
       deployerAddr = session.address;
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, session.address);
       await stageOnChainImage(sessionStagingSender(session));
       const {clone: predicted, params, salt, contentNote} = await buildForDeployer(session.address);
       info(contentNote);
@@ -2220,6 +2247,8 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   const explicitSalt = parseSaltFlag(flags.salt);
   const hasPublicUrl = !!(flags['public-base-url'] || process.env.ABX_PUBLIC_BASE_URL);
 
+  const hotStage = await preflightImageStaging(flags, lane, name, count, explicitSalt);
+
   step('Trust anchor');
   let factory: Address;
   if (dryRun) {
@@ -2430,14 +2459,10 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
   // --onchain-image staging is deferred to the lane branch (hot: env key up front; wallet: inside
   // the sign session). Every other mode is lane-independent, so build it now.
   // opt-in --confirm: a final y/N before ANY upload or send (no-op without --confirm; never blocks scripts)
-  if (!dryRun) {
-    const custody = onchainImage
-      ? 'image on-chain (chunk store)'
-      : offchainImageOnchainJson
-        ? `image off-chain on ${backendId} + on-chain renderer`
-        : onChainUri
-          ? 'inline SVG on-chain'
-          : `off-chain custody → ${baseUrl}`;
+  if (!dryRun && !onchainImage) {
+    const custody = offchainImageOnchainJson
+      ? `image off-chain on ${backendId} + on-chain renderer`
+      : onChainUri ? 'inline SVG on-chain' : `off-chain custody → ${baseUrl}`;
     await confirmSend(
       `About to deploy Series "${name}" (${symbol}) — ${count} token(s); ${custody}; mint: ${mintCount > 0 ? `${mintCount} at deploy` : 'deferred'}; approvals: ${approvals} wallet approval(s); owner+royalty: your wallet @ ${royaltyBps / 100}%.` +
         (transferValidator !== zeroAddress ? ` ERC-721C: enrolled at deploy, permanently (validator ${transferValidator}).` : ''),
@@ -2583,7 +2608,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
     // hot lane: the env key stages every token up front (deployer-independent), then deploys.
     const {wallet, account} = makeWalletClient({chainKey: CHAIN});
     deployerAddr = account.address;
-    if (onchainImage) await buildFields(envStagingSender());
+    if (hotStage) await buildFields(hotStage);
     const {clone: predicted, params, salt} = await buildForDeployer(account.address);
     info(`deterministic address: ${predicted}`);
     info(`mint: ${mintCount > 0 ? `${mintCount} token(s) → ${account.address} at deploy` : 'deferred'}`);
@@ -2608,6 +2633,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
     try {
       const signer = await session.connect();
       deployerAddr = signer;
+      if (onchainImage && explicitSalt) assertSaltGuardForDeployer(explicitSalt, signer);
       if (onchainImage) await buildFields(sessionStagingSender(session));
       const {clone: predicted, params, salt} = await buildForDeployer(signer);
       const sent = await session.send(prepareDeploySeries({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
@@ -2625,6 +2651,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
         throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
       }
       deployerAddr = session.address;
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, session.address);
       await buildFields(sessionStagingSender(session));
       const {clone: predicted, params, salt} = await buildForDeployer(session.address);
       const sent = await session.send(prepareDeploySeries({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}));
@@ -2891,6 +2918,8 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
   const explicitSalt = parseSaltFlag(flags.salt);
   const hasPublicUrl = !!(flags['public-base-url'] || process.env.ABX_PUBLIC_BASE_URL);
 
+  const hotStage = await preflightImageStaging(flags, lane, name, count, explicitSalt);
+
   step('Trust anchor');
   let factory: Address;
   if (dryRun) {
@@ -3086,7 +3115,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
     }
   };
 
-  if (!dryRun) {
+  if (!dryRun && !onchainImage) {
     const custody = onChainUri ? 'inline SVG on-chain' : `off-chain custody (${backendId})`;
     await confirmSend(
       `About to deploy an edition series "${name}" (${symbol}) — ${count} id(s) × ${editionSize === 0n ? 'open' : editionSize.toString()} cop${editionSize === 1n ? 'y' : 'ies'} each; ${custody}; ` +
@@ -3209,7 +3238,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
     const {wallet, account} = makeWalletClient({chainKey: CHAIN});
     deployerAddr = account.address;
     // hot lane: the env key stages every id up front (deployer-independent), then deploys.
-    if (onchainImage) await buildFields(envStagingSender());
+    if (hotStage) await buildFields(hotStage);
     const {clone: predicted, params, salt} = await buildForDeployer(account.address);
     info(`deterministic address: ${predicted}`);
     info(`mint: ${effectiveMintCount > 0 ? `${effectiveMintCount} id(s) × ${mintAmount} cop${mintAmount === 1n ? 'y' : 'ies'} → ${account.address} at deploy` : 'deferred'}`);
@@ -3235,6 +3264,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
     try {
       const signer = await session.connect();
       deployerAddr = signer;
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, signer);
       await buildFields(sessionStagingSender(session));
       const {clone: predicted, params, salt} = await buildForDeployer(signer);
       info(`mint: ${effectiveMintCount > 0 ? `${effectiveMintCount} id(s) × ${mintAmount} cop${mintAmount === 1n ? 'y' : 'ies'} → ${signer} at deploy` : 'deferred'}`);
@@ -3256,6 +3286,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
         throw new Error(`The ABX creator wallet ${session.address} is not the required signer ${flags.for}.`);
       }
       deployerAddr = session.address;
+      if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, session.address);
       await buildFields(sessionStagingSender(session));
       const {clone: predicted, params, salt} = await buildForDeployer(session.address);
       info(`mint: ${effectiveMintCount > 0 ? `${effectiveMintCount} id(s) × ${mintAmount} cop${mintAmount === 1n ? 'y' : 'ies'} → ${session.address} at deploy` : 'deferred'}`);

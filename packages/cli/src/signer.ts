@@ -93,6 +93,15 @@ export function envKeyRequiresYes(chainKey: string): boolean {
   return chainSupportByKey(chainKey)?.environment !== 'testnet';
 }
 
+export function assertHotWriteApproved(chainKey: string, yes?: boolean): void {
+  if (envKeyRequiresYes(chainKey) && !yes) {
+    throw new Error(
+      `Refusing to sign on '${chainKey}' with the env key without --yes. ` +
+        'For real value, prefer the wallet lane (--sign) so the key never touches this process.',
+    );
+  }
+}
+
 /** Funding copy for the browser-wallet lane. Unknown networks stay on the production-safe side:
  * never describe gas as free unless the shared chain registry explicitly marks the network testnet. */
 export function walletFundingGuidance(chainKey: string): string[] {
@@ -202,12 +211,7 @@ async function signSponsored(provider: TxProvider, opts: SignOptions): Promise<S
 
 // ── hot lane: env key signs + broadcasts ─────────────────────────────────────
 async function signHot(provider: TxProvider, opts: SignOptions): Promise<SignResult> {
-  if (envKeyRequiresYes(opts.chainKey) && !opts.yes) {
-    throw new Error(
-      `Refusing to sign on '${opts.chainKey}' with the env key without --yes. ` +
-        `For real value, prefer the wallet lane (--sign) so the key never touches this process.`,
-    );
-  }
+  assertHotWriteApproved(opts.chainKey, opts.yes);
   const {wallet, account} = makeWalletClient({chainKey: opts.chainKey});
   const publicClient = makePublicClient({chainKey: opts.chainKey});
   const prepared = await resolveTx(provider, account.address);
@@ -239,12 +243,7 @@ async function signHot(provider: TxProvider, opts: SignOptions): Promise<SignRes
  * a hand-rolled nonce/gas loop at the one call site that needed it.
  */
 export async function signHotSequence(txs: PreparedTx[], opts: {chainKey: string; yes?: boolean}): Promise<SignResult[]> {
-  if (envKeyRequiresYes(opts.chainKey) && !opts.yes) {
-    throw new Error(
-      `Refusing to sign on '${opts.chainKey}' with the env key without --yes. ` +
-        `For real value, prefer the wallet lane (--sign) so the key never touches this process.`,
-    );
-  }
+  assertHotWriteApproved(opts.chainKey, opts.yes);
   const {wallet, account} = makeWalletClient({chainKey: opts.chainKey});
   const publicClient = makePublicClient({chainKey: opts.chainKey});
   console.log(`\n  ${dim(`signing ${txs.length} transaction(s) with env key ${account.address} …`)}`);
