@@ -32,7 +32,8 @@ export interface ScriptAnalysis {
   bytes: number;
   estChunks: number; // ~22KB SSTORE2 chunks
   traits: {present: boolean; keys: string[]};
-  paramHints: string[]; // PostParam keys the script READS off tokenData (excl. `seed`) — declare with --schema or they're dropped
+  paramHints: string[]; // Statically visible PostParam keys, excluding runtime coordinates.
+  hasDynamicParamReads?: boolean; // A computed key or rest binding could carry other inputs.
   prng: {seeded: boolean; usesBareRandom: boolean; usesMathRandom: boolean; usesNoise: boolean};
   depHints: string[]; // detected library globals (e.g. "p5")
   looksP5: boolean;
@@ -120,50 +121,73 @@ function sourceViews(source: string): {code: string; noComments: string} {
 /**
  * Coordinates the runtime injects into `tokenData` on every render. They are NOT PostParams: they
  * arrive automatically, and `--schema tokenId:…` is advice that must never be followed (a reserved
- * key can't be declared). Excluded from {@link paramKeys} so the "declare EACH or it's dropped"
+ * key can't be declared). Excluded from {@link paramReads} so the "declare EACH or it's dropped"
  * warning only ever names keys a creator can actually declare.
  */
 const RESERVED_TOKEN_DATA_KEYS = new Set(['seed', 'tokenId', 'chainId', 'contractAddress']);
 
-/** PostParam keys the script READS from tokenData — the palette-style customization inputs. A deploy
- *  that omits these from `--schema` silently drops them (the render sees `undefined` → its default),
- *  which is exactly how a real session "forgot" the palette it had itself identified. Heuristic (the
- *  script isn't executed): find identifiers aliased to `abx.tokenData`, then their property reads;
- *  plus direct `abx.tokenData.key`, destructuring, and `tokenData['key']`. `seed` is intrinsic, not a
- *  PostParam, so it's excluded. Advisory — over- or under-detection is a hint, never a hard gate. */
-function paramKeys(source: string): string[] {
+const JS_IDENTIFIER = '[A-Za-z_$][\\w$]*';
+const TOKEN_DATA = '(?:(?:window\\s*\\??\\.\\s*)?abx\\s*\\??\\.\\s*tokenData|window\\s*\\??\\.\\s*abxTokenData)';
+const NAME_START = '(?<![\\w$.])';
+const NAME_END = '(?![\\w$])';
+const RHS_END = '(?=[ \\t]*(?:[,;}]|$|\\r?\\n(?!\\s*(?:[.(\\[?+*/-]|&&|\\|\\|))))';
+const TOKEN_DATA_FALLBACK = '(?:\\|\\||\\?\\?)\\s*\\{\\s*\\}';
+const GUARDED_TOKEN_DATA = `(?:window\\s*\\.\\s*abx\\s*&&\\s*)?${TOKEN_DATA}`;
+const TOKEN_DATA_OBJECT = `(?:${GUARDED_TOKEN_DATA}|\\(\\s*${GUARDED_TOKEN_DATA}(?:\\s*${TOKEN_DATA_FALLBACK})?\\s*\\))(?:\\s*${TOKEN_DATA_FALLBACK})?`;
+const LITERAL_KEY = /^(?:'([^'\\]+)'|"([^"\\]+)")/;
+
+/** Recognize direct reads and simple whole-object aliases without treating arbitrary expressions
+ * or computed properties as known schema keys. Use the blanked source for positions and the
+ * original spelling only when a quoted property is needed. */
+function paramReads(code: string, noComments: string): {paramHints: string[]; hasDynamicParamReads: boolean} {
   const keys = new Set<string>();
-  const add = (k: string | undefined) => { if (k && !RESERVED_TOKEN_DATA_KEYS.has(k)) keys.add(k); };
-  // Identifiers aliased to the token-data object — either `abx.tokenData` (via abx.js) or the raw
-  // injected global `window.abxTokenData` (e.g. `var td = (window.abx && abx.tokenData) || {}`).
+  let hasDynamicParamReads = false;
+  const add = (key: string) => { if (!RESERVED_TOKEN_DATA_KEYS.has(key)) keys.add(key); };
+
+  // Match a complete RHS. In e.g. (abx.tokenData || {}).seed, the binding is a scalar.
+  const assignments = new RegExp(`${NAME_START}(${JS_IDENTIFIER})\\s*=(?!=|>)\\s*`, 'g');
+  const objectRhs = new RegExp(`^${TOKEN_DATA_OBJECT}${RHS_END}`);
   const aliases = new Set<string>();
-  // The `(?!…\.[A-Za-z_$])` guard: only alias when the RHS is the tokenData OBJECT, not a PROPERTY of
-  // it — `const seed = abx.tokenData.seed` aliases `seed` to a scalar, so its method calls
-  // (`seed.startsWith(…)`) must NOT be read as params (the false-positive that flagged startsWith/slice).
-  const aliasRe = /\b([A-Za-z_$][\w$]*)\s*=\s*[^;\n]*(?:abx\s*\??\s*\.\s*tokenData|window\s*\??\s*\.\s*abxTokenData)(?!\s*\??\s*\.\s*[A-Za-z_$])/g;
-  let m: RegExpExecArray | null;
-  while ((m = aliasRe.exec(source)) !== null) aliases.add(m[1]);
-  for (const a of aliases) {
-    // `(?!\s*\()` excludes method CALLS (`td.slice(…)`) — a param read is a bare property, never a call.
-    const dotRe = new RegExp(`\\b${a.replace(/[$]/g, '\\$')}\\s*\\??\\s*\\.\\s*([A-Za-z_$][\\w$]*)(?!\\s*\\()`, 'g');
-    let d: RegExpExecArray | null;
-    while ((d = dotRe.exec(source)) !== null) add(d[1]);
-    // …and bracket reads through the same alias. A DOTTED key (`collapse.index`) is only readable
-    // as `d['collapse.index']`, and ABX's own output-naming convention is dotted
-    // (`effect.render.image`) — so alias+bracket is the documented idiom, not an edge case. Missing
-    // it produced a false "declare EACH or it's dropped at render" warning on a correct program.
-    const brkRe = new RegExp(`\\b${a.replace(/[$]/g, '\\$')}\\s*\\??\\s*\\[\\s*['"]([^'"]+)['"]\\s*\\]`, 'g');
-    while ((d = brkRe.exec(source)) !== null) add(d[1]);
+  const assigned = new Set<string>();
+  for (const match of code.matchAll(assignments)) {
+    const name = match[1];
+    // Reused names are ambiguous in a source heuristic. Keep their reads out of the named hints.
+    if (assigned.has(name)) aliases.delete(name);
+    else if (objectRhs.test(code.slice(match.index + match[0].length))) aliases.add(name);
+    assigned.add(name);
   }
-  // Direct `abx.tokenData.key` and `abx.tokenData['key']`.
-  const directRe = /abx\s*\??\s*\.\s*tokenData\s*\??\s*(?:\.\s*([A-Za-z_$][\w$]*)|\[\s*['"]([^'"]+)['"]\s*\])/g;
-  while ((m = directRe.exec(source)) !== null) add(m[1] ?? m[2]);
-  // Destructuring: `const { palette, foo } = abx.tokenData` (or an alias).
-  const destrRe = /(?:const|let|var)\s*\{([^}]*)\}\s*=\s*[^;\n]*(?:abx\s*\.\s*tokenData|\b(?:tokenData|td)\b)/g;
-  while ((m = destrRe.exec(source)) !== null) {
-    for (const part of m[1].split(',')) add(part.split(':')[0].trim().replace(/\.\.\./, '') || undefined);
+  const aliasNames = [...aliases].map((name) => name.replaceAll('$', '\\$')).join('|');
+  const receivers = aliasNames ? `(?:${TOKEN_DATA}|${aliasNames})` : TOKEN_DATA;
+  const access = new RegExp(
+    `${NAME_START}${receivers}${NAME_END}\\s*(?:\\??\\.\\s*(${JS_IDENTIFIER})|(?:\\?\\.\\s*)?\\[)`,
+    'g',
+  );
+  for (const match of code.matchAll(access)) {
+    const end = match.index + match[0].length;
+    if (match[1]) {
+      if (!/^\s*(?:\?\.\s*)?\(/.test(code.slice(end))) add(match[1]);
+    } else {
+      const literal = /^\s*(?:'([^'\\]+)'|"([^"\\]+)")\s*\]/.exec(noComments.slice(end));
+      if (literal) add(literal[1] ?? literal[2]);
+      else hasDynamicParamReads = true;
+    }
   }
-  return [...keys];
+
+  const fromObject = aliasNames ? `(?:${TOKEN_DATA_OBJECT}|(?:${aliasNames})${NAME_END})` : TOKEN_DATA_OBJECT;
+  const destructuring = new RegExp(`\\b(?:const|let|var)\\s*\\{([^{}]*)\\}\\s*=\\s*${fromObject}${RHS_END}`, 'g');
+  for (const match of code.matchAll(destructuring)) {
+    const start = match.index + match[0].indexOf('{') + 1;
+    for (const part of noComments.slice(start, start + match[1].length).split(',')) {
+      const property = part.trim();
+      if (!property) continue;
+      const literal = LITERAL_KEY.exec(property);
+      const name = /^([A-Za-z_$][\w$]*)\s*(?=[:=]|$)/.exec(property);
+      if (literal) add(literal[1] ?? literal[2]);
+      else if (name) add(name[1]);
+      else hasDynamicParamReads = true;
+    }
+  }
+  return {paramHints: [...keys], hasDynamicParamReads};
 }
 
 /** Extract flat object-literal keys from the first `abx.traits(...)` argument.
@@ -198,9 +222,7 @@ function traitsCallArgumentStart(source: string): number | null {
   return null;
 }
 
-function traitKeys(source: string): string[] {
-  const start = traitsCallArgumentStart(source);
-  if (start === null) return [];
+function traitsArgument(source: string, start: number): string {
   let quote = '';
   let escaped = false;
   let depth = 1;
@@ -217,7 +239,10 @@ function traitKeys(source: string): string[] {
     if (ch === '(') depth++;
     else if (ch === ')' && --depth === 0) { end = i; break; }
   }
-  const argument = source.slice(start, end);
+  return source.slice(start, end);
+}
+
+function traitKeys(argument: string): string[] {
   const keys: string[] = [];
   // A key sits at the start of the object or right after a comma (so a ternary VALUE like
   // `? 'Sparse' : 'Dense'` — a `:` not preceded by `,`/`{` — is never mistaken for a key). Allow
@@ -320,8 +345,10 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   // toolkit injects/captures them? A near-miss global deploys fine but is silently broken.
   // `\??\s*\.` tolerates optional chaining (`abx?.tokenData`) — a common, correct way to read it.
   const readsTokenData = /abx\s*\??\s*\.\s*tokenData\b/.test(code) || /window\s*\??\s*\.\s*abxTokenData\b/.test(code);
-  const reportsTraits = traitsCallArgumentStart(code) !== null;
-  const keys = reportsTraits ? traitKeys(noComments) : [];
+  const traitsStart = traitsCallArgumentStart(code);
+  const reportsTraits = traitsStart !== null;
+  const keys = traitsStart === null ? [] : traitKeys(traitsArgument(noComments, traitsStart));
+  const traitsUseMathRandom = traitsStart !== null && /Math\s*\.\s*random\s*\(/.test(traitsArgument(code, traitsStart));
   let wrongGlobal: string | null = null;
   if (!readsTokenData) {
     if (/window\s*\.\s*tokenTraits\b/.test(code)) wrongGlobal = 'window.tokenTraits — traits are reported by CALLING abx.traits({…}), never by writing a global';
@@ -335,9 +362,12 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   if (!reportsTraits) {
     verdict = 'none';
     reason = 'no abx.traits({…}) call → NO marketplace traits on ANY lane. A resolver captures the keys you pass to abx.traits(); it does not invent traits from internal variables or a global. Call abx.traits({…}) in the sketch if you want filterable traits.';
-  } else if (usesMathRandom && !seeded) {
+  } else if (traitsUseMathRandom) {
     verdict = 'infeasible';
-    reason = 'traits derive from Math.random() (unseeded) — non-deterministic, reproducible nowhere. Serve attributes via a resolver, or ship without marketplace traits.';
+    reason = 'the trait expression calls unseeded Math.random(). Use deterministic trait inputs for reproducible attributes.';
+  } else if (usesMathRandom) {
+    verdict = 'unknown';
+    reason = 'the script uses Math.random(). Static inspection cannot tell whether it affects traits. Check repeatability with identical inputs.';
   } else if (seeded && looksP5) {
     verdict = 'exact-likely';
     reason = 'seeded p5 random() is a documented LCG — integer floor/threshold/select traits port EXACTLY to Solidity. Confirm no trait keys off a raw float value. Wire with --attributes-renderer (see site/content/docs/protocol/renderers.mdx).';
@@ -355,12 +385,11 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
     // order, which is the `careful` bar, not the field-renderer-and-done bar.
     verdict = 'careful';
     reason =
-      'traits derive from a HAND-WRITTEN PRNG seeded off the token seed — deterministic, so reproducible on-chain, ' +
-      'but only if you port that exact generator (same arithmetic, same call order) into Solidity. Verify with identical ' +
-      'seeds on both sides before committing to on-chain traits; the off-chain resolver lane needs no port.';
+      'the script appears to use a HAND-WRITTEN PRNG. Static inspection cannot tell whether it affects traits. ' +
+      'If it does, reproduce the arithmetic and call order in the attributes renderer and compare identical inputs.';
   } else {
     verdict = 'exact-likely';
-    reason = 'traits look derived from the seed/params directly (no PRNG) — reproducible on-chain via an attributes field-renderer.';
+    reason = 'no PRNG recognized. Verify the traits with repeat renders before porting their logic to an attributes renderer.';
   }
 
   const deps = declaredDeps;
@@ -376,7 +405,7 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
     bytes,
     estChunks: Math.max(1, Math.ceil(bytes / 22_000)),
     traits: {present: reportsTraits, keys},
-    paramHints: paramKeys(noComments),
+    ...paramReads(code, noComments),
     prng: {seeded, usesBareRandom, usesMathRandom, usesNoise},
     depHints,
     looksP5,
@@ -387,32 +416,16 @@ export function analyzeScript(source: string, declaredDeps: string[] = []): Scri
   };
 }
 
-/** A one-line lane recommendation derived from the analysis (the decision-tree output). */
+/** Animation size and marketplace serving have independent requirements. */
 export function recommendLane(a: ScriptAnalysis): string {
-  const bigDoc = !a.doc.fitsSingleCall && !a.doc.unknownDepSizes;
-  if (bigDoc) {
-    return 'DIRECTORY mode (--code-dir) or a CDN dependency — the assembled document is too large for a single tokenURI eth_call to be reliable.';
-  }
-  if (a.feasibility.verdict === 'infeasible') {
-    return 'RESOLVER lane (--public-base-url) if marketplace traits matter (a server serves the JS-derived attributes), OR --onchain-uri and accept no marketplace traits (the tokenURI + animation are still fully on-chain).';
-  }
-  if (a.feasibility.verdict === 'exact-likely' || a.feasibility.verdict === 'none') {
-    const dep = a.depHints.length ? ` --dep ${a.depHints[0]}@<version>` : '';
-    const docKb = Math.round(a.doc.estBytes / 1000);
-    // Owner call (real-world experience): for a generative drop meant to sell, LEAD with the off-chain
-    // resolver — maneuverable over time + marketplaces fetch a SMALL tokenURI reliably. Fully-on-chain
-    // is the durability-max alternative, but its ~docKb tokenURI (whole doc per call) strains some
-    // marketplace/indexer reads. Traits are NOT a free flag on the on-chain lane (deployed renderer).
-    const traitNames = a.traits.keys.length ? a.traits.keys.join(', ') : 'dynamic keys';
-    const traits = a.traits.present
-      ? ` Traits (${traitNames}): the resolver serves them from the render with no Solidity; on the on-chain lane they need a DEPLOYED --attributes-renderer (fork SeedTraitsRenderer.sol) or they're omitted.`
-      : ``;
-    return (
-      `DEFAULT WITHOUT DEPLOYMENT CONTEXT — OFF-CHAIN RESOLVER (--public-base-url + an effects runner): maneuverable (metadata/serving can evolve without on-chain surgery) and marketplaces fetch a SMALL tokenURI reliably.${traits}\n` +
-      `  FULLY ON-CHAIN IS ALSO VIABLE (--onchain-uri${dep}): supply authoritative on-chain image/attributes renderers where needed. The tokenURI carries the whole ~${docKb}KB document per call, so confirm marketplace/indexer compatibility before choosing it.`
-    );
-  }
-  return (
-    `RECOMMENDED — an OFF-CHAIN RESOLVER (--public-base-url): maneuverable, and it serves traits from the render regardless of the PRNG. --onchain-uri also works for tokenURI + animation, but first verify the script is deterministic (see the feasibility note), and note the large-tokenURI marketplace-read tradeoff; on that lane traits need a DEPLOYED --attributes-renderer or are omitted.`
-  );
+  const animation = a.doc.fitsSingleCall
+    ? 'Animation can use --onchain-uri. Verify the assembled tokenURI with the RPC and consumers you plan to use.'
+    : a.doc.unknownDepSizes
+      ? 'Animation size is uncertain until dependency sizes are known. Verify tokenURI or use a resolver.'
+      : 'Animation may exceed a single tokenURI call. Consider DIRECTORY mode (--code-dir), a CDN dependency, or the generator’s piecewise getters.';
+  const traits = a.traits.present
+    ? 'A resolver with a render runner can serve the reported JS traits. Chain-rendered traits require --attributes-renderer.'
+    : 'The script has no recognized abx.traits() call for the resolver to capture.';
+  return `${animation}
+  Marketplace stills need an image renderer, a public image URL, or a resolver. ${traits}`;
 }

@@ -35,7 +35,7 @@ built-in help.
 | `deploy` | Deploy a 1/1 image or single-work edition |
 | `deploy-series` | Deploy an image Series or multi-work image edition |
 | `deploy-code` | Deploy a code Series or code edition |
-| `inspect` | Check a script and recommend a deployment lane |
+| `inspect` | Check a script for PostParams, trait hints, and animation delivery options |
 | `scaffold solidity` | Create a Foundry workspace for renderers and hooks |
 | `predict` | Predict a deterministic address from a pinned salt |
 | `add` / `index` | Register or index a deployed project |
@@ -134,6 +134,11 @@ Playwright and its Chromium build remain optional; install them using the comman
 when absent. Bounds are 1–64 seeds, 2–10 runs, 1–20 frames, a 1–4000 pixel square viewport, and a
 1–120000 millisecond timeout per navigation/readiness/capture operation. `--check` and `--shoot`
 are separate modes. Each invocation exercises the same local preview server as the studio.
+
+`abx inspect` reads JavaScript statically. It reports visible PostParam keys and flags computed reads
+that can hide additional inputs. Declare the intended schema explicitly. Script-wide randomness is
+a hint to check repeatability with `abx preview --check`. Verify the assembled `tokenURI` separately
+from the marketplace still and traits you plan to serve.
 
 ## Signing lanes
 
