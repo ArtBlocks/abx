@@ -150,7 +150,9 @@ Token IDs outside the project's range also return `404`.
 ## Gateways
 
 Store an IPFS CID or Arweave transaction ID as the field value. Keep the HTTP gateway separate so it
-can change without changing the content address.
+can change without changing the content address. `abx set-field --url` accepts `ipfs://` and `ar://`
+locators and stores their content ID and optional path in the corresponding typed representation.
+Use an HTTP(S) locator when you intend to store that exact serving URL.
 
 ```bash
 abx set-gateway 0xYourContract \
