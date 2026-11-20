@@ -685,6 +685,8 @@ const COMMAND_HELP: Record<string, string> = {
     ${g('--dep <name@version>')}[,…]    load a library the way the resolver would (built-in CDN map; on-chain refs can't be fetched offline)
     ${g('--port')} <n>                  studio port (default ${DEFAULT_PREVIEW_PORT}; the resolver's ${DEFAULT_PORT} stays free)
     ${g('--shoot')} <dir>               render headlessly to PNGs + traits.json and EXIT ${dim('(for an agent that has no browser)')}
+    ${g('--param key=value')}[,…]       override declared PostParams for --shoot and --check. Use key= to unset a value.
+                                For a live render, pass the values in the URL, for example /view?palette=Dusk.
     ${g('--count')} <n>                 seeds to shoot / show in the grid (default 9)   ${g('--width')} <px>   ${g('--timeout-ms')} <n>
     ${g('--check')} [--runs <n>] [--frames <k>]  render each seed in <n> fresh browser contexts (default 3); bounded repeatability evidence; exit 0 pass · 1 drift · 2 harness. ${g('--json')} prints the report only
                           ${g('--frames')} <k>: sample k frames per run at 1s targets (default 1); compares pixels and traits after abx.done()
