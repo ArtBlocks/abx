@@ -267,7 +267,7 @@ export class CreatorApiClient {
       const parsed = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
       const remaining = parsed.remainingMicros;
       if (response.status === 429 && parsed.error === 'sponsorship_budget_exceeded' &&
-          typeof remaining === 'number' && Number.isSafeInteger(remaining) && remaining >= 0 && remaining <= 1_000_000) {
+          typeof remaining === 'number' && Number.isSafeInteger(remaining) && remaining >= 0) {
         const time = typeof parsed.retryAt === 'string' ? Date.parse(parsed.retryAt) : NaN;
         throw new CreatorSponsorshipBudgetError(remaining, Number.isFinite(time) ? new Date(time).toISOString() : null);
       }

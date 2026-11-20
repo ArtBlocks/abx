@@ -91,9 +91,23 @@ function pendingLogin(options: DeviceLoginOptions): {key: string; raw?: string; 
 }
 
 /** Shared first-party account credential for Node tools. The wallet grant itself stays in the OS keyring. */
-export function creatorAccountPath(createDirectory = false): string {
-  const path = resolvePath(homedir(), '.config', 'abx', 'creator-account.env')
-  if (createDirectory) mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+export function creatorAccountPath(createDirectory = false, configRoot = resolvePath(homedir(), '.config')): string {
+  const directory = resolvePath(configRoot, 'abx')
+  const path = resolvePath(directory, 'creator-account.env')
+  if (createDirectory) {
+    mkdirSync(directory, { recursive: true, mode: 0o700 })
+    if (gitCheck(directory, ['rev-parse', '--is-inside-work-tree']) &&
+        !gitCheck(directory, ['check-ignore', '--quiet', '--', basename(path)]) &&
+        !gitCheck(directory, ['ls-files', '--error-unmatch', '--', basename(path)])) {
+      // Own the default ignore file when this directory is new. Preserve existing Git rules,
+      // and leave the normal tracked-file and ignore checks in place at credential write time.
+      try {
+        writeFileSync(resolvePath(directory, '.gitignore'), '/creator-account.env\n/.creator-account.env.*.tmp\n', { flag: 'wx' })
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      }
+    }
+  }
   return path
 }
 
@@ -582,4 +596,3 @@ export async function oauthLogout(
   if (process.env[options.envVar] === token) delete process.env[options.envVar]
   return { status: 'revoked', local }
 }
-

@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {basename, dirname, join} from 'node:path';
 import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {Chacha20Poly1305} from '@hpke/chacha20poly1305';
 import {CipherSuite, DhkemP256HkdfSha256, HkdfSha256} from '@hpke/core';
@@ -7,6 +11,8 @@ import {generateP256KeyPair} from '@privy-io/node';
 import {CreatorAgentAuthorization, CreatorAuthorizationError, restoreOrAuthorizeCreatorAgent} from '../src/index.js';
 import {CreatorCredentialStoreAccessError, CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/index.js';
 import {
+  assertPrivateEnvPath,
+  creatorAccountPath,
   assertSponsorConfigured,
   assertSponsoredPreparedTx,
   confirmedSponsoredReceipt,
@@ -529,4 +535,27 @@ test('sponsored preview enforces live per-chain entitlement', async () => {
       /not enabled for/,
     );
   }
+});
+
+
+test('user account setup protects credentials in a Git-managed config directory', (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'abx-dotfiles-'));
+  t.after(() => rmSync(home, {recursive: true, force: true}));
+  execFileSync('git', ['init', '--quiet'], {cwd: home});
+
+  const path = creatorAccountPath(true, join(home, '.config'));
+  const directory = dirname(path);
+  const ignored = join(directory, '.gitignore');
+  assert.doesNotThrow(() => assertPrivateEnvPath(path));
+  execFileSync('git', ['check-ignore', '--quiet', '--', '.creator-account.env.123.example.tmp'], {cwd: directory});
+
+  writeFileSync(ignored, '/other-rule\n');
+  creatorAccountPath(true, join(home, '.config'));
+  assert.equal(readFileSync(ignored, 'utf8'), '/other-rule\n');
+  assert.throws(() => assertPrivateEnvPath(path), /not Git-ignored/);
+
+  writeFileSync(path, 'test-fixture', {mode: 0o600});
+  execFileSync('git', ['add', '--force', '--', basename(path)], {cwd: directory});
+  creatorAccountPath(true, join(home, '.config'));
+  assert.throws(() => assertPrivateEnvPath(path), /tracked creator-account\.env/);
 });

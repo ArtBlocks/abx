@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {CreatorApiClient, CreatorApiError} from '../src/creators-service.js';
+import {CreatorApiClient, CreatorApiError, CreatorSponsorshipBudgetError} from '../src/creators-service.js';
 
 const address = '0x1111111111111111111111111111111111111111' as const;
 
@@ -188,3 +188,29 @@ test('service URL normalization is bounded and strips trailing slashes', async (
     /URL is too long/,
   );
 })
+
+
+test('a provider budget above one dollar preserves the amount and retry time', async () => {
+  let requests = 0;
+  const retryAt = '2026-11-20T20:00:00.000Z';
+  const client = new CreatorApiClient({
+    baseUrl: 'https://api.example',
+    token: 'api-key',
+    fetchImpl: async () => {
+      requests++;
+      return Response.json({
+        error: 'sponsorship_budget_exceeded',
+        remainingMicros: 2_500_000,
+        retryAt,
+      }, {status: 429});
+    },
+  });
+
+  await assert.rejects(client.submit('operation_001', {
+    requestExpiry: '1789776000000',
+    data: '0x1234',
+    signed: {url: 'https://api.privy.io/v1/wallets/wallet-1/rpc', headers: {}},
+  }), (error) => error instanceof CreatorSponsorshipBudgetError &&
+    error.remainingMicros === 2_500_000 && error.retryAt === retryAt);
+  assert.equal(requests, 1);
+});
