@@ -1,6 +1,6 @@
 {
   "name": "@artblocks/abx-creator-wallet",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Node client for the shared ABX creator wallet and agent authorization.",
   "license": "MIT",
   "type": "module",
