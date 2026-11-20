@@ -135,7 +135,9 @@ export type OAuthLogoutResult =
   | { status: 'revoked'; local: 'removed' | 'external' | 'different' }
 
 function cleanBaseUrl(value: string): string {
-  return value.replace(/\/+$/, '')
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/') end--
+  return value.slice(0, end)
 }
 
 function safeDescription(value: unknown): string {
@@ -174,7 +176,7 @@ function assertUrl(value: unknown, field: string): string {
 
 function discoverUrl(baseUrl: string): string {
   const parsed = new URL(cleanBaseUrl(baseUrl))
-  const issuerPath = parsed.pathname.replace(/\/+$/, '')
+  const issuerPath = cleanBaseUrl(parsed.pathname)
   parsed.pathname = `/.well-known/oauth-authorization-server${issuerPath}`
   parsed.search = ''
   parsed.hash = ''
