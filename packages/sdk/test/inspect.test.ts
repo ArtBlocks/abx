@@ -41,8 +41,8 @@ test('analyzeScript: seeded p5 sketch — all four trait keys, p5 detected, exac
   assert.equal(a.doc.fitsSingleCall, true); // 1.7KB script + runtime + p5 ~200KB ≪ ceiling
   // Without deployment context, inspect names the tradeoff instead of pretending one lane is
   // universally correct.
-  assert.match(recommendLane(a), /DEFAULT WITHOUT DEPLOYMENT CONTEXT[^\n]*RESOLVER/i);
-  assert.match(recommendLane(a), /FULLY ON-CHAIN IS ALSO VIABLE/i);
+  assert.match(recommendLane(a), /Marketplace stills can use stored image bytes/);
+  assert.match(recommendLane(a), /Estimated animation size is within the budget for --onchain-uri/);
   // A ternary VALUE ('Sparse'/'Dense'/'Calm'/'Wild') must NOT be mistaken for a trait key.
   for (const bogus of ['Sparse', 'Dense', 'Calm', 'Wild']) assert.ok(!a.traits.keys.includes(bogus), `stray key ${bogus}`);
 });
@@ -86,15 +86,15 @@ test('analyzeScript: Math.random traits → infeasible on-chain → resolver lan
   assert.equal(a.prng.usesMathRandom, true);
   assert.equal(a.prng.seeded, false);
   assert.equal(a.feasibility.verdict, 'infeasible');
-  assert.match(recommendLane(a), /RESOLVER/);
+  assert.match(recommendLane(a), /resolver/i);
 });
 
 test('analyzeScript: no traits reported → none, still fully-on-chain viable', () => {
   const a = analyzeScript(`function setup(){createCanvas(400,400);} function draw(){background(0);}`, ['p5@1.0.0']);
   assert.equal(a.traits.present, false);
   assert.equal(a.feasibility.verdict, 'none');
-  assert.match(recommendLane(a), /DEFAULT WITHOUT DEPLOYMENT CONTEXT[^\n]*RESOLVER/i);
-  assert.match(recommendLane(a), /FULLY ON-CHAIN IS ALSO VIABLE/);
+  assert.match(recommendLane(a), /Marketplace stills can use stored image bytes/);
+  assert.match(recommendLane(a), /Estimated animation size is within the budget for --onchain-uri/);
 });
 
 test('analyzeScript: a document too large for one eth_call → directory-mode recommendation', () => {
@@ -143,10 +143,10 @@ test('runtime contract: a bare `tokenData` global → flagged', () => {
   assert.match(a.runtime.wrongGlobal ?? '', /bare/);
 });
 
-test('analyzeScript: no abx.traits() → traits feasibility reason states no traits on ANY lane (not just on-chain)', () => {
-  const a = analyzeScript(`function setup(){createCanvas(400,400);} function draw(){background(0);}`, ['p5@1.0.0']);
-  assert.match(a.feasibility.reason, /ANY lane/i);
-  assert.match(a.feasibility.reason, /does not invent traits/i);
+test('analyzeScript: a missing JS trait report leaves stored and computed attributes available', () => {
+  const a = analyzeScript('abx.done();');
+  assert.equal(a.feasibility.verdict, 'none');
+  assert.match(a.feasibility.reason, /stored attributes or a field renderer/);
 });
 
 // ── heuristics must read CODE, not prose ─────────────────────────────────────────
@@ -266,7 +266,7 @@ test('inspect: traits taken straight off seed/params keep the strong verdict (no
     abx.traits({ Palette: td.palette, Owner: td.tokenId });
   `);
   assert.equal(a.feasibility.verdict, 'exact-likely');
-  assert.match(a.feasibility.reason, /no PRNG/);
+  assert.match(a.feasibility.reason, /no PRNG/i);
 });
 
 test('inspect: real seeded p5 still gets the p5-specific verdict', () => {
@@ -275,7 +275,7 @@ test('inspect: real seeded p5 still gets the p5-specific verdict', () => {
     function draw(){ abx.traits({ n: floor(random(1,9)) }); }
   `);
   assert.equal(a.feasibility.verdict, 'exact-likely');
-  assert.match(a.feasibility.reason, /p5 random/);
+  assert.match(a.feasibility.reason, /p5 randomSeed/);
 });
 
 // ── Runtime vs Traits must not contradict ──────────────────────────────────────
@@ -302,4 +302,61 @@ test('inspect: tokenData accessor near the end of a large file is still detected
   assert.equal(a.runtime.readsTokenData, true);
   assert.equal(a.runtime.reportsTraits, true);
   assert.deepEqual(a.traits.keys, ['Tone']);
+});
+
+
+test('inspect preserves whole-object reads without inventing scalar aliases or method names', () => {
+  const a = analyzeScript(`(()=>{var a=(window.abx&&abx.tokenData||{}).seed;let td=abx.tokenData;let b=a.length;let c=a.slice(0);td.toString();return td?.['palette']})()`);
+  assert.deepEqual(a.paramHints, ['palette']);
+  assert.equal(a.hasDynamicParamReads, false);
+});
+
+test('inspect preserves literal keys and reports computed access without guessing its value', () => {
+  const a = analyzeScript(`
+const data = window.abxTokenData
+const { hue, 'effect.render.image': image } = data;
+const palette = data[key];
+const owner = abx.tokenData.tokenId;
+const sample = 'abx.tokenData.invented';
+`);
+  assert.deepEqual(a.paramHints, ['hue', 'effect.render.image']);
+  assert.equal(a.hasDynamicParamReads, true);
+});
+
+test('inspect describes script-wide PRNG evidence without assigning it to the reported traits', () => {
+  const a = analyzeScript(`
+let state = Number(abx.tokenData.seed);
+state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+abx.traits({Name: abx.tokenData.museName});
+`);
+  assert.equal(a.feasibility.verdict, 'careful');
+  assert.match(a.feasibility.reason, /cannot tell whether it affects traits/);
+  assert.match(recommendLane(a), /^Estimated animation size is within the budget for --onchain-uri/);
+
+  const b = analyzeScript(`drawGrain(Math.random()); abx.traits({Name: 'Mica'});`);
+  assert.equal(b.feasibility.verdict, 'unknown');
+});
+
+
+test('inspect treats a shadowed alias as uncertain while keeping direct PostParam reads', () => {
+  for (const declaration of ['function draw(td)', 'function * draw(td)', 'const steps = function *(td)']) {
+    const a = analyzeScript(`const td = abx.tokenData; ${declaration} { return td.width; }; abx.traits({Hue: abx.tokenData.hue});`);
+    assert.deepEqual(a.paramHints, ['hue']);
+    assert.equal(a.hasDynamicParamReads, true);
+  }
+});
+
+test('inspect distinguishes a method on another object from the built-in Math.random', () => {
+  const a = analyzeScript(`const audioMath = {random: () => 0.5}; abx.traits({Density: audioMath.random()});`);
+  assert.equal(a.prng.usesMathRandom, false);
+  assert.notEqual(a.feasibility.verdict, 'infeasible');
+  const b = analyzeScript(`abx.traits({Density: window.Math.random()});`);
+  assert.equal(b.feasibility.verdict, 'infeasible');
+});
+
+
+test('inspect reports uncertainty when tokenData is assigned to a previously assigned name', () => {
+  const a = analyzeScript('let td = {}; td = abx.tokenData; abx.traits({Hue: td.palette});');
+  assert.deepEqual(a.paramHints, []);
+  assert.equal(a.hasDynamicParamReads, true);
 });

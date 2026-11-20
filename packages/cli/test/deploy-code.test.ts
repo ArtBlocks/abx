@@ -374,8 +374,7 @@ test('deploy-code: a valid mutable-bucket --image-base is accepted on the DEFAUL
   assert.match(out, /render\/storage\s+✓/);
 });
 
-// The palette that got silently dropped: a script reading `td.palette` deployed without --schema must
-// warn that the param is read but undeclared → dropped at render.
+// A recognized palette read should prompt the creator to review the explicit schema.
 test('deploy-code warns when the script reads a PostParam not in --schema', async () => {
   const {code, out} = await runCli(
     ['deploy-code', '--script', tmpSketchWithParam(), '--name', 'X', '--symbol', 'XX', '--onchain-uri', '--dry-run'],
@@ -383,14 +382,14 @@ test('deploy-code warns when the script reads a PostParam not in --schema', asyn
   );
   assert.equal(code, 0, out);
   assert.match(out, /postparams:.*palette/i);
-  assert.match(out, /dropped|not.*in.*--schema|isn't in --schema/i);
+  assert.match(out, /static inspection found palette missing from --schema/i);
   // Declaring it clears the warning.
   const good = await runCli(
     ['deploy-code', '--script', tmpSketchWithParam(), '--name', 'X', '--symbol', 'XX', '--onchain-uri', '--schema', 'palette:HexColor:TokenOwner', '--dry-run'],
     NO_KEY,
   );
   assert.match(good.out, /postparams:.*1 declared/i);
-  assert.doesNotMatch(good.out, /dropped at render/i);
+  assert.doesNotMatch(good.out, /missing from --schema/i);
 });
 
 // The fs render-home footgun bites the RESOLVER lane hardest: a hosted resolver can't read your
@@ -536,7 +535,7 @@ test('Surfaces: an undeclared param alone never claims a surface resolves to NOT
   assert.match(out, /thumbnail: ON-CHAIN/i, 'the on-chain thumbnail must be reported as resolved');
   assert.doesNotMatch(out, /resolves? to NOTHING/i, 'a dropped param must not be called a dead surface');
   // ...and the milder, correct guidance is still given.
-  assert.match(out, /dropped params render with their defaults/i);
+  assert.match(out, /static inspection found palette missing from --schema/i);
 });
 
 // An on-chain image renderer has no off-chain still — so a runner, a bucket backend, and a "publishes

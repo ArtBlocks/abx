@@ -192,14 +192,12 @@ async function cmdPreviewBody(flags: Flags, emit?: (payload: Record<string, unkn
 }
 
 /**
- * `abx inspect <script.js>` — read a generative script and, WITHOUT executing it, report what it
- * needs (traits + their on-chain reproducibility, dependency hints, size → assembled-document size →
- * single-`tokenURI`-eth_call viability) and RECOMMEND a lane. The decision-tree entry point: run it
- * before choosing `--onchain-uri` vs a resolver vs directory mode, so the choice is derived, not guessed.
+ * `abx inspect <script.js>` — read local source for runtime wiring hints and estimate document size.
+ * Actual render and delivery behavior can be checked with preview and the deployed tokenURI.
  */
 export async function cmdInspect(path: string | undefined, flags: Flags) {
   if (!path || path.startsWith('--')) {
-    console.error('usage: abx inspect <script.js> [--dep <name@version>[,…]]   (static analysis + a lane recommendation — abx inspect --help)\n');
+    console.error('usage: abx inspect <script.js> [--dep <name@version>[,…]]   (source hints + size estimate — abx inspect --help)\n');
     process.exitCode = 1;
     return;
   }
@@ -237,42 +235,32 @@ export async function cmdInspect(path: string | undefined, flags: Flags) {
 
   step('Runtime data contract');
   if (a.runtime.readsTokenData) {
-    ok(`reads state via ${bold('abx.tokenData')}${a.runtime.reportsTraits ? ` and reports traits via ${bold('abx.traits({…})')}` : ''} — the recognized accessor(s).`);
-    if (!a.runtime.reportsTraits) info(`no ${bold('abx.traits({…})')} call — fine if this piece has no marketplace traits; add one if you want filterable traits (see below).`);
+    info('recognized an ABX token data accessor in the source.');
   } else {
-    // The silent-breaker: a fresh sketch that invents its own global deploys + renders without error
-    // but never receives the seed/params. This is the #1 authoring trap the skill's contract prevents.
-    warn(`this script never reads the abx token data via a recognized accessor (${bold('abx.tokenData')} or ${bold('window.abxTokenData')}).`);
-    if (a.runtime.wrongGlobal) warn(`  found instead: ${bold(a.runtime.wrongGlobal)}.`);
-    info(`the mint ${bold('seed')} and collector ${bold('params')} will NOT reach it → every token renders IDENTICALLY, and traits stay empty. Read state the one supported way: ${bold('var td = (window.abx && abx.tokenData) || {}')} then ${bold('td.seed')} / ${bold('td.<paramKey>')} (flat), report with ${bold('abx.traits({…})')}. Contract + a worked example: the skill's "Authoring the program" section.`);
+    info(`no ${bold('abx.tokenData')} or ${bold('window.abxTokenData')} accessor recognized. If the work uses the mint seed or PostParams, check how it reads token data.`);
+    if (a.runtime.wrongGlobal) warn(`found a possible wiring mistake: ${bold(a.runtime.wrongGlobal)}.`);
   }
 
   warnInlineScriptHtml(source, a.inlineHtml?.at);
 
   step('Traits');
   if (a.traits.present) {
-    info(
-      a.traits.keys.length
-        ? `reports ${a.traits.keys.length}: ${a.traits.keys.join(', ')}`
-        : 'reports traits, but their keys are dynamic or built outside a flat object literal',
-    );
-    const line = `on-chain reproducibility: ${bold(a.feasibility.verdict)} — ${a.feasibility.reason}`;
-    if (a.feasibility.verdict === 'exact-likely') ok(line);
-    else if (a.feasibility.verdict === 'infeasible') warn(line);
-    else info(line);
-  } else {
-    warn(a.feasibility.reason);
+    info(a.traits.keys.length
+      ? `keys recognized in abx.traits(): ${a.traits.keys.join(', ')}`
+      : 'abx.traits() recognized without visible literal keys');
   }
+  (a.feasibility.verdict === 'infeasible' ? warn : info)(a.feasibility.reason);
 
   step('PostParams (collector-set inputs)');
   if (a.paramHints.length) {
-    warn(`the script READS ${a.paramHints.length} param(s): ${bold(a.paramHints.join(', '))}`);
-    info(`declare EACH collector/creator input at deploy or it's silently dropped (render sees undefined → its default): ${bold(`--schema ${a.paramHints.map((k) => `${k}:<Type>:<Auth>`).join(',')}`)} ${dim(SCHEMA_CATALOG)} ${dim('Skip keys supplied by an augment hook.')}`);
+    info(`statically recognized keys: ${bold(a.paramHints.join(', '))}`);
+    const schema = a.paramHints.map((key) => `${key}:<Type>:<Auth>`).join(',');
+    info(`declare collector/creator inputs with ${bold('--schema ' + schema)} ${dim(SCHEMA_CATALOG)}. Skip keys supplied by an augment hook.`);
   } else {
-    // "none detected" is a HINT, not proof — the scan only sees params read as `abx.tokenData.<key>`
-    // (flat) or destructured from it. A creator who reads them a different way (a nested `.params`,
-    // an invented global) gets a false "none" and drops the --schema. Say so, don't reassure.
-    info(`none detected reading ${bold('abx.tokenData.<key>')} (flat) or destructuring from it. If you INTENDED a collector param (e.g. a palette) but see this, you're likely reading it a different way — read it as ${bold('abx.tokenData.<key>')} and re-run, or declare it explicitly with ${bold('--schema')} or it's dropped at render. Keys supplied by an augment hook do not need schema entries.`);
+    info('no named PostParam reads recognized by static inspection.');
+  }
+  if (a.hasDynamicParamReads) {
+    warn('computed or ambiguous PostParam reads may use additional keys. Declare the intended inputs explicitly with --schema.');
   }
 
   step('On-chain document — RPC viability');
@@ -281,10 +269,10 @@ export async function cmdInspect(path: string | undefined, flags: Flags) {
       `${a.doc.unknownDepSizes ? ' + undeclared/unknown dep bytes' : ''} ` +
       dim(`(script + runtime${a.doc.deps.length ? ' + ' + a.doc.deps.join('+') : ''})`),
   );
-  if (a.doc.fitsSingleCall) ok('fits a single tokenURI eth_call — the template (fully-on-chain) branch is viable.');
+  if (a.doc.fitsSingleCall) info('estimated to fit a single tokenURI eth_call. Verify the assembled output on the target network.');
   else warn('may exceed a single tokenURI eth_call — prefer directory mode, a CDN dep, or the generator piecewise getters.');
 
-  step('Recommended lane');
+  step('Animation and marketplace options');
   console.log(`  ${bold(recommendLane(a))}`);
   console.log(`  ${dim('trait feasibility deep-dive: docs.abx.io/docs/protocol/renderers · all lanes: abx deploy-code --help')}\n`);
 }

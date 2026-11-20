@@ -692,18 +692,16 @@ const COMMAND_HELP: Record<string, string> = {
     seed, so what you iterate on is what deploys. Routes: ${g('/')} studio (seed + params + live traits) · ${g('/grid')} N seeds at once,
     all live · ${g('/view')} the bare document. The program is re-read from disk per render, so ${bold('edit and refresh')} — no watcher.
     Unlike a still-image sweep this shows ${bold('animation')}, which is most of what a screenshot throws away.
-    ${dim('Still do both after the work settles:')} ${g('abx inspect')} ${dim('(is it wired right?) and a testnet deploy (the faithful end-to-end).')}
+    ${dim('Still do both after the work settles:')} ${g('abx inspect')} ${dim('(source hints) and a testnet deploy (end-to-end verification).')}
       ${g('abx preview')} --script art.js --schema palette:HexColor:TokenOwner
       ${g('abx preview')} --script art.js --shoot ./frames --count 12
       ${g('abx preview')} --script art.js --check --json`,
   inspect: `
-  ${bold('abx inspect')} <script.js> ${dim('— static analysis of a generative script + a lane recommendation. Read-only; the script is never executed.')}
-    ${g('--dep <name@version>[,…]')}   the on-chain deps you plan to declare, so the assembled-document size estimate is realistic (e.g. --dep p5@1.0.0)
-    Reports: inline HTML compatibility warnings; script size → on-chain chunks; detected libraries; the traits the script reports AND whether they can be
-    reproduced ON-CHAIN (seeded p5 LCG + integer/threshold traits → exact; Math.random / float-boundary → not); the
-    estimated assembled document size → whether a single ${g('tokenURI')} eth_call fits (template/fully-on-chain viability).
-    Ends with a recommended lane (fully-on-chain / resolver / directory). Run it BEFORE ${g('abx deploy-code')} to derive the
-    lane instead of guessing. Deep dive: docs.abx.io/docs/protocol/renderers`,
+  ${bold('abx inspect')} <script.js> ${dim('— read a local generative script as text for source hints and a size estimate.')}
+    ${g('--dep <name@version>[,…]')}   include planned on-chain dependencies in the document-size estimate (e.g. --dep p5@1.0.0)
+    Reports inline HTML compatibility, script size, and possible runtime wiring, library, trait, and PostParam hints.
+    Declare the intended schema explicitly. Use ${g('abx preview --check')} to test repeatability and query the complete
+    ${g('tokenURI')} on the target network to verify delivery. Deep dive: docs.abx.io/docs/protocol/renderers`,
   'scaffold-renderer': `
   ${bold('abx scaffold-renderer')} [<dir>] ${dim('— compatibility alias for `abx scaffold solidity`; new automation should use the nested command.')}
     Writes the same role-separated Foundry workspace. [--force write into a non-empty dir]`,
@@ -1436,7 +1434,7 @@ function help() {
     ${g('abx capabilities')}          stable native lanes, extension seams, irreversible choices, and unsupported cases   [${g('--json')}]
     ${g('abx preview')} (--script <f> | --code-dir <d>)   ${bold('while you are still making it')} — run the program on localhost, live: refresh for new seeds,
                             drive your PostParams, watch it animate. Same document the generator serves. ${g('--shoot <dir>')} for headless frames. No chain.
-    ${g('abx inspect')} <script.js>   ${bold('before you pick a lane')} — static analysis (traits + on-chain reproducibility, deps, doc size → RPC viability) + a lane recommendation
+    ${g('abx inspect')} <script.js>   advisory source checks and a document-size estimate
     ${g('abx scaffold solidity')} [<dir>]   one buildable Foundry workspace for ${bold('renderers + configure/transfer/augment hooks')} (canonical minters/interfaces via abx-contracts)
     ${g('abx deploy-contract')} --artifact <Foundry.json>   deploy exact compiled initcode through any signing lane (ABX does not compile or audit it)
     ${g('abx deploy-code')} (--script <file> | --code-dir <dir> | ${g('--image-renderer 0x..')})   deploy a ${bold('generative / code project')} (on-chain script, a build directory, or a Solidity SVG renderer — in-chain rendering)
