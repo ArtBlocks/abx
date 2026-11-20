@@ -159,6 +159,25 @@ test('expectedChainComplete: no deps / all-on-chain deps ⇒ expected; CDN or mi
   assert.equal(unknown.expected, null);
 });
 
+test('expectedChainComplete: an absent registry pointer is not reported as an RPC failure (#209)', async () => {
+  const deps = ['p5@1.0.0'].map(parseDependencyRef);
+  // absent registry: no check was attempted → definite "cannot resolve on-chain", never "RPC unreachable"
+  const absent = expectedChainComplete(deps, [], true);
+  assert.equal(absent.expected, false);
+  assert.match(absent.detail, /no dependency registry pointer/);
+  assert.doesNotMatch(absent.detail, /RPC unreachable/);
+  // registry present but the read failed → still the RPC-unreachable wording
+  const failed = expectedChainComplete(deps, [], false);
+  assert.equal(failed.expected, null);
+  assert.match(failed.detail, /RPC unreachable/);
+  // explicit/known registry with on-chain bytes → still chain-complete
+  const onchain = await checksFor(['p5@1.0.0'], {'p5@1.0.0': ONCHAIN_REC('p5@1.0.0')});
+  assert.equal(expectedChainComplete(deps, onchain, false).expected, true);
+  // direct data-contract deps never need a registry, even with none set
+  const direct = ['0x000000000000000000000000000000000000cafe'].map(parseDependencyRef);
+  assert.equal(expectedChainComplete(direct, [], true).expected, true);
+});
+
 // ── verify: the mocked-client onChainStatus + tokenURI report ──────────────────
 
 function stateFixture(over: Partial<ProjectState> = {}): ProjectState {
