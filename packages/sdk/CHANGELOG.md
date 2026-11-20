@@ -1,5 +1,11 @@
 # @artblocks/abx-sdk
 
+## 0.10.6
+
+### Patch Changes
+
+- 3a30a78: Share the creator wallet's account login, native grant storage, and transaction lifecycle through a Node client.
+
 ## 0.10.5
 
 ### Patch Changes
