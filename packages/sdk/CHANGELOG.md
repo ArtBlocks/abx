@@ -1,5 +1,13 @@
 # @artblocks/abx-sdk
 
+## 0.10.5
+
+### Patch Changes
+
+- c1da38e: For creators and tools that statically inspect generative scripts.
+
+  Avoid fabricated PostParam keys on minified input, report computed reads as uncertain, and distinguish animation delivery from marketplace stills and traits.
+
 ## 0.10.4
 
 ### Patch Changes

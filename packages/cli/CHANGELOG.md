@@ -1,5 +1,26 @@
 # @artblocks/abx-cli
 
+## 0.12.0
+
+### Minor Changes
+
+- 370a747: Accept --url for metadata locators and retain switchable gateways for native IPFS and Arweave inputs and catch accidental inline URLs in image and animation fields. Document gateway and reader recipes for content stored in ABX FS.
+- 59bddea: Provide one JSON document for unsigned deployments and owner writes, with the exact ordered transactions, signer and intent, and any predicted clone address. Existing command-specific results remain available in the document.
+
+### Patch Changes
+
+- 1f25696: Document PostParam overrides for headless and live previews in the CLI help.
+- c1da38e: For creators and tools that statically inspect generative scripts.
+
+  Avoid fabricated PostParam keys on minified input, report computed reads as uncertain, and distinguish animation delivery from marketplace stills and traits.
+
+- db6186b: Check mainnet approval and the required signer before staging on-chain content. Ask for interactive confirmation before the first staged write.
+- Updated dependencies [c1da38e]
+  - @artblocks/abx-sdk@0.10.5
+  - @artblocks/abx-indexer@0.2.5
+  - @artblocks/abx-storage@0.1.17
+  - @artblocks/abx-token-api@0.3.5
+
 ## 0.11.2
 
 ### Patch Changes
