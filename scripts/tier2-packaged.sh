@@ -37,13 +37,13 @@ echo ""
 #    with EUNSUPPORTEDPROTOCOL.
 echo "  packing"
 mkdir -p "$WORK/tgz"
-for p in sdk cli indexer token-api storage storage-arweave effects; do
+for p in sdk creator-wallet cli indexer token-api storage storage-arweave effects; do
   (cd "$DEV_ROOT/packages/$p" && pnpm pack --pack-destination "$WORK/tgz" >/dev/null)
 done
 COUNT=$(ls -1 "$WORK/tgz"/*.tgz | wc -l | tr -d ' ')
-[ "$COUNT" -eq 7 ] && ok "packed $COUNT tarballs" || bad "expected 7 tarballs, got $COUNT"
+[ "$COUNT" -eq 8 ] && ok "packed $COUNT tarballs" || bad "expected 8 tarballs, got $COUNT"
 
-# 2. Install them together into a clean consumer. Passing all seven local tarballs at once keeps the
+# 2. Install them together into a clean consumer. Passing all eight local tarballs at once keeps the
 #    check honest: npm satisfies each @artblocks/* dep from OUR tarball rather than downloading the
 #    published sibling, so what runs below is this working tree.
 echo "  installing as a consumer"
@@ -71,7 +71,7 @@ export ABX_NO_UPDATE_CHECK=1
 # non-zero `abx` would otherwise abort the script before it can report every check.
 run() { (cd "$WORK/consumer" && env HOME="$TEST_HOME" "$ABX" "$@" 2>&1) || true; }
 
-# 3. A DEFAULT consumer — the six non-Arweave tarballs only, exactly what `npm install
+# 3. A DEFAULT consumer — the seven non-Arweave tarballs only, exactly what `npm install
 #    @artblocks/abx-cli` pulls in — must install NONE of Turbo's dependency tree. This is the
 #    regression gate: `@ardrive/turbo-sdk` -> `x402-fetch` -> `x402` -> `wagmi` drags
 #    in the entire browser wallet-connector ecosystem, and `@artblocks/abx-storage` used to list

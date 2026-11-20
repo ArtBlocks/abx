@@ -35,7 +35,7 @@ import {
   signTx,
   type SignResult,
 } from '../signer.js';
-import {openSponsoredSession} from '../creator-signer.js';
+import {openSponsoredSession} from '@artblocks/abx-creator-wallet';
 
 /** Matches the App Store registry schema (`lib/submissions.ts` in abx-app-store). */
 export const APP_CATEGORIES = [

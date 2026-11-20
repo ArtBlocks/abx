@@ -48,7 +48,7 @@ import {CHAIN} from './config.js';
 import {type Flags} from './flags.js';
 import {bold, c, dim, g, info, ok, warn} from './output.js';
 export {ABX_SERVICES_API_KEY_VAR, ABX_SERVICES_URL} from './creator-rpc.js';
-import {ABX_SERVICES_API_KEY_VAR, ABX_SERVICES_URL} from './creator-rpc.js';
+import {ABX_SERVICES_API_KEY_VAR, ABX_SERVICES_URL, readCreatorAccountToken} from '@artblocks/abx-creator-wallet';
 
 export type RemoteSource = 'url' | 'named' | 'builtin' | 'default';
 
@@ -115,7 +115,7 @@ export function resolveRemote(
   if (envSuffix(spec) === 'ABX') {
     return {
       url: ABX_SERVICES_URL,
-      token: tokenFlag ?? env[ABX_SERVICES_API_KEY_VAR],
+      token: tokenFlag ?? readCreatorAccountToken(env),
       name: 'ABX',
       source: 'builtin',
       tokenVar: ABX_SERVICES_API_KEY_VAR,
@@ -160,7 +160,7 @@ export function requireRemoteToken(t: RemoteTarget, env: NodeJS.ProcessEnv = pro
   if (t.token) return t.token;
   if (t.source === 'builtin') {
     throw new Error(
-      `remote 'abx' needs ${ABX_SERVICES_API_KEY_VAR} in your private .env, or --remote-token. ` +
+      `remote 'abx' needs a saved account credential, ${ABX_SERVICES_API_KEY_VAR}, or --remote-token. ` +
         `Run \`abx auth login\` for the browser-approved flow (manual fallback: ${ABX_SERVICES_URL}/signup).`,
     );
   }
@@ -188,7 +188,7 @@ export function requireRemoteToken(t: RemoteTarget, env: NodeJS.ProcessEnv = pro
  *  canonical — the env convention is lossy, so enumeration reads the env, never inverts it. */
 export function listConfiguredRemotes(env: NodeJS.ProcessEnv = process.env): Array<{name: string; url: string; hasToken: boolean}> {
   const out: Array<{name: string; url: string; hasToken: boolean}> = [
-    {name: 'ABX', url: ABX_SERVICES_URL, hasToken: !!env[ABX_SERVICES_API_KEY_VAR]},
+    {name: 'ABX', url: ABX_SERVICES_URL, hasToken: !!readCreatorAccountToken(env)},
   ];
   for (const [key, value] of Object.entries(env)) {
     const m = /^ABX_REMOTE_(.+)_URL$/.exec(key);

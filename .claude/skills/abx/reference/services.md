@@ -26,8 +26,8 @@ The first-party provider has the built-in remote name `abx`:
 abx remote abx
 ```
 
-It needs `ABX_SERVICES_API_KEY` in the project's ignored `.env`; it does not need
-`ABX_REMOTE_ABX_URL`. When the key is absent, use:
+It uses the saved first-party creator account credential or an explicit `ABX_SERVICES_API_KEY`.
+When the key is absent, use:
 
 ```bash
 abx auth login
@@ -37,7 +37,7 @@ The CLI starts the OAuth device flow and shows a verified browser URL plus a mat
 The human signs in with the ABX account email and approves in that browser. An existing browser
 session avoids another email code. The same approval provisions or reuses the account's creator
 wallet. The CLI polls at the provider-declared interval, receives the API key, and writes it directly
-to ignored `.env` without printing it. The browser never receives the key. Do not ask the human to
+to private user configuration without printing it. The browser never receives the key. Do not ask the human to
 paste an OTP or key into chat. A new first-party key requires the human to accept the current Art
 Blocks User Terms in the browser; do not accept them on the human's behalf. Existing keys do not
 require re-acceptance. `--no-open` leaves the browser handoff as a link; `--force` is required

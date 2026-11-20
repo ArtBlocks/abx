@@ -21,7 +21,7 @@ import {
 } from '@artblocks/abx-sdk';
 import type {TransactionReceipt} from 'viem';
 import {faucetHint} from './config.js';
-import {openSponsoredSession} from './creator-signer.js';
+import {openSponsoredSession} from '@artblocks/abx-creator-wallet';
 import {recordUnsignedTransaction} from './jsonout.js';
 import {ANSI as C, ansiBold as bold, ansiDim as dim, ansiGreen as green, ansiPurple as purple} from './ansi.js';
 

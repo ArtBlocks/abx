@@ -12,7 +12,7 @@ import {
   type PreparedTx,
 } from '@artblocks/abx-sdk';
 import {CHAIN, explorerBase} from '../config.js';
-import {sponsoredWalletAddress} from '../creator-signer.js';
+import {sponsoredWalletAddress} from '@artblocks/abx-creator-wallet';
 import {assertSaltGuardForDeployer, type Flags, isDryRun, parseSaltFlag} from '../flags.js';
 import {bold, dim, info, ok} from '../output.js';
 import {gatedSend, laneFromFlags} from '../riskgate.js';

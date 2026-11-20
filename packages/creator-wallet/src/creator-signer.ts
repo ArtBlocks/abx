@@ -16,6 +16,7 @@ import {
   waitForCodeAt,
   waitForTransactionReceiptResilient,
   type Address,
+  type CreatorAccount,
   type CreatorOperation,
   type Hex,
   type PreparedTx,
@@ -25,8 +26,8 @@ import {formatEther, formatGwei, type TransactionReceipt} from 'viem';
 import {CreatorAgentAuthorization, restoreOrAuthorizeCreatorAgent} from './creator-agent.js';
 import {CreatorKeyringStore} from './creator-keyring.js';
 import {quoteCreatorPayment, assertCreatorSigningRequest, preflightCreatorPayment} from './creator-payment.js';
-import {warn} from './output.js';
-import {ABX_SERVICES_URL} from './remote.js';
+import {ABX_SERVICES_URL} from './service.js';
+import {readCreatorAccountToken} from './device-login.js';
 
 const CREATOR_GRANTS_URL = 'https://services.abx.io/authorize';
 
@@ -53,8 +54,8 @@ function assertSponsorConfiguredWithEnv(chainKey: string, env: NodeJS.ProcessEnv
       'The creator-wallet lane requires a selectable ABX network and live wallet eligibility.',
     );
   }
-  if (!env.ABX_SERVICES_API_KEY) {
-    throw new Error('--sponsor needs ABX_SERVICES_API_KEY in your ignored .env. Run `abx auth login` first.');
+  if (!readCreatorAccountToken(env)) {
+    throw new Error('--sponsor needs a saved ABX account credential or ABX_SERVICES_API_KEY. Sign in with the CLI first.');
   }
 }
 
@@ -76,12 +77,12 @@ export async function sponsoredPreviewAddress(
  * and remain strictly read-only. */
 export async function sponsoredWalletAddress(
   chainKey: string,
-  options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch; provision?: boolean} = {},
+  options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch; provision?: boolean; requireSponsorshipBudget?: boolean} = {},
 ): Promise<Address> {
   const env = options.env ?? process.env;
   const chain = resolveChain(chainKey);
   assertSponsorConfiguredWithEnv(chainKey, env);
-  const apiKey = env.ABX_SERVICES_API_KEY!;
+  const apiKey = readCreatorAccountToken(env)!;
   const api = new CreatorApiClient({
     baseUrl: await creatorApiUrl(chain.id, env),
     token: apiKey,
@@ -104,6 +105,7 @@ export async function sponsoredWalletAddress(
       !(account.capabilities.sponsorship && account.capabilities.sponsoredChains.includes(chain.id))) {
     throw new Error(`ABX creator-wallet payment is not enabled for ${chain.name} on this account.`);
   }
+  if (options.requireSponsorshipBudget) assertBudgetedSponsorship(account, chain.id);
   return account.wallet.address;
 }
 
@@ -132,7 +134,7 @@ export async function sponsoredOperationStatus(
   const chain = resolveChain(chainKey);
   return new CreatorApiClient({
     baseUrl: await creatorApiUrl(chain.id, env, false),
-    token: env.ABX_SERVICES_API_KEY!,
+    token: readCreatorAccountToken(env)!,
     fetchImpl: options.fetchImpl,
   }).getOperation(operationId);
 }
@@ -145,6 +147,7 @@ export async function confirmedSponsoredReceipt(
   operation: CreatorOperation & {transactionHash: Hex},
   op: string,
   line: (message: string) => void = console.log,
+  recoveryCommand = 'abx auth operation',
 ): Promise<SponsoredReceipt> {
   const label = operation.paymentMode === 'self-paid' ? 'Self-paid' : 'Sponsored';
   line(`  ${label} operation ${operation.operationId} confirmed by ABX Services.`);
@@ -155,7 +158,7 @@ export async function confirmedSponsoredReceipt(
   } catch (cause) {
     throw new Error(
       `${label} operation ${operation.operationId} was submitted as ${operation.transactionHash}, but the configured RPCs ` +
-        `could not read its receipt. Do not retry it. Run \`abx auth operation ${operation.operationId}\` or check the transaction in a block explorer.`,
+        `could not read its receipt. Do not retry it. Run \`${recoveryCommand} ${operation.operationId}\` or check the transaction in a block explorer.`,
       {cause},
     );
   }
@@ -207,7 +210,7 @@ function checkedCreatorApiUrl(raw: string): string {
  * explicit local/staging escape hatch; production callers discover the interface from the
  * services catalog and do not need to know a deployment hostname. */
 export async function creatorApiUrl(chainId: number, env: NodeJS.ProcessEnv = process.env, requireChain = true): Promise<string> {
-  if (env.ABX_CREATORS_API_URL) return checkedCreatorApiUrl(env.ABX_CREATORS_API_URL);
+  if (env.ABX_SERVICES_API_KEY && env.ABX_CREATORS_API_URL) return checkedCreatorApiUrl(env.ABX_CREATORS_API_URL);
   const descriptor = await new AbxServiceClient({baseUrl: ABX_SERVICES_URL, timeoutMs: 10_000}).descriptor();
   const endpoint = resolveServiceInterfaceEndpoint(ABX_SERVICES_URL, descriptor, CREATOR_WALLET_INTERFACE);
   if (!endpoint) {
@@ -224,9 +227,9 @@ export async function provisionCreatorWallet(
   options: {env?: NodeJS.ProcessEnv; fetchImpl?: typeof fetch} = {},
 ): Promise<{address: Address; created: boolean}> {
   const env = options.env ?? process.env;
-  const apiKey = env.ABX_SERVICES_API_KEY;
-  if (!apiKey) throw new Error('Creator wallet setup needs ABX_SERVICES_API_KEY. Run `abx auth login` first.');
-  const baseUrl = env.ABX_CREATORS_API_URL
+  const apiKey = readCreatorAccountToken(env);
+  if (!apiKey) throw new Error('Creator wallet setup needs ABX_SERVICES_API_KEY. Sign in with the CLI first.');
+  const baseUrl = env.ABX_SERVICES_API_KEY && env.ABX_CREATORS_API_URL
     ? checkedCreatorApiUrl(env.ABX_CREATORS_API_URL)
     : await (async () => {
         const descriptor = await new AbxServiceClient({baseUrl: ABX_SERVICES_URL, timeoutMs: 10_000}).descriptor();
@@ -236,6 +239,13 @@ export async function provisionCreatorWallet(
       })();
   const wallet = await new CreatorApiClient({baseUrl, token: apiKey, fetchImpl: options.fetchImpl}).provisionWallet();
   return {address: wallet.address, created: wallet.created};
+}
+
+function assertBudgetedSponsorship(account: CreatorAccount, chainId: number): void {
+  if (!account.capabilities.sponsorshipBudget || !account.capabilities.sponsorship ||
+      !account.capabilities.sponsoredChains.includes(chainId)) {
+    throw new Error('Budgeted ABX sponsorship is not available for this account and network.');
+  }
 }
 
 function openBrowser(url: string): void {
@@ -260,16 +270,28 @@ function openBrowser(url: string): void {
  * credential store and reused across CLI invocations. The decrypted request-signing key remains
  * memory-only and every exact transaction is still prepared, signed, and reconciled independently.
  */
-export async function openSponsoredSession(chainKey: string): Promise<SponsoredSession> {
+export async function openSponsoredSession(
+  chainKey: string,
+  options: {
+    env?: NodeJS.ProcessEnv;
+    recoveryCommand?: string;
+    requireSponsorshipBudget?: boolean;
+  } = {},
+): Promise<SponsoredSession> {
+  const env = options.env ?? process.env;
   const chain = resolveChain(chainKey);
-  assertSponsorConfigured(chainKey);
+  assertSponsorConfiguredWithEnv(chainKey, env);
   await assertChainId(chainKey);
-  const apiKey = process.env.ABX_SERVICES_API_KEY;
+  const apiKey = readCreatorAccountToken(env);
   if (!apiKey) throw new Error('ABX Services API key disappeared after sponsorship preflight.');
 
-  const api = new CreatorApiClient({baseUrl: await creatorApiUrl(chain.id), token: apiKey});
+  const api = new CreatorApiClient({baseUrl: await creatorApiUrl(chain.id, env), token: apiKey});
   const wallet = await api.provisionWallet();
   const account = await api.account();
+  if (options.requireSponsorshipBudget) {
+    assertBudgetedSponsorship(account, chain.id);
+    account.capabilities.selfPayment = false;
+  }
   if (!account.wallet || !account.capabilities.wallet || account.wallet.address.toLowerCase() !== wallet.address.toLowerCase()) {
     throw new Error('ABX Creators returned inconsistent wallet binding. Nothing was signed.');
   }
@@ -282,7 +304,7 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
   const persistenceWarning = () => {
     if (persistenceWarningShown) return;
     persistenceWarningShown = true;
-    warn('Could not use the OS credential store. This authorization works for the current command only.');
+    console.warn('Could not use the OS credential store. This authorization works for the current command only.');
   };
   const store = new CreatorKeyringStore(wallet.providerAppId, wallet.address);
   const authorization = new CreatorAgentAuthorization({
@@ -383,6 +405,8 @@ export async function openSponsoredSession(chainKey: string): Promise<SponsoredS
           publicClient,
           operation as CreatorOperation & {transactionHash: Hex},
           tx.op,
+          console.log,
+          options.recoveryCommand,
         );
       },
       close() {

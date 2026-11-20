@@ -4,7 +4,8 @@ import {existsSync, mkdtempSync, readFileSync, statSync, writeFileSync} from 'no
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {test} from 'node:test';
-import {cmdAuth, deviceLogin, oauthLogout} from '../src/commands/auth.js';
+import {deviceLogin, oauthLogout} from '@artblocks/abx-creator-wallet';
+import {cmdAuth} from '../src/commands/auth.js';
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const BASE = 'https://provider.example';

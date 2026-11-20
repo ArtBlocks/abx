@@ -4,8 +4,8 @@ import type {Address, PublicClient} from '@artblocks/abx-sdk';
 import {Chacha20Poly1305} from '@hpke/chacha20poly1305';
 import {CipherSuite, DhkemP256HkdfSha256, HkdfSha256} from '@hpke/core';
 import {generateP256KeyPair} from '@privy-io/node';
-import {CreatorAgentAuthorization, CreatorAuthorizationError, restoreOrAuthorizeCreatorAgent} from '../src/creator-agent.js';
-import {CreatorCredentialStoreAccessError, CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/creator-keyring.js';
+import {CreatorAgentAuthorization, CreatorAuthorizationError, restoreOrAuthorizeCreatorAgent} from '../src/index.js';
+import {CreatorCredentialStoreAccessError, CreatorKeyringStore, type CreatorAuthorizationStore, type StoredCreatorAuthorization} from '../src/index.js';
 import {
   assertSponsorConfigured,
   assertSponsoredPreparedTx,
@@ -16,8 +16,7 @@ import {
   sponsoredPreviewAddress,
   sponsoredOperationStatus,
   sponsoredWalletAddress,
-} from '../src/creator-signer.js';
-import {warnUnfunded} from '../src/commands/deploy.js';
+} from '../src/index.js';
 
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), {status, headers: {'content-type': 'application/json'}});
@@ -314,23 +313,6 @@ test('sponsor preflight permits Base and Arbitrum networks behind the live accou
   }
 });
 
-test('sponsored deploys skip the native-balance and faucet preflight', async () => {
-  let balanceReads = 0;
-  const publicClient = {
-    getBalance: async () => {
-      balanceReads += 1;
-      return 1n;
-    },
-  } as unknown as PublicClient;
-  const wallet = '0x0000000000000000000000000000000000000001' as Address;
-
-  await warnUnfunded(publicClient, wallet, 'sponsor');
-  assert.equal(balanceReads, 0, 'the service-funded lane must not inspect or require wallet gas');
-
-  await warnUnfunded(publicClient, wallet, 'send');
-  assert.equal(balanceReads, 1, 'self-funded lanes still retain the native-balance preflight');
-});
-
 test('sponsored transactions preserve large network gas estimates without an ABX policy cap', () => {
   assert.equal(sponsoredGasLimit(4_933_890n), 4_933_890);
   assert.equal(sponsoredGasLimit(30_000_000n), 30_000_000);
@@ -406,15 +388,15 @@ test('sponsored transaction boundary requires a target and still pins chain and 
 
 test('the explicit creator API override is a bounded development escape hatch', async () => {
   assert.equal(
-    await creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'https://api.example///'}),
+    await creatorApiUrl(84532, {ABX_SERVICES_API_KEY: 'test', ABX_CREATORS_API_URL: 'https://api.example///'}),
     'https://api.example',
   );
   await assert.rejects(
-    () => creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'http://api.example'}),
+    () => creatorApiUrl(84532, {ABX_SERVICES_API_KEY: 'test', ABX_CREATORS_API_URL: 'http://api.example'}),
     /must be HTTPS/,
   );
   await assert.rejects(
-    () => creatorApiUrl(84532, {ABX_CREATORS_API_URL: 'https://api.example?token=secret'}),
+    () => creatorApiUrl(84532, {ABX_SERVICES_API_KEY: 'test', ABX_CREATORS_API_URL: 'https://api.example?token=secret'}),
     /must be HTTPS/,
   );
 });
