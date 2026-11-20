@@ -1,0 +1,45 @@
+{
+  "name": "@artblocks/abx-creator-wallet",
+  "version": "0.0.1",
+  "description": "Node client for the shared ABX creator wallet and agent authorization.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "homepage": "https://docs.abx.io",
+  "bugs": "https://github.com/ArtBlocks/abx/issues",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArtBlocks/abx.git",
+    "directory": "packages/creator-wallet"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "exports": {
+      ".": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "prepack": "tsc -b tsconfig.build.json"
+  },
+  "dependencies": {
+    "@artblocks/abx-sdk": "workspace:*",
+    "@hpke/chacha20poly1305": "1.8.0",
+    "@hpke/core": "1.10.0",
+    "@napi-rs/keyring": "2.1.2",
+    "@privy-io/node": "0.38.0",
+    "viem": "^2.57.16"
+  }
+}

@@ -209,7 +209,7 @@ import {describeSchema, editionSchemaAdvisory, parseSchemaSpecs} from '../schema
 import {parseSeriesTraits} from '../series-traits.js';
 import {decodeOnChainJson} from '../served.js';
 import {openWalletSession, signHotSequence, signTx, type Lane, type SignResult} from '../signer.js';
-import {assertSponsorConfigured, openSponsoredSession, sponsoredPreviewAddress} from '../creator-signer.js';
+import {assertSponsorConfigured, openSponsoredSession, sponsoredPreviewAddress} from '@artblocks/abx-creator-wallet';
 
 // ── plan-object warning capture ──────────────────────────────────────────────────────────────────
 // The structured `--json` plan object (deploy-plan.ts) reports "the warnings the lane raised"

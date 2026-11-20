@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import type {CreatorAccount, CreatorPreparedOperation, PreparedTx, PublicClient} from '@artblocks/abx-sdk';
-import {assertCreatorSigningRequest, preflightCreatorPayment, quoteCreatorPayment} from '../src/creator-payment.js';
+import {assertCreatorSigningRequest, preflightCreatorPayment, quoteCreatorPayment} from '@artblocks/abx-creator-wallet';
 
 const wallet = '0x1111111111111111111111111111111111111111' as const;
 const target = '0x2222222222222222222222222222222222222222' as const;

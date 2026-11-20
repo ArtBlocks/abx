@@ -37,7 +37,7 @@ import {
   resolveServiceInterfaceEndpoint,
   verifyParity,
 } from '@artblocks/abx-sdk';
-import {assertPrivateEnvPath, saveEnvSecret, saveEnvSecrets} from './auth.js';
+import {assertPrivateEnvPath, saveEnvSecret, saveEnvSecrets} from '@artblocks/abx-creator-wallet';
 import {repinNodeCustody, resolveBackend} from '@artblocks/abx-storage';
 import {DEFAULT_PORT, resolveBaseUrl, startChainWatcher, startTokenApiServer, watchIntervalMs} from '@artblocks/abx-token-api';
 import {formatAssertion, runConformance, verdictLine} from '../conformance.js';

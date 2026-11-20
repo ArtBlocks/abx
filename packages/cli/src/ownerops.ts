@@ -148,7 +148,7 @@ import {detectTokenKind, describeKind, isEditionContract, assertHasParamsSurface
 import {planOnChainScript} from './script-chunks.js';
 import {fetchServedTokenUri, servedOk} from './served.js';
 import {assertHotWriteApproved, openWalletSession, type SignResult, type TxProvider, type WalletSession} from './signer.js';
-import {openSponsoredSession} from './creator-signer.js';
+import {openSponsoredSession} from '@artblocks/abx-creator-wallet';
 import {confirmSend, gatedSend, laneFromFlags, type DryRunSimulation} from './riskgate.js';
 import {withJson} from './jsonout.js';
 import {lazyBootstrapSender, info} from './output.js';

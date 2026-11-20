@@ -8,8 +8,8 @@ import {
   rpcEnvVar,
 } from '@artblocks/abx-sdk';
 
-export const ABX_SERVICES_URL = 'https://services.abx.io';
-export const ABX_SERVICES_API_KEY_VAR = 'ABX_SERVICES_API_KEY';
+import {readCreatorAccountToken} from '@artblocks/abx-creator-wallet';
+export {ABX_SERVICES_API_KEY_VAR, ABX_SERVICES_URL} from '@artblocks/abx-creator-wallet';
 export const ABX_RPC_REMOTE_VAR = 'ABX_RPC_REMOTE';
 
 export interface CreatorRpcRemote {
@@ -22,7 +22,7 @@ export interface CreatorRpcRemote {
 export function creatorRpcRemoteSpec(env: NodeJS.ProcessEnv = process.env): string | null {
   const selected = env[ABX_RPC_REMOTE_VAR]?.trim();
   if (selected) return selected;
-  return env[ABX_SERVICES_API_KEY_VAR]?.trim() ? 'abx' : null;
+  return readCreatorAccountToken(env)?.trim() ? 'abx' : null;
 }
 
 /**

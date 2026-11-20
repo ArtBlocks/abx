@@ -204,7 +204,7 @@ human confirmation authorizes execution.
    to configure a signer. Otherwise configure one of the bring-your-own lanes. For first-party hosted
    services, run `abx auth login --no-open` in a short-yield or resumable session: immediately hand
    its verified browser URL and matching code to the human, then resume that same polling process.
-   Let the CLI store `ABX_SERVICES_API_KEY` in ignored `.env` without printing it. The same Privy
+   Let the CLI save the account credential in private user configuration. The same Privy
    browser identity provisions or reuses the creator wallet; an existing browser session can avoid
    another email code. Never ask for an email code or key in chat, start duplicate login sessions,
    or add standing login instructions to `AGENTS.md`/`CLAUDE.md`. The key is long-lived: reuse it

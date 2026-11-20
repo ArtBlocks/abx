@@ -13,7 +13,7 @@ export interface CreatorAccount {
   accountId: string;
   emailVerified: boolean;
   wallet: CreatorWallet | null;
-  capabilities: {wallet: boolean; sponsorship: boolean; sponsoredChains: number[]; selfPayment?: boolean; walletChains?: number[]};
+  capabilities: {wallet: boolean; sponsorship: boolean; sponsoredChains: number[]; sponsorshipBudget?: boolean; selfPayment?: boolean; walletChains?: number[]};
 }
 
 export interface CreatorOperation {
@@ -56,6 +56,19 @@ export class CreatorApiError extends Error {
   ) {
     super(`ABX Creators: ${code} (HTTP ${status})`);
     this.name = 'CreatorApiError';
+  }
+}
+
+export class CreatorSponsorshipBudgetError extends CreatorApiError {
+  constructor(readonly remainingMicros: number, readonly retryAt: string | null) {
+    super('sponsorship_budget_exceeded', 429);
+    this.name = 'CreatorSponsorshipBudgetError';
+    const remaining = new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD', maximumFractionDigits: 6,
+    }).format(remainingMicros / 1_000_000);
+    this.message = `This transaction exceeds the remaining 24-hour ABX sponsorship budget (${remaining} available).` +
+      (retryAt ? ` This estimate fits again after ${retryAt} if no more sponsorship is used.` : '') +
+      ' No transaction was sent.';
   }
 }
 
@@ -147,6 +160,7 @@ export class CreatorApiClient {
         wallet: capabilities.wallet === true,
         sponsorship: capabilities.sponsorship === true,
         sponsoredChains: chains as number[],
+        ...(capabilities.sponsorshipBudget === true ? {sponsorshipBudget: true} : {}),
         selfPayment: capabilities.selfPayment === true,
         walletChains: (() => {
           if (capabilities.walletChains === undefined) return [];
@@ -211,7 +225,7 @@ export class CreatorApiClient {
     } catch (submitError) {
       if (
         submitError instanceof CreatorApiError &&
-        (submitError.status < 500 || ['sponsorship_disabled', 'self_payment_disabled'].includes(submitError.code))
+        (submitError.status < 500 || ['sponsorship_disabled', 'self_payment_disabled', 'sponsorship_quote_unavailable'].includes(submitError.code))
       )
         throw submitError;
       // The write may already have reached the provider. Never replay it: reconcile the durable
@@ -251,6 +265,12 @@ export class CreatorApiClient {
     const data = (await response.json().catch(() => null)) as unknown;
     if (!response.ok) {
       const parsed = data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+      const remaining = parsed.remainingMicros;
+      if (response.status === 429 && parsed.error === 'sponsorship_budget_exceeded' &&
+          typeof remaining === 'number' && Number.isSafeInteger(remaining) && remaining >= 0) {
+        const time = typeof parsed.retryAt === 'string' ? Date.parse(parsed.retryAt) : NaN;
+        throw new CreatorSponsorshipBudgetError(remaining, Number.isFinite(time) ? new Date(time).toISOString() : null);
+      }
       throw new CreatorApiError(typeof parsed.error === 'string' ? parsed.error : 'request_failed', response.status);
     }
     return data;

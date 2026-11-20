@@ -51,6 +51,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@artblocks/abx-creator-wallet':
+        specifier: workspace:*
+        version: link:../creator-wallet
       '@artblocks/abx-indexer':
         specifier: workspace:*
         version: link:../indexer
@@ -63,6 +66,23 @@ importers:
       '@artblocks/abx-token-api':
         specifier: workspace:*
         version: link:../token-api
+      viem:
+        specifier: ^2.57.16
+        version: 2.57.16(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@6.0.6)(zod@4.6.7)
+    devDependencies:
+      playwright:
+        specifier: 1.64.1
+        version: 1.64.1
+    optionalDependencies:
+      '@artblocks/abx-effects':
+        specifier: workspace:*
+        version: link:../effects
+
+  packages/creator-wallet:
+    dependencies:
+      '@artblocks/abx-sdk':
+        specifier: workspace:*
+        version: link:../sdk
       '@hpke/chacha20poly1305':
         specifier: 1.8.0
         version: 1.8.0
@@ -78,14 +98,6 @@ importers:
       viem:
         specifier: ^2.57.16
         version: 2.57.16(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@6.0.6)(zod@4.6.7)
-    devDependencies:
-      playwright:
-        specifier: 1.64.1
-        version: 1.64.1
-    optionalDependencies:
-      '@artblocks/abx-effects':
-        specifier: workspace:*
-        version: link:../effects
 
   packages/effects:
     dependencies:
@@ -658,10 +670,6 @@ packages:
 
   '@hpke/chacha20poly1305@1.8.0':
     resolution: {integrity: sha512-FcBfAQ+Y99vMNJP2yrZ9wpL8V0GOwp1+zMyzvc6alasrBygfFjFm1yeUtyADJCu/27C3Lm5mJzx6u7pwg+cX5w==}
-    engines: {node: '>=16.0.0'}
-
-  '@hpke/common@1.10.1':
-    resolution: {integrity: sha512-moJwhmtLtuxiUzzNp1jpfBfx8yefKoO9D/RCR9dmwrnc7qjJqId1rEtQz+lSlU5cabX8daToMSx/7HayXOiaFw==}
     engines: {node: '>=16.0.0'}
 
   '@hpke/common@1.13.0':
@@ -4707,9 +4715,7 @@ snapshots:
 
   '@hpke/chacha20poly1305@1.8.0':
     dependencies:
-      '@hpke/common': 1.10.1
-
-  '@hpke/common@1.10.1': {}
+      '@hpke/common': 1.13.0
 
   '@hpke/common@1.13.0': {}
 

@@ -1,3 +1,4 @@
+import {readCreatorAccountToken} from '@artblocks/abx-creator-wallet';
 /**
  * The CLI's one risk gate for a write — the choke point every signing path (owner-op or deploy)
  * routes an already-prepared tx through, so `--dry-run` and `--confirm` behave IDENTICALLY no
@@ -452,5 +453,5 @@ export function signingReadiness(lane: Lane, options: {
 export function currentSigningReadiness(lane: Lane, expectedSigner?: string | null, simulation?: DryRunSimulation, value?: bigint): SigningReadiness {
   let key: string | undefined;
   if (lane === 'send') {try {key = envSigningKey();} catch {key = 'invalid';}}
-  return signingReadiness(lane, {key, apiKey: process.env.ABX_SERVICES_API_KEY, expectedSigner, simulation, value});
+  return signingReadiness(lane, {key, apiKey: readCreatorAccountToken(), expectedSigner, simulation, value});
 }

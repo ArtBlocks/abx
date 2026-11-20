@@ -13,8 +13,10 @@ abx remote abx
 abx add 0xYourContract --remote abx
 ```
 
-`abx auth login` opens a browser flow and saves `ABX_SERVICES_API_KEY` to an ignored `.env`. It does
-not print the key. The same sign-in provisions or reuses the creator wallet; an active browser
+`abx auth login` opens a browser flow and saves the first-party account key in a private user
+configuration file shared with compatible CLI tools. Existing shell and project
+`ABX_SERVICES_API_KEY` credentials take precedence. The same sign-in provisions or reuses the
+creator wallet. An active browser
 session can avoid another email code. A later CLI login reuses the loaded key. Creating a key
 requires agreement to the [Art Blocks User Terms](https://www.artblocks.io/user-terms.pdf). Existing
 keys continue to work; acceptance is checked only when a new key is created.
@@ -29,8 +31,8 @@ abx auth login --resume --no-wait --json
 ```
 
 The first command returns `pending`, the verification URL, user code, absolute expiry, and polling
-interval. The private device grant stays in an ignored, mode-0600 `.env` entry beside the eventual
-API key; it is never printed. Run resume from the same directory and for the same named remote.
+interval. The private device grant stays in a mode-0600 credential file beside the eventual API key.
+Resume with the same named remote. For a custom remote, resume in the project where you started.
 Resume polls at most once when `--no-wait` is present and respects the provider interval across
 invocations; omit `--no-wait` to wait until approval. Results distinguish `pending`, `completed`,
 `denied`, and `expired`; denied and expired exit unsuccessfully. Terminal states remove the pending
