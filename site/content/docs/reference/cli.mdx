@@ -113,6 +113,10 @@ abx preview --script art.js --check --count 9 --runs 3 --json
 abx preview --code-dir ./dist --check --frames 3 --param palette=Dusk --json
 ```
 
+Use `--param key=value` with `--shoot` or `--check` to apply an override to every render. Use
+`key=` to leave that parameter unset. For a live render, pass the values on the request, for
+example `/view?palette=Dusk`. Declare the keys with `--schema`.
+
 Each seed runs in fresh Chromium contexts with the same token data and parameter overrides. A pass
 means no pixel or normalized trait drift was observed for these inputs, capture times, and browser
 build. It does not prove purity, cross-browser consistency, or correctness after deployment. Continue
