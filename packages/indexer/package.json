@@ -48,6 +48,6 @@
   },
   "dependencies": {
     "@artblocks/abx-sdk": "workspace:*",
-    "viem": "^2.57.16"
+    "viem": "^2.58.0"
   }
 }

@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "ipaddr.js": "^2.5.0",
-    "viem": "^2.57.16"
+    "viem": "^2.58.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
