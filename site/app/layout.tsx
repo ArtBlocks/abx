@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { Manrope, Red_Hat_Mono } from 'next/font/google';
+import { docsOrigin } from '@/lib/shared';
 import './global.css';
 
 const manrope = Manrope({
@@ -18,7 +19,7 @@ const redHatMono = Red_Hat_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://docs.abx.io'),
+  metadataBase: new URL(docsOrigin),
   title: {
     default: 'ABX Docs | Start building',
     template: '%s | ABX Docs',
