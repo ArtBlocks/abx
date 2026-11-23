@@ -177,6 +177,7 @@ import {
   type DeployPlanFamily,
   type DeployPlanImageFile,
 } from '../deploy-plan.js';
+import {deployFeeLines, estimateDeployFees, usesBaseFeeBreakdown} from '../deploy-fees.js';
 import {
   parseRoyaltyBps,
   AUTHORSHIP_DEPLOY_FIELDS,
@@ -860,6 +861,27 @@ async function preflightImageStaging(
   return hotStage;
 }
 
+async function previewImageDeployFees(
+  client: PublicClient,
+  account: Address,
+  lane: Lane,
+  missingCalldata: boolean,
+  prepare: () => PreparedTx,
+) {
+  const chainId = resolveChain(CHAIN).id;
+  if (!usesBaseFeeBreakdown(chainId)) return {ethApprox: null, gasApprox: null};
+  const unavailableReason = lane === 'sponsor'
+    ? 'The creator-wallet provider prices this operation at signing time.'
+    : missingCalldata
+      ? 'An upload, staging transaction, or renderer deployment must finish before the final calldata is known.'
+      : undefined;
+  const estimate = await estimateDeployFees(client, {
+    chainId, account, unavailableReason, transactions: unavailableReason ? undefined : [prepare()],
+  });
+  deployFeeLines(estimate).forEach(info);
+  return estimate;
+}
+
 export async function cmdDeploy(flags: Flags, serveAfter: boolean) {
   if (serveAfter && isDryRun(flags)) {
     throw new Error('abx demo is a live deployment walkthrough; use `abx deploy --dry-run --for <address>` for a non-mutating preview');
@@ -1305,6 +1327,10 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
     // The whole point of the readout: it is the contract. The real deploy writes EXACTLY these
     // values — nothing is added, inferred, or substituted between here and the on-chain tx.
     info(dim('the values above are exactly what a real deploy writes — nothing else is added.'));
+    const estimate = await previewImageDeployFees(publicClient, deployer, lane,
+      onchainImage || (onChainUri && (renderer === zeroAddress || (!!flags.image && imageResolvesWithoutServer(flags, false) && !imageEndsUpOnChain(flags, false)))),
+      () => prepareDeployOneOfOne({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}),
+    );
     console.log(`\n  ${g('dry run')} ${dim('— nothing sent, no bytes stored. Re-run without --dry-run to deploy.')}\n`);
     // A dry run DOES know the address when --salt pinned it (a pure function of factory+salt); without
     // --salt it's null — reporting the freshly-reserved one would be a real-looking value a script
@@ -1338,7 +1364,7 @@ export async function cmdDeployBody(flags: Flags, serveAfter: boolean, emit: (p:
           image: planImageFile,
         },
         mint: {deferred: noMint, count: noMint ? 0 : 1, amountPerId: null, recipient: noMint ? null : deployer},
-        estimate: {ethApprox: null, gasApprox: null}, // the 1/1 lane computes no cost estimate
+        estimate,
         warnings: planWarnings.slice(),
         surfaces: null, // the code lanes' per-surface disposition has no equivalent here
         dependencies: null, // the 1/1 lane has no dependency-registry concept
@@ -1922,6 +1948,10 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
       info(`address: pinned by salt — re-run with ${bold(`--salt ${salt}`)} (same address), or ${bold(`abx predict --salt ${salt} --for ${deployer} --copies ${flags.copies}`)}.`);
     }
     info(dim('the values above are exactly what a real deploy writes — nothing else is added.'));
+    const estimate = await previewImageDeployFees(publicClient, deployer, lane,
+      onchainImage || (onChainUri && (renderer === zeroAddress || (!!flags.image && imageResolvesWithoutServer(flags, false) && !imageEndsUpOnChain(flags, false)))),
+      () => prepareDeployOneOfOneEdition({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}),
+    );
     console.log(`\n  ${g('dry run')} ${dim('— nothing sent, no bytes stored. Re-run without --dry-run to deploy.')}\n`);
     emit(jsonSafe({
       command: 'deploy', kind: '1of1-edition', copies: editionSize.toString(), dryRun: true, sent: false, address: explicitSalt ? predicted : null, chain: CHAIN, chainId: resolveChain(CHAIN).id, factory, salt, saltPinned: !!explicitSalt, name, symbol,
@@ -1947,7 +1977,7 @@ export async function cmdDeployOneOfOneEditionBody(flags: Flags, emit: (p: Recor
           image: planImageFile,
         },
         mint: {deferred: mintAmount === 0n, count: mintAmount > 0n ? 1 : 0, amountPerId: mintAmount.toString(), recipient: mintAmount > 0n ? deployer : null},
-        estimate: {ethApprox: null, gasApprox: null},
+        estimate,
         warnings: planWarnings.slice(),
         surfaces: null,
         dependencies: null,
@@ -2559,6 +2589,10 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
       info(`address: pinned by salt — re-run with ${bold(`--salt ${salt}`)} (same address), or ${bold(`abx predict --dir ${flags.dir} --salt ${salt} --for ${deployer}`)}.`);
       info(`reproduce this exact preview (salt included): ${bold(deploySeriesCommandLine(flags, salt))}`);
     }
+    const estimate = await previewImageDeployFees(publicClient, deployer, lane,
+      onchainImage || offchainImageOnchainJson || (onChainUri && renderer === zeroAddress),
+      () => prepareDeploySeries({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}),
+    );
     console.log(`\n  ${g('dry run')} ${dim('— nothing sent, no bytes stored.')}\n`);
     // Without --salt, `address` would be a freshly-reserved value a real deploy will NOT land at —
     // report null rather than a real-looking value a script could wrongly act on.
@@ -2590,7 +2624,7 @@ export async function cmdDeploySeriesBody(flags: Flags, emit: (p: Record<string,
           image: null,
         },
         mint: {deferred: mintCount === 0, count: mintCount, amountPerId: null, recipient: mintCount > 0 ? deployer : null},
-        estimate: {ethApprox: null, gasApprox: null},
+        estimate,
         warnings: planWarnings.slice(),
         surfaces: null,
         dependencies: null,
@@ -3192,6 +3226,10 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
       console.log(`\n  ${bold('salt')}  ${g(salt)}`);
       info(`address: pinned by salt — re-run with ${bold(`--salt ${salt}`)} (same address).`);
     }
+    const estimate = await previewImageDeployFees(publicClient, deployer, lane,
+      onchainImage || offchainImageOnchainJson || (onChainUri && renderer === zeroAddress),
+      () => prepareDeployEditionImage({factory, params, salt, chainId: resolveChain(CHAIN).id, clone: predicted}),
+    );
     console.log(`\n  ${g('dry run')} ${dim('— nothing sent, no bytes stored. Re-run without --dry-run to deploy.')}\n`);
     emit(jsonSafe({
       command: 'deploy-series', kind: 'edition', copies: editionSize.toString(), ids: count, dryRun: true, sent: false, address: explicitSalt ? predicted : null, chain: CHAIN, chainId: resolveChain(CHAIN).id, factory, salt, saltPinned: !!explicitSalt, name, symbol,
@@ -3224,7 +3262,7 @@ export async function cmdDeployEditionImageBody(flags: Flags, emit: (p: Record<s
           amountPerId: mintAmount.toString(),
           recipient: effectiveMintCount > 0 ? deployer : null,
         },
-        estimate: {ethApprox: null, gasApprox: null},
+        estimate,
         warnings: planWarnings.slice(),
         surfaces: null,
         dependencies: null,
@@ -3783,6 +3821,41 @@ export function codeSetupTxsFromBatches(batches: SetupLeg[][], args: {contract: 
       onchainUri: batch.some((l) => l.kind === 'uri'),
     }),
   );
+}
+
+function codeSetupGas(batches: SetupLeg[][]): bigint[] {
+  return batches.map((batch) => BigInt(batch.reduce((gas, leg) => gas + leg.gas, 21_000)));
+}
+
+async function previewCodeDeployFees(client: PublicClient, plan: {
+  chainId: number;
+  lane: Lane;
+  deployer: Address | null;
+  salt: Hex | null;
+  predicted: Address | null;
+  requiresUpload: boolean;
+  requiresRenderer: boolean;
+  factoryGas: bigint;
+  setupGas: bigint[];
+  prepare: (owner: Address, clone: Address, salt: Hex) => PreparedTx[];
+}) {
+  const {chainId, deployer, salt, predicted, factoryGas, setupGas} = plan;
+  const unavailableReason = plan.lane === 'sponsor'
+    ? 'The creator-wallet provider prices this operation at signing time.'
+    : plan.requiresUpload || plan.requiresRenderer
+      ? 'An upload or renderer deployment must finish before the final calldata is known.'
+      : !deployer
+        ? 'Pass --for with the deployer address to estimate fees from the prepared transactions.'
+        : undefined;
+  const transactions = usesBaseFeeBreakdown(chainId) && !unavailableReason && deployer && salt && predicted
+    ? plan.prepare(deployer, predicted, salt)
+    : undefined;
+  const estimate = await estimateDeployFees(client, {
+    chainId, account: deployer, transactions, factoryGasFallback: transactions ? factoryGas : undefined,
+    setupGas, roughGas: setupGas.reduce((total, gas) => total + gas, factoryGas), unavailableReason,
+  });
+  deployFeeLines(estimate).forEach(info);
+  return estimate;
 }
 
 export async function cmdDeployCode(flags: Flags) {
@@ -4397,6 +4470,54 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     );
   }
 
+  // --onchain-uri with no explicit public URL: leave the off-chain pointer EMPTY rather than
+  // baking a misleading localhost (the renderer is authoritative while set) — the same rule as
+  // the 1/1's on-chain lane. The renderers themselves are set as setup-multicall legs, so the
+  // on-chain lane flips on atomically WITH the content/params it resolves from.
+  const initParamsFor = (owner: Address, clone: Address) => ({
+    owner,
+    name,
+    symbol,
+    tokenURIBase: onChainUri && !hasPublicUrl ? '' : `${baseUrl}/t`,
+    // Renderer-only fold: the metadata renderer (what makes tokenURI resolve on-chain) rides the
+    // deploy tx. The script/dir lane still sets it via the multicall (0 here), because its content
+    // isn't on-chain until that same multicall — flipping the renderer on before the chunks land
+    // would leave a transient window of broken tokenURIs.
+    tokenURIRenderer: foldIntoInit ? metadataRenderer : zeroAddress,
+    contractURIBase: onChainUri && !hasPublicUrl ? '' : `${baseUrl}/c`,
+    contractURIRenderer: foldIntoInit ? metadataRenderer : zeroAddress,
+    royaltyReceiver: owner,
+    royaltyBps,
+    maxRoyaltyBps,
+    burnable,
+    transferValidator,
+    maxInvocations: max,
+    primaryPayee: (flags['primary-payee'] as Address) ?? zeroAddress,
+    minter: (flags.minter as Address) ?? zeroAddress,
+    paused,
+    seedSource,
+    disableTokenOwnerDelegation: flags['no-delegation'] !== undefined,
+    // Reserve mints fold into init ONLY for renderer-only (the token is fully configured at deploy).
+    mintTo: foldIntoInit && mintCount > 0 ? owner : zeroAddress,
+    mintCount: foldIntoInit ? BigInt(mintCount) : 0n,
+    tokenFields: [],
+    contractFields: resolveImageNamespace(contractFields, clone),
+  });
+  // `setupLegGroups` (the shared, resume-compatible builder) and the fresh-deploy batch shape
+  // (`freshDeployBatches`) are hoisted above — see the comment there for why. Build the REAL
+  // transactions for the actual signer from the SAME batch shape (identical `.gas` sequence ⇒
+  // identical split — see `planCodeSetupBatches`'s doc), this time with real mint calldata.
+  const cid = resolveChain(CHAIN).id;
+  const codeTransactions = (owner: Address, clone: Address, salt: Hex): PreparedTx[] => {
+    const g = setupLegGroups(owner);
+    const batches = planCodeSetupBatches({
+      ...coreSetupLegs(g),
+      mints: Array.from({length: setupMintCount}, () => mintSetupLeg(g.mints.data)),
+    });
+    const setupTxs = codeSetupTxsFromBatches(batches, {contract: clone, chainId: cid, deps: deps.map((d) => d.display)});
+    return [prepareDeploySeriesCode({factory, params: initParamsFor(owner, clone), salt, chainId: cid, clone}), ...setupTxs];
+  };
+
   // --dry-run: emit the full plan (the on-chain values the skill formats into its confirm table),
   // then stop — no upload, no factory/seed deploy, no send.
   //
@@ -4491,34 +4612,15 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         (foldIntoInit && freshDeployBatches.length === 0 ? ` ${dim('— single transaction, fully self-contained')}` : ''),
     );
     info(`approvals   ${approvals} wallet approval(s)`); // TX signatures only; the same number the tx-count line above implies
-    // Best-effort cost guidance (owner: a bonus in dry-run, never a blocker — silently skip if the
-    // RPC can't price gas; see cli-ux-decisions). On-chain byte storage dominates a template drop,
-    // so apply the skill's own ~200 gas/byte heuristic to the stored bytes + coarse per-op costs,
-    // priced at the live gas price. Clearly hedged — it's an order-of-magnitude figure, not a quote.
-    // `planEstimate` carries the SAME figures into the plan object below — `null` (not computed)
-    // when the RPC can't price gas, exactly mirroring the human line's own silent skip.
-    let planEstimate: {ethApprox: string; gasApprox: string} | null = null;
-    try {
-      const chunkBytes = scriptChunks.reduce((n, c) => n + (c.length - 2) / 2, 0);
-      const fieldBytes = contractFields.reduce((n, f) => n + (f.value.length - 2) / 2, 0);
-      const storedBytes = Math.round(chunkBytes + fieldBytes);
-      const roughGas =
-        250_000n + // clone + init (also writes the collection fields)
-        BigInt(scriptChunks.length) * 34_000n + // per-chunk SSTORE2 CREATE overhead
-        BigInt(storedBytes) * 216n + // ~200 gas/byte code deposit + ~16 gas/byte calldata
-        BigInt(schemas.length) * 45_000n +
-        BigInt(depLegs) * 55_000n +
-        BigInt(onchainUriLegs?.length ?? 0) * 60_000n +
-        BigInt(mintCount) * 65_000n;
-      const gasPrice = await publicClient.getGasPrice();
-      const eth = Number(roughGas * gasPrice) / 1e18;
-      const ethStr = eth >= 0.00001 ? eth.toFixed(5) : '<0.00001';
-      info(
-        `est. on-chain cost: ${dim('~')}${ethStr} ETH ` +
-          dim(`(very rough — ~${Number(roughGas).toLocaleString()} gas @ ${(Number(gasPrice) / 1e9).toFixed(2)} gwei; excludes off-chain storage${codeDir ? ', the dominant cost for a directory drop' : ''})`),
-      );
-      planEstimate = {ethApprox: ethStr, gasApprox: roughGas.toString()};
-    } catch { /* gas pricing unavailable — cost guidance is a bonus, skip silently */ }
+    // Keep the heuristic for wallet-less previews and for chains outside the Base rollout.
+    const factoryGas = 250_000n + 200n * BigInt(contractFields.reduce((bytes, field) => bytes + (field.value.length - 2) / 2, 0)) +
+      BigInt(foldIntoInit ? mintCount : 0) * 65_000n;
+    const setupGas = codeSetupGas(freshDeployBatches);
+    const planEstimate = await previewCodeDeployFees(publicClient, {
+      chainId, lane, deployer, salt, predicted, requiresUpload: !!dirUpload,
+      requiresRenderer: onChainUri && metadataRenderer === zeroAddress,
+      factoryGas, setupGas, prepare: codeTransactions,
+    });
 
     // ── Surfaces — every marketplace-facing dimension, resolved NOW (none is backfillable) ──────
     const renderHome = process.env.ABX_STORAGE_BACKEND || 'fs'; // empty string counts as unset (=fs)
@@ -4681,7 +4783,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
           image: null,
         },
         mint: {deferred: mintCount === 0, count: mintCount, amountPerId: null, recipient: mintCount > 0 ? deployer : null},
-        estimate: planEstimate ?? {ethApprox: null, gasApprox: null},
+        estimate: planEstimate,
         warnings: planWarnings.slice(),
         surfaces: {
           thumbnail: {ok: !imageOrphaned, detail: stripAnsiForPlan(imageDisposition)},
@@ -4710,57 +4812,12 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
   }
 
   step('Deploy');
-  // --onchain-uri with no explicit public URL: leave the off-chain pointer EMPTY rather than
-  // baking a misleading localhost (the renderer is authoritative while set) — the same rule as
-  // the 1/1's on-chain lane. The renderers themselves are set as setup-multicall legs, so the
-  // on-chain lane flips on atomically WITH the content/params it resolves from.
-  const initParamsFor = (owner: Address, clone: Address) => ({
-    owner,
-    name,
-    symbol,
-    tokenURIBase: onChainUri && !hasPublicUrl ? '' : `${baseUrl}/t`,
-    // Renderer-only fold: the metadata renderer (what makes tokenURI resolve on-chain) rides the
-    // deploy tx. The script/dir lane still sets it via the multicall (0 here), because its content
-    // isn't on-chain until that same multicall — flipping the renderer on before the chunks land
-    // would leave a transient window of broken tokenURIs.
-    tokenURIRenderer: foldIntoInit ? metadataRenderer : zeroAddress,
-    contractURIBase: onChainUri && !hasPublicUrl ? '' : `${baseUrl}/c`,
-    contractURIRenderer: foldIntoInit ? metadataRenderer : zeroAddress,
-    royaltyReceiver: owner,
-    royaltyBps,
-    maxRoyaltyBps,
-    burnable,
-    transferValidator,
-    maxInvocations: max,
-    primaryPayee: (flags['primary-payee'] as Address) ?? zeroAddress,
-    minter: (flags.minter as Address) ?? zeroAddress,
-    paused,
-    seedSource,
-    disableTokenOwnerDelegation: flags['no-delegation'] !== undefined,
-    // Reserve mints fold into init ONLY for renderer-only (the token is fully configured at deploy).
-    mintTo: foldIntoInit && mintCount > 0 ? owner : zeroAddress,
-    mintCount: foldIntoInit ? BigInt(mintCount) : 0n,
-    tokenFields: [],
-    contractFields: resolveImageNamespace(contractFields, clone),
-  });
-  // `setupLegGroups` (the shared, resume-compatible builder) and the fresh-deploy batch shape
-  // (`freshDeployBatches`) are hoisted above — see the comment there for why. Build the REAL
-  // transactions for the actual signer from the SAME batch shape (identical `.gas` sequence ⇒
-  // identical split — see `planCodeSetupBatches`'s doc), this time with real mint calldata.
-  const cid = resolveChain(CHAIN).id;
   const preparedFor = async (owner: Address) => {
     const explicitSalt = parseSaltFlag(flags.salt);
     if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, owner);
     const salt = explicitSalt ?? saltFor(owner);
     const clone = (await publicClient.readContract({address: factory, abi: seriesCodeFactoryAbi, functionName: 'predictDeterministicAddress', args: [salt]})) as Address;
-    const g = setupLegGroups(owner);
-    const batches = planCodeSetupBatches({
-      ...coreSetupLegs(g),
-      mints: Array.from({length: setupMintCount}, () => mintSetupLeg(g.mints.data)),
-    });
-    const setupTxs = codeSetupTxsFromBatches(batches, {contract: clone, chainId: cid, deps: deps.map((d) => d.display)});
-    const txs = [prepareDeploySeriesCode({factory, params: initParamsFor(owner, clone), salt, chainId: cid, clone}), ...setupTxs];
-    return {clone, txs};
+    return {clone, txs: codeTransactions(owner, clone, salt)};
   };
 
   // ── --resume: finish an EXISTING contract, deploy nothing ──────────────────────────────────
@@ -5684,16 +5741,18 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
   // `owner` is irrelevant to the batch SHAPE (see the comment above), so `zeroAddress` here is a
   // placeholder used purely to size `approvals` before a deployer is known — never sent.
   const editionSetupBatches = planCodeSetupBatches({chunks: chunkLegs, config: configLegs, mints: mintLegsFor(zeroAddress)});
-  const preparedFor = async (owner: Address): Promise<{clone: Address; txs: PreparedTx[]}> => {
-    const salt = explicitSalt ?? saltFor(owner);
-    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, owner);
-    const clone = await predictClone(publicClient, {factory, salt});
+  const codeTransactions = (owner: Address, clone: Address, salt: Hex): PreparedTx[] => {
     const setupTxs = codeSetupTxsFromBatches(
       planCodeSetupBatches({chunks: chunkLegs, config: configLegs, mints: mintLegsFor(owner)}),
       {contract: clone, chainId, deps: deps.map((d) => d.display)},
     );
-    const txs = [prepareDeployEditionCode({factory, params: initParamsFor(owner, clone), salt, chainId, clone}), ...setupTxs];
-    return {clone, txs};
+    return [prepareDeployEditionCode({factory, params: initParamsFor(owner, clone), salt, chainId, clone}), ...setupTxs];
+  };
+  const preparedFor = async (owner: Address) => {
+    const salt = explicitSalt ?? saltFor(owner);
+    if (explicitSalt) assertSaltGuardForDeployer(explicitSalt, owner);
+    const clone = await predictClone(publicClient, {factory, salt});
+    return {clone, txs: codeTransactions(owner, clone, salt)};
   };
   // deps ride the same setup batch as chunks/schemas/mints when everything fits one transaction, so
   // they don't add an approval on their own — but they must be COUNTED in the "is there a setup
@@ -5750,6 +5809,14 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
         `(${[scriptChunks.length ? 'script chunks' : null, schemas.length ? 'schemas' : null, onChainUri ? 'on-chain URI wiring' : null, mintCount > 0 ? 'reserve mints' : null].filter(Boolean).join(' + ') || 'nothing else'})`,
     );
     info(`approvals   ${approvals} wallet approval(s)`); // parity with the 721 code twin — it had this only in the --confirm sentence
+    const estimate = usesBaseFeeBreakdown(chainId)
+      ? await previewCodeDeployFees(publicClient, {
+          chainId, lane, deployer, salt, predicted, requiresUpload: !!dirUpload,
+          requiresRenderer: onChainUri && metadataRenderer === zeroAddress,
+          factoryGas: 250_000n + 200n * BigInt(contractFields.reduce((bytes, field) => bytes + (field.value.length - 2) / 2, 0)),
+          setupGas: codeSetupGas(editionSetupBatches), prepare: codeTransactions,
+        })
+      : {ethApprox: null, gasApprox: null};
     if (!explicitSalt && deployer) {
       console.log(`\n  ${bold('salt')}  ${g(salt!)}`);
       info(`address: pinned by salt — re-run with ${bold(`--salt ${salt}`)} (same address).`);
@@ -5784,7 +5851,7 @@ export async function cmdDeployEditionCodeBody(flags: Flags, emit: (p: Record<st
           amountPerId: mintAmount.toString(),
           recipient: mintCount > 0 ? deployer : null,
         },
-        estimate: {ethApprox: null, gasApprox: null}, // this lane computes no cost estimate
+        estimate,
         warnings: planWarnings.slice(),
         surfaces: null, // only the fresh 721 code lane computes the per-surface disposition today
         dependencies: {count: deps.length, registry: depRegistry ?? null},

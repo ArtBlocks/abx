@@ -177,8 +177,9 @@ Do not import code-edition limits into static editions or vice versa. Use the ca
    `plan` object (every `deploy`/`deploy-series`/`deploy-code` emit, including `--resume`) carries
    most of this pre-structured — `transactions`, `roles`, `royalty`, `custody`, `mint`, `estimate`,
    `warnings`, and (code lanes) `surfaces`/`dependencies` — versioned via `plan.schemaVersion`. Prefer
-   it over parsing the human prose for anything it covers; a field it has no answer for is `null`, not
-   absent.
+   it over parsing the human prose. On Base and Base Sepolia use `estimate.feeBreakdown.totalWei`
+   for the estimated network fee and `unavailableReason` when the total is `null`. `ethApprox` is the
+   execution component. Off-chain storage and creator-wallet payment at signing are separate.
 4. Receive explicit confirmation.
 5. Run the same normalized command without `--dry-run`; do not start another write using the EOA.
 6. Capture the chain, contract address, deploy block, owner, storage locators, and resolver/remote.
