@@ -1,5 +1,11 @@
 # @artblocks/abx-cli
 
+## 0.12.2
+
+### Patch Changes
+
+- 9982612: Report execution, L1 data, and operator fee estimates separately in Base and Base Sepolia deploy previews. The versioned JSON plan adds `estimate.feeBreakdown` and keeps the existing execution estimate fields. Missing costs stay explicit, including plans that still need a storage locator or staging transaction.
+
 ## 0.12.1
 
 ### Patch Changes
