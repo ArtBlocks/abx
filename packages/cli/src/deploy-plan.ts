@@ -25,8 +25,9 @@ import type {Address} from '@artblocks/abx-sdk';
  *  see each field's own doc comment). A consumer keying behavior off `legs`' shape needs to know
  *  which version it's reading.
  *
- *  v3: added `paymentPolicy` to describe automatic creator-wallet payment. */
-export const DEPLOY_PLAN_SCHEMA_VERSION = 3 as const;
+ *  v3: added `paymentPolicy` to describe automatic creator-wallet payment.
+ *  v4: added the Base dry-run fee breakdown. */
+export const DEPLOY_PLAN_SCHEMA_VERSION = 4 as const;
 
 /** The six product lanes `deploy.ts` implements — a stable discriminator independent of the legacy
  *  `command`/`kind` fields already on the payload (which exist for backward compat and don't fully
@@ -156,24 +157,19 @@ export interface DeployPlanMint {
 }
 
 export interface DeployPlanEstimate {
-  /**
-   * A rough, hedged order-of-magnitude ETH/gas figure for THIS deploy's on-chain write cost.
-   *
-   * `null` is not "not implemented yet" here — it is the honest answer on every lane that genuinely
-   * computes no such number today, including the image lanes' `--onchain-image` staging (1/1,
-   * 1/1-edition, series, series-edition all skip this: verified directly — none of them prices gas or
-   * prints an "est. on-chain cost" line anywhere on the dry-run path). The ONE lane that does compute
-   * and print one is the fresh `code` family's on-chain-byte-storage guidance (a best-effort
-   * `~200 gas/byte` heuristic priced at the live gas price, wrapped in a try/catch that skips silently
-   * if the RPC can't price gas) — see the `planEstimate` local in `commands/deploy.ts`.
-   *
-   * This field NEVER re-derives or newly computes a number for the plan — it only carries over the
-   * exact estimate the human readout already printed. Do not extend this to a lane that doesn't
-   * already print one without saying so explicitly wherever that change is made: an estimate implies
-   * an RPC gas-price read, which is a new class of work for a dry run that today makes none.
-   */
+  /** Display values for execution gas and execution cost. Neither includes rollup fees. */
   ethApprox: string | null;
   gasApprox: string | null;
+  /** Base and Base Sepolia dry runs include a breakdown even when a component is unavailable. */
+  feeBreakdown?: {
+    executionGasSource: 'rpc' | 'heuristic' | null;
+    gasPriceWei: string | null;
+    executionFeeWei: string | null;
+    l1DataFeeWei: string | null;
+    operatorFeeWei: string | null;
+    totalWei: string | null;
+    unavailableReason: string | null;
+  };
 }
 
 export interface DeployPlanSurface {

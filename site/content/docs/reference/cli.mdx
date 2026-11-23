@@ -42,7 +42,7 @@ built-in help.
 | `serve` | Run a local resolver |
 | `render` / `effects` | Render once or run the effects worker |
 
-Structured deploy output uses `plan.schemaVersion: 3`. Creator-wallet plans include
+Structured deploy output uses `plan.schemaVersion: 4`. Creator-wallet plans include
 `paymentPolicy: "prefer-self-payment"`; other signing lanes use `paymentPolicy: null`.
 Consumers should check the schema version before interpreting the plan.
 
@@ -198,6 +198,15 @@ warnings, required public surfaces, dependencies, and resume state. Unknown valu
 `transactions.approvals` is the number of wallet approvals. `transactions.legs` names the logical
 groups they contain. Large code deployments may split setup across transactions. `deploy-code
 --resume` continues the idempotent setup steps, and reserve mints run last.
+
+On Base and Base Sepolia, fresh deploy dry runs include `estimate.feeBreakdown` for standard wallet
+transactions. It reports the execution fee, L1 data fee, operator fee, and total as decimal strings
+in wei. `executionGasSource` identifies RPC estimates and heuristics. Code setup gas is heuristic
+because the target contract does not exist yet. `ethApprox` and `gasApprox` describe execution only.
+Pass `--for` to supply the deployer address for a code preview. A missing input, deferred upload or
+staging step, or failed RPC quote leaves the affected components and total `null`. A reported `"0"`
+means the quote returned zero. Off-chain storage costs and creator-wallet payment at signing are
+separate from the standard wallet estimate.
 
 ## Optional utilities
 
