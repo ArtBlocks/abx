@@ -26,30 +26,28 @@ import {
 ///         writes hit the token's own ERC-7201 namespaces; events log from the token — the spine is
 ///         byte-identical to an inlined implementation.
 ///
-///         This header used to say "ONLY by {EditionCode} (never by {OneOfOneEdition} /
-///         {EditionImage}, which must stay lib-free so their factories keep CREATE2-deterministic
-///         addresses)". Both halves were wrong, and the second one is why the first was believed:
-///         linking a library costs NOTHING in determinism (the library is CREATE2'd at a canonical
-///         salt, and linking substitutes its address into already-compiled bytecode), so the two
-///         tokens were held library-free for no reason. They are now linked — and because this
-///         comment outlived the change, both of their factories were left deploying UNLINKED
-///         bytecode in both toolchains. A stale comment asserting an architectural constraint is
-///         worse than no comment: it stops the next reader from checking.
-/// @dev Access control stays in {EditionCode}'s thin overrides (`onlyOwner`); this library
-///      assumes its caller already gated. Event declarations duplicate the mixins' — same
+///
+///         Linking this library costs the three tokens nothing in address determinism: it is
+///         CREATE2'd at a canonical salt, and linking substitutes that address into bytecode that
+///         is already compiled (see the contracts README on deterministic addresses).
+/// @dev **Access control lives in the mixins that call in, not here.** Every state-changing entry
+///      point is reached only by a typed library call from mixin or token code, never by a token
+///      selector, and each caller gates first: {Uri1155}'s setters and {EditionSupply-setMaxSupply}
+///      are `onlyOwner`; {CreatorToken1155-setTransferValidator} runs `_requireValidatorCaller`
+///      (owner, or anyone suspending once the collection is ownerless); enrollment, the transfer
+///      gate, the hook notification and the mint bookkeeping are internal to initialize, the
+///      transfer hooks and the mint path. Solidity's library call protection makes the non-view
+///      functions revert if called directly rather than by delegatecall. The one raw-calldata
+///      passthrough is the `uri(uint256)` read. Event declarations duplicate the mixins' — same
 ///      signatures, same topics — plus Solady `ERC1155`'s native `URI`, which this library must
 ///      re-declare itself since it doesn't inherit `ERC1155`.
 ///
 ///      **Why these three mixins, and not the shared code-project ones** ({OnChainScript},
 ///      {Dependencies}, {Params}, {ConfigurableParams}): those already delegatecall
-///      {AbxCodeLib}/{AbxParamsLib} directly from the SHARED mixin body, unconditionally, for
-///      BOTH standards (721 and 1155) — {SeriesCode} already pays that externalization cost, so
-///      composing them onto {EditionCode} adds no NEW inlined bytecode versus the 721 twin.
-///      {Uri1155}, {CreatorToken1155}, and {EditionSupply} are different: they're 1155-only mixins
-///      whose bodies were originally inlined into each token. All three edition tokens now override
-///      the relevant functions to delegate here instead — {EditionCode} because it rides the EIP-170
-///      ceiling, the other two because holding them lib-free bought nothing (see the header) and cost
-///      them the margin the creator-token fixes needed.
+///      {AbxCodeLib}/{AbxParamsLib} directly from the SHARED mixin body, for both standards, so
+///      composing them onto {EditionCode} adds no new inlined bytecode versus the 721 twin.
+///      {Uri1155}, {CreatorToken1155} and {EditionSupply} are 1155-only mixins whose bodies would
+///      otherwise be inlined into each edition token; they delegate here instead.
 library AbxEditionLib {
     using LibString for uint256;
     using LibString for address;
@@ -70,11 +68,10 @@ library AbxEditionLib {
     event AbxExtensionVersionSet(bytes32 indexed extensionId, uint16 version);
     // EditionSupply
     event MaxSupplyUpdated(uint256 indexed id, uint256 cap);
-    event DefaultMaxSupplySet(uint256 cap);
 
-    /// @dev Mirrors {CreatorToken1155}'s own `ID` / `VERSION` — the same permanent extension id
-    ///      (`keccak256("abx.extension.creator-token")`) and implemented version, restated because
-    ///      an external library cannot read the mixin's `private` constants.
+    /// @dev The creator-token extension's permanent id (`keccak256("abx.extension.creator-token")`,
+    ///      shared with the 721 {CreatorToken}) and the 1155 lane's implemented version. Enrollment
+    ///      runs only here, so these are the edition lane's single source for both.
     bytes32 private constant CREATOR_TOKEN_ID =
         0x0839e7ed7fc1f5db3f253851d61b10f852045c5520c2936138b121b73e7e27c0;
     uint16 private constant CREATOR_TOKEN_VERSION = 1;
@@ -88,8 +85,9 @@ library AbxEditionLib {
 
     // ── Uri1155: the uri() precedence ladder + string composition + mutation ops ──────────────
 
-    /// @dev Identical precedence ladder to {Uri1155-uri}: renderer → per-id override → derived
-    ///      base → "". `address(this)` is `EditionCode` under delegatecall either way.
+    /// @dev The body of {Uri1155-uri}, reached by its raw-calldata passthrough: renderer → per-id
+    ///      override → derived base → "". `address(this)` is the calling edition token under
+    ///      delegatecall.
     function uri(uint256 id) public view returns (string memory) {
         TokenURIStorage.Layout storage l = TokenURIStorage.layout();
         if (l.renderer != address(0)) {
@@ -101,7 +99,8 @@ library AbxEditionLib {
         return _composeUri(l.base, id);
     }
 
-    /// @dev Identical to {Uri1155-_composeUri}: `{base}/{chainId}/{address}/{id}`.
+    /// @dev The 1155 lane's only copy of the path grammar, matching the 721 lane's
+    ///      {TokenURI-_composeTokenURI}: `{base}/{chainId}/{address}/{id}`.
     function _composeUri(string memory base, uint256 id) private view returns (string memory) {
         return string.concat(
             base,
@@ -156,14 +155,10 @@ library AbxEditionLib {
         emit TokenURIFrozen();
     }
 
-    /// @dev Identical to {Uri1155-pingURI} — owner-only (the mixin gates it), caller-chunked. Emits
+    /// @dev The body of {Uri1155-pingURI}, which is `onlyOwner` and caller-chunked. Emits
     ///      `MetadataUpdate(id)` always, and the native `URI` only when no on-chain renderer is
     ///      configured: with one, `uri(id)` renders the whole document into log data.
     function pingURI(uint256[] calldata ids) public {
-        // Both behaviours below were added to {Uri1155-pingURI} and NOT ported here, where they
-        // actually run — all three edition tokens override the mixin to delegate into this library,
-        // so for a while no edition emitted the ERC-4906 ping at all and every one of them rendered
-        // the whole document into log data.
         bool onChain = TokenURIStorage.layout().renderer != address(0);
         for (uint256 i; i < ids.length; ++i) {
             uint256 id = ids[i];
@@ -179,7 +174,7 @@ library AbxEditionLib {
 
     // ── CreatorToken1155: enrollment, re-point, and the per-transfer validator loop ────────────
 
-    /// @dev Identical to {CreatorToken1155-_initCreatorToken}, beacon announce included.
+    /// @dev The body of {CreatorToken1155-_initCreatorToken}, beacon announce included.
     function initCreatorToken(address validator) public {
         if (validator == address(0)) return;
         _requireHasCode(validator);
@@ -199,8 +194,8 @@ library AbxEditionLib {
         _registerTokenType(validator);
     }
 
-    /// @dev Identical to {CreatorToken1155-setTransferValidator} (minus the `onlyOwner` gate,
-    ///      which stays on {EditionCode}'s override).
+    /// @dev The body of {CreatorToken1155-setTransferValidator}, which authorizes the caller first
+    ///      (owner, or anyone suspending once the collection is ownerless).
     function setTransferValidator(address validator) public {
         TransferValidatorStorage.Layout storage l = TransferValidatorStorage.layout();
         if (!l.enrolled) revert NotCreatorToken();
@@ -209,7 +204,9 @@ library AbxEditionLib {
         _registerTokenType(validator);
     }
 
-    /// @dev Identical to {CreatorToken1155-_validateTransfer1155}.
+    /// @dev The per-id validation loop behind {CreatorToken1155-_validateTransfer1155}, which has
+    ///      already returned for mints, burns and a missing validator; those checks are repeated
+    ///      here so the function is correct for any caller.
     function validateTransfer1155(
         address from,
         address to,
@@ -231,8 +228,8 @@ library AbxEditionLib {
         }
     }
 
-    /// @dev Identical to {CreatorToken1155-_requireHasCode} — see {CreatorToken-_requireHasCode}
-    ///      for the live-probe evidence and why an ERC-165 gate is not viable.
+    /// @dev The 1155 lane's only copy of {CreatorToken-_requireHasCode}, byte-for-byte the same
+    ///      probe — see there for the live-probe evidence and why an ERC-165 gate is not viable.
     function _requireHasCode(address validator) private view {
         bool bad;
         assembly {
@@ -259,8 +256,10 @@ library AbxEditionLib {
         emit TransferValidatorUpdated(old, validator);
     }
 
-    /// @dev Identical to {CreatorToken1155}'s own `TOKEN_TYPE_ERC1155` — see its class-level dev
-    ///      note for the PermitC/creator-token-standards provenance of the `uint16` typing.
+    /// @dev PermitC's token-type constant for ERC-1155 — the EIP number, as for 20/721. Verified
+    ///      against limitbreak `permit-c` 1.0.0 `src/Constants.sol` and creator-token-standards'
+    ///      `ERC1155C._tokenType()`, which returns `uint16(TOKEN_TYPE_ERC1155)`; `uint16` matches
+    ///      `setTokenTypeOfCollection`'s parameter.
     uint16 private constant TOKEN_TYPE_ERC1155 = 1155;
 
     function _registerTokenType(address validator) private {
@@ -273,7 +272,7 @@ library AbxEditionLib {
 
     // ── EditionSupply: setMaxSupply + the mint-time cap guard ──────────────────────────────────
 
-    /// @dev Identical to {EditionSupply-setMaxSupply} (minus the `onlyOwner` gate).
+    /// @dev The body of {EditionSupply-setMaxSupply}, which is `onlyOwner`.
     function setMaxSupply(uint256 id, uint256 cap) public {
         EditionSupplyStorage.Layout storage l = EditionSupplyStorage.layout();
         if (l.overridden[id]) {
@@ -287,7 +286,7 @@ library AbxEditionLib {
         emit MaxSupplyUpdated(id, cap);
     }
 
-    /// @dev Identical to {EditionSupply-_requireWithinEditionCap}.
+    /// @dev The body of {EditionSupply-_requireWithinEditionCap}.
     function requireWithinEditionCap(uint256 id, uint256 amount) public view {
         EditionSupplyStorage.Layout storage l = EditionSupplyStorage.layout();
         if (!l.overridden[id] && l.defaultCap == 0) return;
@@ -299,7 +298,7 @@ library AbxEditionLib {
 
     // ── EditionCode's mint-path bookkeeping: id watermark + first-mint seed draw ───────────────
 
-    /// @dev Identical to the id-watermark bump + seed-draw slice of {EditionCode-_mintEditionId}
+    /// @dev The id-watermark bump + seed-draw slice of {EditionCode-_mintEditionId}
     ///      — everything BETWEEN the guards and the actual `_mint`, which stays on the token
     ///      itself (Solady's `_mint` is `internal`, invisible to an external library). Reads
     ///      {SeedSourceStorage} / checks {ParamsStorage}'s `isSet` directly (the same plain
@@ -324,10 +323,13 @@ library AbxEditionLib {
         }
     }
 
-    /// @dev Identical semantics to {ConfigurableParams-_notifyTransferHook}: the hook is a VETO, its
-    ///      revert bubbles and fails the whole batch, and the hook set is freezable with
-    ///      `lockParamHooks()`. No swallow, no gas budget — see that function for why the old
-    ///      "never blocks a transfer" promise was unkeepable and why saying so plainly is better.
+    /// @dev The edition lane's transfer-hook notification. Like the ERC-721 lane's
+    ///      {ConfigurableParams-_notifyTransferHook}, the hook is a VETO: its revert bubbles and
+    ///      fails the whole batch, there is no swallow and no gas budget, and the hook set is
+    ///      freezable with `lockParamHooks()` (see that function for why). Unlike the ERC-721 lane
+    ///      it skips self-transfers and zero-amount entries, which the ERC-721 lane cannot have
+    ///      the same reason to skip: a 721 self-transfer requires owning or being approved for the
+    ///      token, whereas an 1155 zero-amount transfer needs neither (see below).
     function notifyTransferHookForIds(
         uint256[] memory ids,
         uint256[] memory amounts,
@@ -337,10 +339,10 @@ library AbxEditionLib {
     ) public {
         address hook = ConfigurableParamsStorage.layout().transferHook;
         if (hook == address(0)) return;
-        // Nothing moved ⇒ nothing to notify. Both skips close a permissionless spoof an independent
-        // Adversarial testing reproduced: Solady allows `safeTransferFrom(from, to, id, 0, "")`
-        // from any caller
-        // (zero is not greater than a zero balance), so a stranger holding no copy could fire the
+        // Nothing moved ⇒ nothing to notify. Both skips close a permissionless spoof that
+        // adversarial testing reproduced: Solady allows `safeTransferFrom(from, to, id, 0, "")` from
+        // any caller (zero is not greater than a zero balance), so a stranger holding no copy could
+        // fire the
         // lifecycle for any id, and a hook storing transfer-derived state would rewrite params
         // shared by every real holder. A self-transfer is the same shape with a real balance: the
         // ownership set is unchanged, so the lifecycle has nothing to report.

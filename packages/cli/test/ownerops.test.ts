@@ -209,8 +209,8 @@ test('every other representation carries raw bytes and is passed through untouch
 // the node sent none when it isn't (never "we couldn't read it").
 import {revertReason} from '../src/riskgate.js';
 import {encodeErrorResult} from 'viem';
-import {editionCodeAbi, seriesCodeAbi} from '@artblocks/abx-sdk';
-import {abxCodeLibAbi, abxParamsLibAbi} from '@artblocks/abx-sdk/abi';
+import {abxCoreV3ErrorsAbi, editionCodeAbi, seriesCodeAbi} from '@artblocks/abx-sdk';
+import {abxCodeLibAbi} from '@artblocks/abx-sdk/abi';
 
 test('revertReason: an ABX custom error decodes to its own name', () => {
   const data = encodeErrorResult({abi: seriesCodeAbi, errorName: 'RoyaltyTooHigh'});
@@ -219,10 +219,17 @@ test('revertReason: an ABX custom error decodes to its own name', () => {
   assert.match(revertReason({cause: {data}}), /^RoyaltyTooHigh\(\)$/);
 });
 
-test('revertReason: errors raised inside the delegatecalled libraries decode by name', () => {
+test('revertReason: param errors decode for both the current and the v3 generation', () => {
+  const key = `0x${Buffer.from('palette').toString('hex').padEnd(64, '0')}` as const;
+  const v4 = encodeErrorResult({abi: seriesCodeAbi, errorName: 'SchemaGoverned', args: [key]});
+  assert.match(revertReason({data: v4}), /^SchemaGoverned\(0x70616c65747465/);
+  // A v3 collection reverts with the argument-less shape — a different selector.
+  const v3 = encodeErrorResult({abi: abxCoreV3ErrorsAbi, errorName: 'NotParamAuthorized'});
+  assert.match(revertReason({data: v3}), /^NotParamAuthorized\(\)$/);
+});
+
+test('revertReason: other errors raised inside the delegatecalled libraries decode by name', () => {
   // Not declared in the token ABIs, so these used to surface as a raw selector.
-  const notAuthorized = encodeErrorResult({abi: abxParamsLibAbi, errorName: 'NotParamAuthorized'});
-  assert.match(revertReason({data: notAuthorized}), /^NotParamAuthorized\(\)$/);
   const scriptLocked = encodeErrorResult({abi: abxCodeLibAbi, errorName: 'ScriptIsLocked'});
   assert.match(revertReason({data: scriptLocked}), /^ScriptIsLocked\(\)$/);
   const supplyReached = encodeErrorResult({abi: editionCodeAbi, errorName: 'EditionSupplyReached'});

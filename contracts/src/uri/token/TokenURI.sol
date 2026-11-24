@@ -109,7 +109,9 @@ abstract contract TokenURI is ERC721, Ownable, IERC4906 {
     }
 
     /// @notice Owner freezes the token-URI config (base + renderer + all overrides) forever.
-    ///         With the token's fields also locked, the resolved metadata is provably immutable.
+    /// @dev This freezes POINTERS. With the token's fields also locked, every input the token stores
+    ///      is fixed; the resolved metadata is fixed only if the renderer and anything it reads are
+    ///      themselves immutable.
     function lockTokenURI() external onlyOwner {
         TokenURIStorage.layout().locked = true;
         emit TokenURIFrozen();

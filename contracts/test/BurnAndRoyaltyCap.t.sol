@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
-import {ERC721} from "solady/tokens/ERC721.sol";
 
 import {OneOfOneImage} from "../src/tokens/OneOfOneImage.sol";
 import {OneOfOneImageFactory} from "../src/factories/OneOfOneImageFactory.sol";
@@ -51,6 +50,30 @@ contract BurnAndRoyaltyCapTest is Test {
                     royaltyBps: royaltyBps,
                     maxRoyaltyBps: maxRoyaltyBps,
                     burnable: burnable,
+                    transferValidator: address(0),
+                    tokenFields: new IAbxOnChainMetadata.FieldInput[](0),
+                    contractFields: new IAbxOnChainMetadata.FieldInput[](0)
+                })
+            )
+        );
+    }
+
+    function _deploy721Deferred() internal returns (OneOfOneImage) {
+        return OneOfOneImage(
+            factory.deploy(
+                OneOfOneImage.InitParams({
+                    owner: owner,
+                    mintTo: address(0),
+                    name: "One",
+                    symbol: "ONE",
+                    tokenURIBase: "https://abx.test/t",
+                    tokenURIRenderer: address(0),
+                    contractURIBase: "https://abx.test/c",
+                    contractURIRenderer: address(0),
+                    royaltyReceiver: owner,
+                    royaltyBps: 0,
+                    maxRoyaltyBps: 0,
+                    burnable: true,
                     transferValidator: address(0),
                     tokenFields: new IAbxOnChainMetadata.FieldInput[](0),
                     contractFields: new IAbxOnChainMetadata.FieldInput[](0)
@@ -109,6 +132,29 @@ contract BurnAndRoyaltyCapTest is Test {
         // ERC-721: the token no longer exists → ownerOf reverts.
         vm.expectRevert();
         nft.ownerOf(0);
+    }
+
+    /// A burned 1/1 stays burned: the owner cannot mint id 0 again, so a burn-to-redeem cannot be
+    /// undone and the collection's whole lifetime issuance is one token.
+    function test_Burn_OneOfOneCannotBeResurrected() public {
+        OneOfOneImage nft = _deploy721(true, 500, 1000);
+        vm.prank(holder);
+        nft.burn(0);
+        vm.prank(owner);
+        vm.expectRevert(OneOfOneImage.AlreadyMinted.selector);
+        nft.mint(stranger);
+        assertEq(nft.totalSupply(), 0);
+    }
+
+    /// A deferred 1/1 (no deploy-time mint) still mints exactly once.
+    function test_DeferredOneOfOneMintsExactlyOnce() public {
+        OneOfOneImage nft = _deploy721Deferred();
+        vm.startPrank(owner);
+        nft.mint(holder);
+        vm.expectRevert(OneOfOneImage.AlreadyMinted.selector);
+        nft.mint(stranger);
+        vm.stopPrank();
+        assertEq(nft.ownerOf(0), holder);
     }
 
     function test_Burn_MetadataStopsResolvingAfterBurn() public {

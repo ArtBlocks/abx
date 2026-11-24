@@ -17,11 +17,11 @@ import {EditionCode} from "../tokens/EditionCode.sol";
 ///      discovery, never trust. A new core version ships as a new implementation + new factory;
 ///      old clones stay frozen on their version.
 ///
-///      **Library linking**: {EditionCode} `delegatecall`s the shared, externally-linked
-///      {AbxParamsLib} / {AbxCodeLib} (same non-CREATE2 lib dance as {SeriesCodeFactory}) — `forge
-///      script --broadcast` auto-deploys and links them; their addresses land in the broadcast
-///      artifacts and belong in the deployment manifest alongside this factory (see
-///      `script/DeployEditionCode.s.sol`).
+///      **Library linking**: {EditionCode} `delegatecall`s {AbxParamsLib}, {AbxCodeLib},
+///      {AbxEditionLib} and {AbxMetadataLib}. Each is CREATE2'd first at a canonical salt
+///      (`script/DeployLibraries.s.sol`), and the deploy script substitutes those addresses into the
+///      compiled bytecode (`script/AbxLink.sol`) — never forge's `--libraries`, which would change
+///      this factory's own CREATE2 address (see the contracts README).
 contract EditionCodeFactory {
     /// @notice The canonical implementation every clone delegates to (immutable).
     address public immutable implementation;
@@ -66,12 +66,15 @@ contract EditionCodeFactory {
     }
 
     function _initAndRegister(address clone, EditionCode.InitParams calldata params) internal {
-        // Register AFTER `initialize` returns. Initialization makes one external call — to the
-        // owner-supplied transfer validator — and during that callback the clone would otherwise
-        // already read as canonical to any integration that treats `isAbxClone` as "fully set up",
-        // while deploy-time mints and `Deployed` have not happened yet. No present invariant break
-        // was found (caps are written before the callback, and the validator is owner-chosen), but
-        // the ordering costs nothing and removes the window.
+        // Register AFTER `initialize` returns. Initialization calls out — to the owner-supplied transfer validator (its code probe and
+        // `setTokenTypeOfCollection`), to the seed source and to the recipient's
+        // `onERC1155Received`, once per deploy-time id — and
+        // during those calls the clone would otherwise already read as canonical to any
+        // integration that treats `isAbxClone` as "fully set up", while deploy-time mints and
+        // `Deployed` have not finished. No present invariant break was found (every cap is written
+        // before the first call out), but the ordering costs nothing and removes the window. The
+        // flip side, by design: a callee that gates on `isAbxClone(msg.sender)` sees `false` while
+        // the clone initializes.
         EditionCode(clone).initialize(params);
         isAbxClone[clone] = true;
         emit Deployed(clone, implementation, params.owner);

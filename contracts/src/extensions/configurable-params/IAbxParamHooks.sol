@@ -56,8 +56,10 @@ interface IAbxConfigureHook {
     ) external;
 }
 
-/// @notice Transfer hook: called by the token after every ownership change (mint = transfer from
-///         `0x0`, burn = transfer to `0x0`). The mechanism for owner-dependent output — it may
+/// @notice Transfer hook: called by the token after every token movement (mint = transfer from
+///         `0x0`, burn = transfer to `0x0`). On ERC-721 that is every transfer, a self-transfer
+///         included; on ERC-1155 it is every id moved with a non-zero amount between two different
+///         addresses. The mechanism for owner-dependent output — it may
 ///         persist/derive params (the token exposes no special path; the hook acts through its
 ///         own authority). **A VETO**: its revert bubbles and the transfer (or mint) fails. The
 ///         token used to swallow reverts and promise the lifecycle could never block a transfer,
@@ -85,9 +87,11 @@ interface IAbxTransferHook {
     ///      cannot tell a real transfer from a no-op. Adversarial review showed the consequence:
     ///      Solady permits `safeTransferFrom(from, to, id, 0, "")` from any caller who owns nothing,
     ///      so a stranger could fire the lifecycle for an id they hold no copy of, and a hook that
-    ///      stored "the most recent mover" would rewrite shared params for every real holder. The
-    ///      token now refuses to notify on zero-amount and self-transfers, and these two arguments
-    ///      let a hook apply its own policy on top.
+    ///      stored "the most recent mover" would rewrite shared params for every real holder. An
+    ///      ERC-1155 token therefore refuses to notify on zero-amount and self-transfers, and these
+    ///      two arguments let a hook apply its own policy on top. An ERC-721 token notifies on
+    ///      self-transfers, which only the owner or an approved operator can make; a hook that
+    ///      counts changes of holder should skip `from == to`.
     ///
     ///      **Think carefully before storing per-id state from this on a multi-copy edition.**
     ///      Params are per id and therefore SHARED across every holder of that id, so a hook that

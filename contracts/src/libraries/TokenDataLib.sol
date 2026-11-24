@@ -12,7 +12,11 @@ import {IAbxAugmentHook} from "../extensions/configurable-params/IAbxParamHooks.
 /// @title TokenDataLib — the canonical `tokenData` decode + assembly, on-chain
 /// @notice The Solidity twin of the off-chain serializer: field renderers use it to build the
 ///         flat `tokenData` JSON a program receives, byte-consistent with what the resolver
-///         and render nodes produce. Every value is a JSON
+///         and render nodes produce for values written through the governed path. Three
+///         owner-created states differ: a stored `Select` index at or past the option count
+///         (this emits nothing; the generator and SDK emit the index), and a token scope holding
+///         a literal where the contract scope holds a blob, or the reverse (this falls back to the
+///         contract scope; they use the token scope). Every value is a JSON
 ///         string; the canonical decode does the conversion (`HexColor → "#rrggbb"`,
 ///         `DecimalRange` ÷ 1e10, `Bytes → base64`, …); `String` values are JSON-escaped here
 ///         — the single escaping point.

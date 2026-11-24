@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 /// @notice The always-stored ERC-721 collection identity: `name` and `symbol`. These
 ///         are plain strings with no resolution strategy (there is no "off-chain name"),
 ///         so they live in the core base — unlike `contractURI`, which is a URI with a
-///         stored-vs-on-chain strategy (see `StoredContractURI`). Clones can't use
+///         stored-vs-on-chain strategy (see {ContractURI}). Clones can't use
 ///         immutables for strings, so they live in storage; namespaced to avoid
 ///         colliding with the ERC-721 base or other mixins.
 library CollectionMetadataLib {

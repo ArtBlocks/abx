@@ -101,7 +101,7 @@ contract ReferenceHooksTest is Test {
         assertEq(transfers.transferCount(0), 0);
     }
 
-    function test_TransferCounterCountsSelfAndOrdinaryTransfers() public {
+    function test_TransferCounterCountsChangesOfHolderOnly() public {
         TransferCounterHook transfers = new TransferCounterHook(address(token));
 
         vm.startPrank(owner);
@@ -109,14 +109,15 @@ contract ReferenceHooksTest is Test {
         uint256 id = token.mint(collector);
         vm.stopPrank();
 
-        // ERC-721 emits Transfer for a self-transfer, and its transfer hook observes that event.
+        // ERC-721 reports a self-transfer to its transfer hook; the counter ignores it, so a holder
+        // cannot raise the rendered count by sending the token to themselves.
         vm.prank(collector);
         token.transferFrom(collector, collector, id);
-        assertEq(transfers.transferCount(id), 1);
+        assertEq(transfers.transferCount(id), 0);
 
         vm.prank(collector);
         token.transferFrom(collector, recipient, id);
-        assertEq(transfers.transferCount(id), 2);
+        assertEq(transfers.transferCount(id), 1);
     }
 
     function test_EmptyBlobIsRejectedByTheRealTokenBeforeTheHook() public {

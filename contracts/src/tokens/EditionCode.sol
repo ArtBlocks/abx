@@ -21,8 +21,7 @@ import {Dependencies} from "../extensions/dependencies/Dependencies.sol";
 import {IAbxEditionMint} from "../interfaces/IAbxEditionMint.sol";
 import {Erc1155SupplyStorage} from "../libraries/Erc1155SupplyStorage.sol";
 import {AbxEditionLib} from "../libraries/AbxEditionLib.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
-import {AbxCodeLib} from "../libraries/AbxCodeLib.sol";
+import {ConfigurableParamsStorage} from "../libraries/ConfigurableParamsStorage.sol";
 import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMetadata.sol";
 
 /// @title EditionCode — copies of many distinct generative works (ERC-1155, a program is the content)
@@ -34,9 +33,11 @@ import {IAbxOnChainMetadata} from "../extensions/onchain-metadata/IAbxOnChainMet
 ///         Deployed as an immutable EIP-1167 clone by {EditionCodeFactory}; never used directly.
 /// @dev **The seed promise, generalized to "first mint of an id" instead of "the mint":** a
 ///      Series token mints each id exactly once, so {SeriesCode} draws a seed at *the* mint. An
-///      edition id can be minted many times (more copies), so the seed draws at the id's **FIRST**
-///      mint only (`totalSupply(id) == 0` before this mint) — every copy of the same id shares one
-///      seed, since the seed belongs to the WORK (the id), not to any individual copy. Once
+///      edition id can be minted many times (more copies), so the seed draws once per id, at a mint
+///      that finds the id with no live copies and no seed — in practice its first mint. Every copy
+///      of the same id shares that one seed, since the seed belongs to the WORK (the id), not to
+///      any individual copy. (Edge: if no seed source was set at the first mint, the id has no
+///      seed; a later mint draws one only after every copy has been burned.) Once
 ///      set, `seed` is settled exactly like {SeriesCode}: the raw owner setters refuse it, a schema
 ///      declared after the fact is refused, and a seed source re-entering mid-mint is refused
 ///      (`SeedSettled`, enforced in {AbxParamsLib}).
@@ -83,6 +84,8 @@ contract EditionCode is
     /// @param contractURIRenderer On-chain renderer for the collection URI; `address(0)` = off-chain.
     /// @param royaltyReceiver Default royalty payee.
     /// @param royaltyBps Default royalty in basis points (<= the royalty cap).
+    /// @param maxRoyaltyBps Royalty ceiling in basis points (0–10000), reduce-only after deploy.
+    /// @param burnable Opt-in burn, fixed at deploy; `false` means copies can never be destroyed.
     /// @param transferValidator Zero = a plain ERC-1155 forever. Non-zero = permanent ERC-1155C
     ///        enrollment with this validator.
     /// @param maxInvocations The id-space cap N (> 0): the number of distinct works, monotonically
@@ -91,7 +94,8 @@ contract EditionCode is
     /// @param primaryPayee Primary-sale payout destination (`address(0)` = none).
     /// @param minter Initial authorized minter (`address(0)` = owner-only).
     /// @param paused Initial mint-pause state (usually deployed paused).
-    /// @param seedSource IAbxSeedSource the token calls at each id's FIRST mint (`address(0)` = no
+    /// @param seedSource IAbxSeedSource the token calls once per id, at a mint that finds the id
+    ///        unseeded with no live copies — in practice its first mint (`address(0)` = no
     ///        mint-time seed — post-mint schemas, curated seeds, or non-generative code).
     /// @param mintTo Recipient for the deploy-time mint (`address(0)` = defer all minting).
     /// @param mintCount Distinct works to mint at deploy, ids `[0, mintCount)`; `<= maxInvocations`.
@@ -131,10 +135,6 @@ contract EditionCode is
     error MintingPaused();
     /// @notice A mint amount of 0 copies was requested.
     error ZeroMintAmount();
-    /// @notice `seed` is assigned and settled — nothing may rewrite, re-shape, or clear it.
-    /// @dev Declared for this contract's ABI; enforced once, structurally, in {AbxParamsLib} — the
-    ///      single choke point every external param write passes through. Same selector.
-    error SeedSettled();
 
     constructor() {
         // Lock the implementation: only clones (which start uninitialized) can initialize.
@@ -142,24 +142,32 @@ contract EditionCode is
     }
 
     /// @notice One-time setup, called by the factory in the deploy transaction.
-    /// @dev Event order mirrors {SeriesCode} with the 1155 sale-stack extensions substituted —
-    ///      MINUS the `DelegateRegistrySet` event {SeriesCode} sometimes emits here: editions have
-    ///      no TokenOwner-leg delegation to opt out of (see {ConfigurableParams-_initConfigurableParamsForEdition}),
-    ///      so this never fires, opted out or not:
-    ///      OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
-    ///      RoyaltyChangedForAll → …(max-invocations, edition-supply, external-minter,
-    ///      primary-payee, paused)… → AbxExtensionVersionSet(seed-source) → [SeedSourceSet] →
+    /// @dev Event order: OwnershipTransferred → AbxDeployed → AbxExtensionVersionSet(royalty) →
+    ///      MaxRoyaltyBpsUpdated → RoyaltyChangedForAll → BurnConfigured →
+    ///      AbxExtensionVersionSet(max-invocations) → MaxInvocationsUpdated →
+    ///      AbxExtensionVersionSet(edition-supply) → DefaultMaxSupplySet →
+    ///      AbxExtensionVersionSet(external-minter) → [MinterSet] →
+    ///      AbxExtensionVersionSet(primary-payee) → [PrimaryPayeeChanged] →
+    ///      AbxExtensionVersionSet(paused) → [PausedStatusChanged(true)] →
+    ///      AbxExtensionVersionSet(seed-source) → [SeedSourceSet] →
     ///      AbxExtensionVersionSet(params) → AbxExtensionVersionSet(configurable-params) →
     ///      AbxExtensionVersionSet(onchain-script) → AbxExtensionVersionSet(dependencies) →
-    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet*/ContractFieldSet* →
-    ///      ContractURIUpdated → (per deploy-time id) TokenParamConfigured("seed") + TransferSingle.
+    ///      AbxExtensionVersionSet(onchain-metadata) → TokenFieldSet* → ContractFieldSet* →
+    ///      ContractURIUpdated → [AbxExtensionVersionSet(creator-token) → TransferValidatorUpdated] →
+    ///      per deploy-time id: [TokenParamConfigured("seed") → MetadataUpdate] → TransferSingle →
+    ///      Initialized(1). Editions have no TokenOwner-leg delegation to opt out of (see
+    ///      {ConfigurableParams-_initConfigurableParamsForEdition}), so unlike {SeriesCode} no
+    ///      `DelegateRegistrySet` ever fires here. `mintTo == address(0)` defers all minting
+    ///      whatever `mintCount`/`mintAmount` say.
+    ///      `[…]` = emitted only when configured; `*` = once per entry. `Initialized(1)` is Solady's
+    ///      initializer event; the factory then emits its own `Deployed`. `test/InitEventOrder.t.sol`
+    ///      pins this sequence with every optional extension configured.
     ///      Script chunks, dependencies, and schemas are post-deploy owner ops (`multicall` under
     ///      a gas budget) — a script is far too large for a fat initialize.
     ///
-    ///      The creator-token pair — [AbxExtensionVersionSet(creator-token) →
-    ///      TransferValidatorUpdated] — fires LAST of the extension inits, after
-    ///      ContractURIUpdated, because enrollment is the only external call here and every
-    ///      cap must be written before that reentrancy window opens (see the body).
+    ///      The creator-token pair fires LAST of the extension inits, after ContractURIUpdated,
+    ///      because enrollment is the only external call among them and every cap must be written
+    ///      before that reentrancy window opens (see the body).
     function initialize(InitParams calldata p) external initializer {
         if (p.maxInvocations == 0) revert InvalidMaxInvocations();
         if (p.mintCount > p.maxInvocations) revert MintCountExceedsMax();
@@ -216,8 +224,8 @@ contract EditionCode is
         _mintEditionId(to, id, amount);
     }
 
-    /// @dev The single choke point for all mint paths: guards → id high-water mark → seed (on the
-    ///      id's FIRST mint only) → mint. The seed is drawn *before* `_mint` so a transfer hook
+    /// @dev The single choke point for all mint paths: guards → id high-water mark → seed (once
+    ///      per id, when the id is unseeded with no live copies) → mint. The seed is drawn *before* `_mint` so a transfer hook
     ///      observes it; a pre-set (creator-curated) seed wins over the source — the source fills
     ///      gaps, never overwrites. The watermark bump + seed draw is delegated to
     ///      {AbxEditionLib-advanceWatermarkAndDrawSeed} (EIP-170 relief; identical semantics) —
@@ -244,15 +252,6 @@ contract EditionCode is
         if (paused()) revert MintingPaused();
         if (msg.sender != minter()) revert NotMinterOrOwner();
     }
-
-    // ── AbxEditionLib delegation (EIP-170 relief valve) ────────────────────────────────────────
-    //
-    // All three edition tokens delegate these bodies now. EditionCode is simply the tightest: it
-    // rides the EIP-170 ceiling even with the shared code-project extensions already externalized
-    // ({AbxParamsLib}/{AbxCodeLib}), so here the
-    // {Uri1155} / {CreatorToken1155} / {EditionSupply} bodies move to a delegatecalled external
-    // library instead. Access control (`onlyOwner`) stays on these overrides; the library assumes
-    // its caller already gated — identical division of labor to {Params}/{OnChainScript}.
 
     // ── composition wiring ──────────────────────────────────────────────────--
 
@@ -338,9 +337,11 @@ contract EditionCode is
     }
 
     /// @dev Supply counter (via {AbxErc1155Base}) + the veto-capable transfer-hook notification —
-    ///      the param lifecycle's ownership-change signal, once per transferred id (mint = from
-    ///      `0x0`, burn = to `0x0`). The notify loop is delegated to
-    ///      {AbxEditionLib-notifyTransferHookForIds} (EIP-170 relief; identical semantics).
+    ///      the param lifecycle's ownership-change signal, once per transferred id with a non-zero
+    ///      amount (mint = from `0x0`, burn = to `0x0`; a self-transfer changes no holder and is not
+    ///      reported). The notify loop lives in {AbxEditionLib-notifyTransferHookForIds}; the two
+    ///      cheap exits run here first so a collection with no transfer hook, and a self-transfer,
+    ///      never pay the library hop.
     function _afterTokenTransfer(
         address from,
         address to,
@@ -349,8 +350,7 @@ contract EditionCode is
         bytes memory data
     ) internal override(AbxErc1155Base, ERC1155) {
         super._afterTokenTransfer(from, to, ids, amounts, data);
+        if (from == to || ConfigurableParamsStorage.layout().transferHook == address(0)) return;
         AbxEditionLib.notifyTransferHookForIds(ids, amounts, from, to, msg.sender);
     }
-
-
 }

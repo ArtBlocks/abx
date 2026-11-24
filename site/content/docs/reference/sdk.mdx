@@ -132,6 +132,10 @@ Other common reads:
 ERC-721 lifecycle values are `unminted`, `live`, and terminal `burned`. ERC-1155 editions use `live`
 or `no-live-copies`; an ID with zero copies can mint again.
 
+The exported contract ABIs describe the current generation. Core v4 changed the parameter error
+signatures, so to decode reverts from collections of either generation, add `abxCoreV3ErrorsAbi` to the
+ABI you decode with, for example `[...seriesCodeAbi, ...abxCoreV3ErrorsAbi]`.
+
 ## Resolver client
 
 `AbxServiceClient` speaks the public service descriptor and version 1 control plane.

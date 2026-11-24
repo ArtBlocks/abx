@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {IAbxParams} from "../src/extensions/params/IAbxParams.sol";
 import {LibString} from "solady/utils/LibString.sol";
 import {Base64} from "solady/utils/Base64.sol";
 
@@ -367,15 +368,16 @@ contract SecurityPropertiesTest is Test {
     function test_NonAsciiParamKeyIsRefused() public {
         SeriesCode nft = _seriesCode();
         vm.prank(owner);
-        vm.expectRevert(AbxParamsLib.InvalidParamKey.selector);
-        nft.setTokenParam(0, bytes32(abi.encodePacked("size", hex"C080")), bytes32(uint256(1)));
+        bytes32 key = bytes32(abi.encodePacked("size", hex"C080"));
+        vm.expectRevert(abi.encodeWithSelector(IAbxParams.InvalidParamKey.selector, key));
+        nft.setTokenParam(0, key, bytes32(uint256(1)));
     }
 
     /// An empty key has no readable name to render.
     function test_EmptyParamKeyIsRefused() public {
         SeriesCode nft = _seriesCode();
         vm.prank(owner);
-        vm.expectRevert(AbxParamsLib.InvalidParamKey.selector);
+        vm.expectRevert(abi.encodeWithSelector(IAbxParams.InvalidParamKey.selector, bytes32(0)));
         nft.setTokenParam(0, bytes32(0), bytes32(uint256(1)));
     }
 
@@ -404,7 +406,13 @@ contract SecurityPropertiesTest is Test {
 
         opts[0] = "Frost";
         vm.prank(owner);
-        vm.expectRevert(AbxParamsLib.ParamLockExpired.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAbxConfigurableParams.ParamLockExpired.selector,
+                bytes32("palette"),
+                uint48(block.timestamp - 1)
+            )
+        );
         nft.setParamSchema(
             "palette",
             IAbxConfigurableParams.ParamType.Select,
@@ -443,7 +451,7 @@ contract SecurityPropertiesTest is Test {
         SeriesCode nft = _seriesCode();
         vm.startPrank(owner);
         nft.lockParamHooks();
-        vm.expectRevert(AbxParamsLib.ParamHooksLocked.selector);
+        vm.expectRevert(IAbxConfigurableParams.ParamHooksLocked.selector);
         nft.setParamHooks(address(0), address(0), address(0));
         vm.stopPrank();
     }
@@ -478,7 +486,11 @@ contract SecurityPropertiesTest is Test {
         bytes[3] memory hostile = [bytes(hex"c328"), bytes(hex"80"), bytes(hex"ff")];
         for (uint256 i; i < hostile.length; ++i) {
             vm.prank(collector);
-            vm.expectRevert(AbxParamsLib.InvalidParamValue.selector);
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IAbxConfigurableParams.InvalidParamValue.selector, bytes32("title"), 0
+                )
+            );
             nft.configureTokenParamData(0, "title", hostile[i]);
         }
     }
@@ -494,7 +506,11 @@ contract SecurityPropertiesTest is Test {
         ];
         for (uint256 i; i < hostile.length; ++i) {
             vm.prank(collector);
-            vm.expectRevert(AbxParamsLib.InvalidParamValue.selector);
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IAbxConfigurableParams.InvalidParamValue.selector, bytes32("title"), 0
+                )
+            );
             nft.configureTokenParamData(0, "title", hostile[i]);
         }
     }

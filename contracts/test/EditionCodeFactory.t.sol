@@ -131,8 +131,8 @@ contract EditionCodeFactoryTest is Test {
     function test_LinkedLibraries_ParamsAndScriptExtensionsWork() public {
         EditionCode clone = EditionCode(factory.deploy(_params()));
         // announced at init — proves AbxParamsLib-backed extensions initialized without reverting
-        assertEq(clone.extensionVersion(PARAMS_ID), 2);
-        assertEq(clone.extensionVersion(CONFIGURABLE_PARAMS_ID), 3); // v3: configure-hook blob args
+        assertEq(clone.extensionVersion(PARAMS_ID), 3);
+        assertEq(clone.extensionVersion(CONFIGURABLE_PARAMS_ID), 4); // v4: contextual errors args
         assertEq(clone.extensionVersion(ONCHAIN_SCRIPT_ID), 1);
         assertEq(clone.extensionVersion(DEPENDENCIES_ID), 1);
 

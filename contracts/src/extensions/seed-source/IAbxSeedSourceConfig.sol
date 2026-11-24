@@ -3,7 +3,8 @@ pragma solidity 0.8.28;
 
 /// @title IAbxSeedSourceConfig — Seed Source extension vocabulary (Register 2)
 /// @notice Mint-time randomness as **configuration, not hard-coded token logic**: the token
-///         stores a seed-source address; at mint it calls `IAbxSeedSource.seed(tokenId, to)`
+///         stores a seed-source address; at mint, when the token (an ERC-721 id, or an edition
+///         id with no live copies) has no `seed` yet, it calls `IAbxSeedSource.seed(tokenId, to)`
 ///         and persists the result as the token's `seed` param (`TokenParamConfigured`,
 ///         `updatedBy` = the source). Opt-out is first-class: zero (or omitting the extension)
 ///         = no mint-time seed — post-mint assignment under a schema, creator-curated seeds, or
@@ -15,7 +16,8 @@ pragma solidity 0.8.28;
 ///      settled. That promise is what lets a collector trust a generative mint without reading
 ///      the implementation.
 interface IAbxSeedSourceConfig {
-    /// @notice The seed source was set (non-zero ⇒ every mint derives a `seed`) or cleared.
+    /// @notice The seed source was set (non-zero ⇒ mints of tokens without a `seed` draw one) or
+    ///         cleared.
     event SeedSourceSet(address indexed seedSource);
 
     /// @notice The current seed source (`address(0)` = no mint-time seed).
