@@ -4573,7 +4573,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
         info(`  on-chain URI wiring rides the ${bold('deploy tx')} itself (tokenURI/contractURI renderers${mintCount > 0 ? ' + the reserve mint' : ''} in init) — no separate setup tx for it.`);
       }
       if (hasProgram && !codeDir) {
-        const expectation = expectedChainComplete(deps, depChecks);
+        const expectation = expectedChainComplete(deps, depChecks, !depRegistry);
         info(
           `  chain-complete expectation: ${expectation.expected === true ? g('yes') : expectation.expected === false ? 'no' : 'unknown'} — ${expectation.detail}` +
             ` ${dim('(abx verify reads onChainStatus from chain after deploy)')}`,
@@ -5265,7 +5265,7 @@ export async function cmdDeployCodeBody(flags: Flags, emit: (p: Record<string, u
     if (hasProgram) info(`animation_url computes on-chain via the generator ${generator} — it enumerates this token's params from chain, so there is no key list to maintain`);
     else info(`renderer-only — image + attributes computed on-chain by your Solidity renderer(s); no animation_url · ${g('fully on-chain')}, zero dependency outside the EVM`);
     if (hasProgram && !codeDir) {
-      const expectation = expectedChainComplete(deps, depChecks);
+      const expectation = expectedChainComplete(deps, depChecks, !depRegistry);
       info(`chain-complete expectation: ${expectation.expected === true ? g('yes') : expectation.expected === false ? 'no' : 'unknown'} — ${expectation.detail}`);
     } else if (codeDir) {
       info(`directory branch: no-server, not chain-complete — liveness rides the gateway; params ride the URL (8KB budget).`);

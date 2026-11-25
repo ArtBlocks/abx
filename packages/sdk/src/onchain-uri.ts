@@ -154,11 +154,20 @@ export async function hasParamEnumeration(client: GeneratorReadClient, contract:
 export function expectedChainComplete(
   deps: ParsedDependencyRef[],
   checks: DepCheck[],
+  /** True when the plan has no registry pointer at all (no registry configured for the chain and no
+   *  `--dep-registry`): no read was attempted, which is different from a read that failed. */
+  registryAbsent = false,
 ): {expected: boolean | null; detail: string} {
   if (deps.length === 0) return {expected: true, detail: 'no dependencies — the document assembles from the script chunks alone'};
   const registryDeps = deps.filter((d) => d.resolution === DEP_RESOLUTION.registry);
   if (registryDeps.length === 0) {
     return {expected: true, detail: 'all dependencies are on-chain data contracts (read directly)'};
+  }
+  if (registryAbsent) {
+    return {
+      expected: false,
+      detail: `${registryDeps.map((d) => d.display).join(', ')} cannot resolve entirely on-chain — no dependency registry pointer is set for this plan (none is configured for this chain and no --dep-registry was given), so the resolver falls back to its CDN`,
+    };
   }
   const byDep = new Map(checks.map((c) => [c.dep, c]));
   const cdnOnly: string[] = [];
